@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SuperMaker 16 — Multi-Genre SNES Game Editor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    /* ── Reset & Base ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg0:      #0f0f10;
+      --bg1:      #1a1a1e;
+      --bg2:      #252528;
+      --bg3:      #2d2d32;
+      --border:   #3a3a42;
+      --text:     #dcdcdc;
+      --muted:    #888896;
+      --gold:     #f0c040;
+      --gold2:    #c8962a;
+      --blue:     #569cd6;
+      --blue2:    #264f78;
+      --green:    #4ec94e;
+      --red:      #e05555;
+      --pixel:    'Press Start 2P', monospace;
+      --sans:     'Inter', system-ui, sans-serif;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg0);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── Pixel scanline overlay ───────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,.08) 2px,
+        rgba(0,0,0,.08) 4px
+      );
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    /* ── Utility ──────────────────────────────────────────────── */
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+    .pixel { font-family: var(--pixel); }
+    .gold  { color: var(--gold); }
+    .blue  { color: var(--blue); }
+    .muted { color: var(--muted); }
+
+    /* pixel border accent */
+    .pixel-border {
+      border: 2px solid var(--border);
+      box-shadow: 4px 4px 0 var(--bg0);
+    }
+
+    /* ── Nav ──────────────────────────────────────────────────── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(15,15,16,.92);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+    }
+    nav .inner {
+      display: flex; align-items: center; justify-content: space-between;
+      height: 56px; max-width: 1100px; margin: 0 auto; padding: 0 24px;
+    }
+    nav .logo {
+      font-family: var(--pixel);
+      font-size: 11px;
+      color: var(--gold);
+      letter-spacing: 1px;
+      text-decoration: none;
+    }
+    nav .logo span { color: var(--blue); }
+    nav .links { display: flex; gap: 24px; align-items: center; }
+    nav a {
+      color: var(--muted); font-size: 13px; font-weight: 500;
+      text-decoration: none; transition: color .2s;
+    }
+    nav a:hover { color: var(--text); }
+    nav .btn-nav {
+      background: var(--gold); color: #000;
+      padding: 8px 18px; border-radius: 2px;
+      font-weight: 600; font-size: 12px;
+      transition: background .2s;
+      font-family: var(--pixel);
+    }
+    nav .btn-nav:hover { background: var(--gold2); color: #000; }
+
+    /* ── Hero ─────────────────────────────────────────────────── */
+    .hero {
+      min-height: calc(100vh - 56px);
+      display: flex; align-items: center;
+      background:
+        radial-gradient(ellipse 80% 60% at 60% 40%, rgba(86,156,214,.07) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 50% at 20% 70%, rgba(240,192,64,.05) 0%, transparent 60%),
+        var(--bg0);
+      padding: 80px 0 60px;
+    }
+    .hero .container { display: flex; gap: 60px; align-items: center; flex-wrap: wrap; }
+
+    .hero-text { flex: 1; min-width: 280px; }
+    .hero-badge {
+      display: inline-block;
+      background: var(--bg3); border: 1px solid var(--border);
+      color: var(--green); font-family: var(--pixel); font-size: 8px;
+      padding: 6px 12px; margin-bottom: 28px;
+      letter-spacing: 2px;
+    }
+    .hero h1 {
+      font-family: var(--pixel);
+      font-size: clamp(18px, 3.5vw, 32px);
+      line-height: 1.6;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    .hero h1 .line2 { color: var(--gold); }
+    .hero h1 .line3 { color: var(--blue); }
+    .hero-sub {
+      font-size: 16px; color: var(--muted); margin: 24px 0 40px;
+      max-width: 480px; line-height: 1.75;
+    }
+    .hero-ctas { display: flex; gap: 12px; flex-wrap: wrap; }
+
+    .btn-primary {
+      background: var(--gold); color: #000;
+      font-family: var(--pixel); font-size: 10px;
+      padding: 14px 28px; border: none; cursor: pointer;
+      text-decoration: none; display: inline-block;
+      box-shadow: 4px 4px 0 var(--gold2);
+      transition: transform .1s, box-shadow .1s;
+    }
+    .btn-primary:hover { transform: translate(-2px,-2px); box-shadow: 6px 6px 0 var(--gold2); }
+    .btn-primary:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 var(--gold2); }
+
+    .btn-secondary {
+      background: transparent; color: var(--blue);
+      font-family: var(--pixel); font-size: 10px;
+      padding: 13px 24px; border: 2px solid var(--blue);
+      cursor: pointer; text-decoration: none; display: inline-block;
+      transition: background .2s, color .2s;
+    }
+    .btn-secondary:hover { background: var(--blue2); color: #fff; }
+
+    /* Hero window mockup */
+    .hero-visual { flex: 1; min-width: 300px; max-width: 520px; }
+    .window-chrome {
+      background: var(--bg2); border: 1px solid var(--border);
+      box-shadow: 8px 8px 0 rgba(0,0,0,.5);
+    }
+    .window-titlebar {
+      background: var(--bg3); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 14px; font-family: var(--pixel); font-size: 9px; color: var(--muted);
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .dot-r { background: #e05555; }
+    .dot-y { background: var(--gold); }
+    .dot-g { background: var(--green); }
+    .window-body { padding: 0; }
+
+    /* fake editor grid */
+    .fake-editor {
+      display: grid; grid-template-columns: 160px 1fr; height: 280px;
+      font-family: var(--pixel); font-size: 8px;
+    }
+    .fake-sidebar {
+      background: var(--bg1); border-right: 1px solid var(--border);
+      padding: 12px 8px; overflow: hidden;
+    }
+    .fake-sidebar .section-label {
+      color: var(--muted); font-size: 7px; margin-bottom: 6px; letter-spacing: 1px;
+    }
+    .fake-tree-item {
+      padding: 5px 8px; color: var(--text); font-size: 8px;
+      cursor: default; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .fake-tree-item.selected { background: var(--blue2); color: #fff; }
+    .fake-tree-item.child { padding-left: 20px; color: var(--muted); font-size: 7px; }
+
+    .fake-canvas {
+      background: #0a0a0c;
+      display: grid;
+      grid-template-columns: repeat(16, 1fr);
+      grid-template-rows: repeat(14, 1fr);
+      gap: 1px;
+      padding: 4px;
+      position: relative;
+    }
+    .fake-canvas .tile {
+      border-radius: 1px;
+    }
+
+    /* pixel palette */
+    .t0 { background: #1a1a2e; }
+    .t1 { background: #2a3a1a; }
+    .t2 { background: #3a2a1a; }
+    .t3 { background: #1a2a3a; }
+    .t4 { background: #2a1a3a; }
+    .t5 { background: #2c5282; }
+    .t6 { background: #276749; }
+    .t7 { background: #744210; }
+    .t8 { background: var(--bg1); }
+    .ts { background: #4a3728; }  /* solid */
+    .tw { background: #6b4c3b; }  /* wall */
+
+    .fake-canvas .entity-dot {
+      position: absolute;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--red);
+      border: 1px solid #fff;
+    }
+    .fake-canvas .player-dot {
+      position: absolute;
+      width: 6px; height: 8px;
+      background: var(--gold);
+      border: 1px solid #fff;
+    }
+
+    /* toolbar above canvas */
+    .fake-toolbar {
+      background: var(--bg3); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 6px; padding: 6px 10px;
+      flex-wrap: wrap;
+    }
+    .fake-btn {
+      background: var(--bg2); border: 1px solid var(--border);
+      color: var(--muted); font-family: var(--pixel); font-size: 7px;
+      padding: 3px 7px; cursor: default;
+    }
+    .fake-btn.active { background: var(--blue2); color: #fff; border-color: var(--blue); }
+    .fake-tag { color: var(--muted); font-size: 7px; }
+
+    /* ── Stats bar ────────────────────────────────────────────── */
+    .stats-bar {
+      background: var(--bg1); border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 32px 0;
+    }
+    .stats-bar .container {
+      display: flex; justify-content: center; gap: 60px; flex-wrap: wrap;
+    }
+    .stat { text-align: center; }
+    .stat .num {
+      font-family: var(--pixel); font-size: 22px; color: var(--gold);
+      display: block; margin-bottom: 6px;
+    }
+    .stat .label { font-size: 12px; color: var(--muted); }
+
+    /* ── Section shared ───────────────────────────────────────── */
+    section { padding: 96px 0; }
+    .section-title {
+      font-family: var(--pixel);
+      font-size: clamp(13px, 2.5vw, 18px);
+      color: var(--text); margin-bottom: 12px; line-height: 1.6;
+    }
+    .section-lead { font-size: 15px; color: var(--muted); max-width: 560px; line-height: 1.75; }
+
+    /* ── Features ─────────────────────────────────────────────── */
+    #features { background: var(--bg1); }
+    .features-header { text-align: center; margin-bottom: 64px; }
+    .features-header .section-lead { margin: 0 auto; }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px;
+    }
+    .feature-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      padding: 28px 24px;
+      transition: border-color .2s, transform .2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .feature-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--gold), transparent);
+      opacity: 0;
+      transition: opacity .2s;
+    }
+    .feature-card:hover { border-color: var(--blue); transform: translateY(-2px); }
+    .feature-card:hover::before { opacity: 1; }
+
+    .feature-icon {
+      font-size: 28px; margin-bottom: 16px; display: block;
+      filter: drop-shadow(0 0 6px rgba(240,192,64,.3));
+    }
+    .feature-title {
+      font-family: var(--pixel); font-size: 10px;
+      color: var(--gold); margin-bottom: 12px; line-height: 1.8;
+    }
+    .feature-desc { font-size: 13px; color: var(--muted); line-height: 1.75; }
+    .feature-tags { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag {
+      background: var(--bg3); border: 1px solid var(--border);
+      color: var(--muted); font-size: 10px; padding: 3px 8px;
+      font-family: var(--pixel); font-size: 8px;
+    }
+
+    /* ── AI Deep-dive ─────────────────────────────────────────── */
+    #ai-section { background: var(--bg0); }
+    .ai-layout { display: flex; gap: 60px; align-items: flex-start; flex-wrap: wrap; }
+    .ai-text { flex: 1; min-width: 260px; }
+    .ai-text .section-title { margin-bottom: 20px; }
+    .ai-text p { font-size: 14px; color: var(--muted); line-height: 1.8; margin-bottom: 16px; }
+    .ai-text ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .ai-text li {
+      display: flex; align-items: flex-start; gap: 10px;
+      font-size: 13px; color: var(--muted);
+    }
+    .ai-text li::before {
+      content: '▶';
+      color: var(--gold); font-size: 10px; flex-shrink: 0; margin-top: 3px;
+    }
+
+    .ai-panel {
+      flex: 1; min-width: 280px;
+      background: var(--bg2); border: 1px solid var(--border);
+      font-family: var(--pixel); font-size: 8px;
+    }
+    .ai-panel-title {
+      background: var(--bg3); border-bottom: 1px solid var(--border);
+      padding: 10px 14px; color: var(--muted); display: flex; align-items: center; gap: 8px;
+    }
+    .ai-panel-title span { color: var(--text); }
+    .ai-panel-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .ai-group-label { color: var(--muted); font-size: 7px; margin-bottom: 4px; letter-spacing: 1px; }
+    .ai-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .ai-row.three { grid-template-columns: repeat(3, 1fr); }
+    .ai-field { display: flex; flex-direction: column; gap: 4px; }
+    .ai-field label { color: var(--muted); font-size: 7px; }
+    .ai-field .val {
+      background: var(--bg1); border: 1px solid var(--border);
+      color: var(--blue); padding: 5px 8px; font-size: 8px;
+    }
+
+    /* ── How it works ─────────────────────────────────────────── */
+    #workflow { background: var(--bg1); }
+    .workflow-header { text-align: center; margin-bottom: 64px; }
+    .steps { display: flex; gap: 0; flex-wrap: wrap; position: relative; }
+    .step {
+      flex: 1; min-width: 200px;
+      text-align: center; padding: 32px 24px;
+      position: relative;
+    }
+    .step + .step::before {
+      content: '▶';
+      position: absolute; left: -10px; top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px; color: var(--border);
+    }
+    @media (max-width: 640px) { .step + .step::before { display: none; } }
+    .step-num {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: var(--bg3); border: 2px solid var(--gold);
+      font-family: var(--pixel); font-size: 14px; color: var(--gold);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+    }
+    .step h3 { font-family: var(--pixel); font-size: 9px; color: var(--text); margin-bottom: 10px; line-height: 1.8; }
+    .step p { font-size: 12px; color: var(--muted); line-height: 1.7; }
+
+    /* ── SDK & Extensibility ─────────────────────────────────── */
+    #sdk { background: var(--bg0); }
+    .sdk-layout { display: flex; gap: 56px; flex-wrap: wrap; align-items: flex-start; }
+    .sdk-col { flex: 1; min-width: 280px; }
+
+    .license-cards { display: flex; flex-direction: column; gap: 12px; margin-top: 24px; }
+    .license-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      padding: 20px 22px; display: flex; flex-direction: column; gap: 8px;
+    }
+    .license-card.open  { border-left: 3px solid var(--green); }
+    .license-card.closed { border-left: 3px solid var(--blue); }
+    .lc-head { display: flex; align-items: center; gap: 10px; }
+    .lc-icon { font-size: 18px; }
+    .lc-title { font-family: var(--pixel); font-size: 9px; color: var(--text); }
+    .lc-badge {
+      font-family: var(--pixel); font-size: 7px; padding: 3px 8px;
+      margin-left: auto;
+    }
+    .lc-badge.open-badge  { background: rgba(78,201,78,.15); color: var(--green); border: 1px solid var(--green); }
+    .lc-badge.prop-badge  { background: rgba(86,156,214,.12); color: var(--blue);  border: 1px solid var(--blue); }
+    .lc-desc { font-size: 12px; color: var(--muted); line-height: 1.7; }
+    .lc-link {
+      font-family: var(--pixel); font-size: 8px; color: var(--blue);
+      text-decoration: none; align-self: flex-start; margin-top: 4px;
+      transition: color .2s;
+    }
+    .lc-link:hover { color: #fff; }
+
+    .lang-list { display: flex; flex-direction: column; gap: 10px; margin-top: 24px; }
+    .lang-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      padding: 16px 20px; display: flex; align-items: flex-start; gap: 16px;
+    }
+    .lang-name {
+      font-family: var(--pixel); font-size: 11px; color: var(--text);
+      min-width: 48px; margin-top: 2px;
+    }
+    .lang-body { flex: 1; }
+    .lang-body p { font-size: 12px; color: var(--muted); line-height: 1.7; }
+    .lang-status {
+      font-family: var(--pixel); font-size: 7px;
+      padding: 3px 9px; margin-bottom: 6px; display: inline-block;
+    }
+    .status-now     { background: rgba(78,201,78,.15); color: var(--green); border: 1px solid var(--green); }
+    .status-planned { background: rgba(240,192,64,.1);  color: var(--gold);  border: 1px solid var(--gold2); }
+
+    /* ── Download CTA ─────────────────────────────────────────── */
+    #download {
+      background: radial-gradient(ellipse 80% 80% at 50% 50%, rgba(86,156,214,.08) 0%, transparent 70%), var(--bg1);
+      text-align: center;
+    }
+    #download .section-title { margin-bottom: 16px; }
+    #download .section-lead { margin: 0 auto 48px; text-align: center; }
+    .dl-buttons { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+
+    .dl-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      padding: 32px 36px; min-width: 240px;
+      display: flex; flex-direction: column; align-items: center; gap: 16px;
+      transition: border-color .2s;
+    }
+    .dl-card:hover { border-color: var(--gold); }
+    .dl-card .platform { font-family: var(--pixel); font-size: 9px; color: var(--muted); }
+    .dl-card .version { font-size: 11px; color: var(--muted); }
+    .dl-card .btn-primary { font-size: 9px; padding: 12px 24px; }
+
+    /* ── Footer ───────────────────────────────────────────────── */
+    footer {
+      background: var(--bg0); border-top: 1px solid var(--border);
+      padding: 40px 0;
+    }
+    footer .inner {
+      max-width: 1100px; margin: 0 auto; padding: 0 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 16px;
+    }
+    footer .logo { font-family: var(--pixel); font-size: 10px; color: var(--gold); }
+    footer .tagline { font-size: 12px; color: var(--muted); }
+    footer .foot-links { display: flex; gap: 20px; }
+    footer a { color: var(--muted); font-size: 12px; text-decoration: none; transition: color .2s; }
+    footer a:hover { color: var(--blue); }
+
+    /* ── Responsive ───────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .hero .container { flex-direction: column; }
+      .hero-visual { width: 100%; }
+      .ai-layout { flex-direction: column; }
+      nav .links .hide-sm { display: none; }
+    }
+
+    /* ── Scroll fade-in animation ─────────────────────────────── */
+    .reveal {
+      opacity: 0; transform: translateY(24px);
+      transition: opacity .5s ease, transform .5s ease;
+    }
+    .reveal.visible { opacity: 1; transform: none; }
+  </style>
+</head>
+<body>
+
+<!-- ── Nav ── -->
+<nav>
+  <div class="inner">
+    <a class="logo" href="#">SUPER<span>MAKER</span> 16</a>
+    <div class="links">
+      <a href="#features" class="hide-sm">Features</a>
+      <a href="#workflow" class="hide-sm">How It Works</a>
+      <a href="#sdk" class="hide-sm">SDK</a>
+      <a href="https://github.com" class="hide-sm" target="_blank" rel="noopener">GitHub</a>
+      <a href="#download" class="btn-nav">Download</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ── Hero ── -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-text reveal">
+      <div class="hero-badge">▶ ENGINE SDK OPEN SOURCE</div>
+      <h1>
+        BUILD YOUR<br>
+        <span class="line2">16-BIT WORLD</span><br>
+        <span class="line3">YOUR WAY</span>
+      </h1>
+      <p class="hero-sub">
+        A powerful, multi-genre game editor for creating authentic SNES-style games —
+        tile maps, enemy AI, animations, and ROM builds, all in one place.
+      </p>
+      <div class="hero-ctas">
+        <a href="#download" class="btn-primary">⬇ Download Editor</a>
+        <a href="https://github.com" class="btn-secondary" target="_blank" rel="noopener">View on GitHub</a>
+      </div>
+    </div>
+
+    <!-- Fake editor window -->
+    <div class="hero-visual reveal">
+      <div class="window-chrome">
+        <div class="window-titlebar">
+          <span class="dot dot-r"></span>
+          <span class="dot dot-y"></span>
+          <span class="dot dot-g"></span>
+          <span style="margin-left:8px">SuperMaker 16 — dungeon1 / cave_b2.map</span>
+        </div>
+        <div class="fake-toolbar">
+          <span class="fake-btn active">BG1</span>
+          <span class="fake-btn">BG2</span>
+          <span class="fake-btn active">Grid</span>
+          <span class="fake-btn active">Spawns</span>
+          <span class="fake-btn">Floor/Ceil</span>
+          <span style="flex:1"></span>
+          <span class="fake-btn">1x</span>
+          <span class="fake-btn">2x</span>
+        </div>
+        <div class="fake-editor">
+          <div class="fake-sidebar">
+            <div class="section-label">ROOMS</div>
+            <div class="fake-tree-item">▼ Dungeon 1</div>
+            <div class="fake-tree-item child">cave_b1</div>
+            <div class="fake-tree-item child selected">cave_b2</div>
+            <div class="fake-tree-item child">cave_b3</div>
+            <div class="fake-tree-item child">cave_boss</div>
+            <div class="fake-tree-item" style="margin-top:10px">▼ Dungeon 2</div>
+            <div class="fake-tree-item child">tower_1f</div>
+            <div class="fake-tree-item child">tower_2f</div>
+          </div>
+          <div style="display:flex;flex-direction:column;overflow:hidden;">
+            <div id="mapCanvas" class="fake-canvas"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Stats ── -->
+<div class="stats-bar">
+  <div class="container">
+    <div class="stat reveal"><span class="num">16-BIT</span><span class="label">Authentic SNES hardware target</span></div>
+    <div class="stat reveal"><span class="num">6+</span><span class="label">Specialized editor panels</span></div>
+    <div class="stat reveal"><span class="num">1-CLICK</span><span class="label">Compile to ROM</span></div>
+    <div class="stat reveal"><span class="num">∞</span><span class="label">Genres &amp; projects</span></div>
+  </div>
+</div>
+
+<!-- ── Features ── -->
+<section id="features">
+  <div class="container">
+    <div class="features-header reveal">
+      <p class="muted pixel" style="font-size:9px;margin-bottom:12px;letter-spacing:2px">// FEATURES</p>
+      <h2 class="section-title">Everything you need to ship a 16-bit game</h2>
+      <p class="section-lead">
+        SuperMaker 16 covers the full production loop — from painting tile maps
+        to tuning enemy frame data — so you can focus on making the game, not the tooling.
+      </p>
+    </div>
+    <div class="features-grid">
+
+      <div class="feature-card reveal">
+        <span class="feature-icon">🗺️</span>
+        <div class="feature-title">Level Editor</div>
+        <p class="feature-desc">
+          Design multi-room dungeons with a tree-based room hierarchy.
+          Paint BG1 &amp; BG2 tile layers, toggle grid overlays, and
+          visualize spawn regions, floor/ceiling bounds, and player start positions at a glance.
+        </p>
+        <div class="feature-tags">
+          <span class="tag">BG1 / BG2</span>
+          <span class="tag">Spawn Regions</span>
+          <span class="tag">Multi-Dungeon</span>
+        </div>
+      </div>
+
+      <div class="feature-card reveal">
+        <span class="feature-icon">👾</span>
+        <div class="feature-title">Entity Designer</div>
+        <p class="feature-desc">
+          Configure every character in your game — health, attack power, movement speed,
+          portrait selection, and semantic animation role mapping — all in one dialog.
+          Changes export directly to the SNES build.
+        </p>
+        <div class="feature-tags">
+          <span class="tag">Stats</span>
+          <span class="tag">Portraits</span>
+          <span class="tag">Anim Roles</span>
+        </div>
+      </div>
+
+      <div class="feature-card reveal">
+        <span class="feature-icon">🤖</span>
+        <div class="feature-title">AI Profile Editor</div>
+        <p class="feature-desc">
+          Fine-tune enemy behavior with frame-perfect combat data: approach speed, orbit radius,
+          attack startup / active / recovery windows, hitstun, knockback, getup, and
+          post-attack retreat logic. No code required.
+        </p>
+        <div class="feature-tags">
+          <span class="tag">Frame Data</span>
+          <span class="tag">Hitboxes</span>
+          <span class="tag">Behavior</span>
+        </div>
+      </div>
+
+      <div class="feature-card reveal">
+        <span class="feature-icon">🎬</span>
+        <div class="feature-title">Animation System</div>
+        <p class="feature-desc">
+          Import sprite sheets, browse individual frames with the frame picker, and define
+          named animation ranges. Map animation names to semantic roles like
+          <em>idle</em>, <em>walk</em>, <em>attack1</em> used throughout the engine.
+        </p>
+        <div class="feature-tags">
+          <span class="tag">Frame Picker</span>
+          <span class="tag">Import</span>
+          <span class="tag">Roles</span>
+        </div>
+      </div>
+
+      <div class="feature-card reveal">
+        <span class="feature-icon">🔨</span>
+        <div class="feature-title">Integrated Build</div>
+        <p class="feature-desc">
+          Hit <em>Rebuild</em> to run the full pipeline: code generation, Wiz compiler,
+          and resource insertion — producing a playable <code style="color:var(--blue)">.sfc</code> ROM
+          without ever leaving the editor.
+        </p>
+        <div class="feature-tags">
+          <span class="tag">Wiz Compiler</span>
+          <span class="tag">ROM Output</span>
+          <span class="tag">One-Click</span>
+        </div>
+      </div>
+
+      <div class="feature-card reveal">
+        <span class="feature-icon">📁</span>
+        <div class="feature-title">Project Workflow</div>
+        <p class="feature-desc">
+          Everything lives in a portable project folder with a simple JSON config.
+          Open recent projects instantly, and support multiple genres
+          from beat 'em ups to RPGs — configured per-project.
+        </p>
+        <div class="feature-tags">
+          <span class="tag">Multi-Genre</span>
+          <span class="tag">JSON Config</span>
+          <span class="tag">Portable</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── AI Deep-dive ── -->
+<section id="ai-section">
+  <div class="container">
+    <div class="ai-layout">
+      <div class="ai-text reveal">
+        <p class="muted pixel" style="font-size:9px;margin-bottom:12px;letter-spacing:2px">// ENEMY AI</p>
+        <h2 class="section-title">Frame-perfect enemy AI,<br/><span class="gold">no code required</span></h2>
+        <p>
+          Great beat 'em ups live and die by enemy feel. SuperMaker 16 gives you
+          fine-grained control over every frame of enemy behavior through a
+          structured AI Profile — the same data that drives the SNES runtime.
+        </p>
+        <p>
+          Adjust values in real time, rebuild the ROM, and test in your emulator —
+          rapid iteration without touching a single line of assembly.
+        </p>
+        <ul>
+          <li>Approach speed, orbit radius, and hunch thresholds for positioning logic</li>
+          <li>Startup, active, and recovery frame windows for attack timing</li>
+          <li>Independent hitstun, knockdown, getup, and grab stun durations</li>
+          <li>Probabilistic retreat, shuffle distance, and post-attack repositioning</li>
+          <li>Per-entity knockback speed and damage values for hit feel</li>
+        </ul>
+      </div>
+
+      <div class="ai-panel reveal">
+        <div class="ai-panel-title">
+          Edit Entity — <span>Goblin Guard</span>
+        </div>
+        <div class="ai-panel-body">
+
+          <div>
+            <div class="ai-group-label">MOVEMENT</div>
+            <div class="ai-row">
+              <div class="ai-field"><label>Approach Speed</label><div class="val">1.5</div></div>
+              <div class="ai-field"><label>Orbit Radius</label><div class="val">48</div></div>
+            </div>
+            <div class="ai-row" style="margin-top:8px">
+              <div class="ai-field"><label>Hunch Threshold</label><div class="val">80</div></div>
+              <div class="ai-field"><label>Attack Range</label><div class="val">32</div></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="ai-group-label">ATTACK TIMING (frames)</div>
+            <div class="ai-row three">
+              <div class="ai-field"><label>Commit</label><div class="val">12</div></div>
+              <div class="ai-field"><label>Startup</label><div class="val">6</div></div>
+              <div class="ai-field"><label>Active</label><div class="val">4</div></div>
+            </div>
+            <div class="ai-row" style="margin-top:8px">
+              <div class="ai-field"><label>Recovery</label><div class="val">18</div></div>
+              <div class="ai-field"><label>Orbit Reroll</label><div class="val">30</div></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="ai-group-label">STUN / RECOVERY</div>
+            <div class="ai-row three">
+              <div class="ai-field"><label>Hitstun</label><div class="val">10</div></div>
+              <div class="ai-field"><label>Knockdown</label><div class="val">40</div></div>
+              <div class="ai-field"><label>Getup</label><div class="val">24</div></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="ai-group-label">POST-ATTACK</div>
+            <div class="ai-row three">
+              <div class="ai-field"><label>Retreat %</label><div class="val">40</div></div>
+              <div class="ai-field"><label>Shuffle Dist</label><div class="val">24</div></div>
+              <div class="ai-field"><label>Retreat Dist</label><div class="val">64</div></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── How it works ── -->
+<section id="workflow">
+  <div class="container">
+    <div class="workflow-header reveal">
+      <p class="muted pixel" style="font-size:9px;margin-bottom:12px;letter-spacing:2px">// WORKFLOW</p>
+      <h2 class="section-title">From idea to ROM in four steps</h2>
+    </div>
+    <div class="steps">
+      <div class="step reveal">
+        <div class="step-num">1</div>
+        <h3>Create a Project</h3>
+        <p>Start a new project, pick your genre, and point SuperMaker at your resources folder.</p>
+      </div>
+      <div class="step reveal">
+        <div class="step-num">2</div>
+        <h3>Design Your World</h3>
+        <p>Paint dungeons room by room, place entities, configure spawn regions and player start.</p>
+      </div>
+      <div class="step reveal">
+        <div class="step-num">3</div>
+        <h3>Tune Your Entities</h3>
+        <p>Set stats, portraits, animation roles, and full AI profiles for every enemy and NPC.</p>
+      </div>
+      <div class="step reveal">
+        <div class="step-num">4</div>
+        <h3>Build &amp; Play</h3>
+        <p>Hit Rebuild. The editor runs the full pipeline and outputs a playable SNES ROM.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── SDK & Extensibility ── -->
+<section id="sdk">
+  <div class="container">
+    <div class="sdk-layout">
+
+      <!-- Licensing -->
+      <div class="sdk-col reveal">
+        <p class="muted pixel" style="font-size:9px;margin-bottom:12px;letter-spacing:2px">// LICENSING</p>
+        <h2 class="section-title">Open engine.<br/><span class="gold">Proprietary editor.</span></h2>
+        <p class="section-lead" style="margin-top:16px">
+          The SNES engine &amp; SDK that powers your game is fully open source —
+          fork it, study it, ship your own game with it.
+          The SuperMaker 16 editor is proprietary software, free to download and use.
+        </p>
+        <div class="license-cards">
+          <div class="license-card open">
+            <div class="lc-head">
+              <span class="lc-icon">🔓</span>
+              <span class="lc-title">SNES Engine &amp; SDK</span>
+              <span class="lc-badge open-badge">OPEN SOURCE</span>
+            </div>
+            <div class="lc-desc">
+              The full 65816 engine — entity system, behavior VM, rendering, DMA, audio —
+              is open source and available on GitHub. Build on it, learn from it, contribute to it.
+            </div>
+            <a href="https://github.com" class="lc-link" target="_blank" rel="noopener">→ View Engine on GitHub</a>
+          </div>
+          <div class="license-card closed">
+            <div class="lc-head">
+              <span class="lc-icon">🔒</span>
+              <span class="lc-title">SuperMaker 16 Editor</span>
+              <span class="lc-badge prop-badge">PROPRIETARY</span>
+            </div>
+            <div class="lc-desc">
+              The editor is free to download and use but its source is not publicly available
+              at this time. Binaries are distributed for Windows.
+            </div>
+            <a href="#download" class="lc-link">→ Download Editor</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Extensibility -->
+      <div class="sdk-col reveal">
+        <p class="muted pixel" style="font-size:9px;margin-bottom:12px;letter-spacing:2px">// EXTENSIBILITY</p>
+        <h2 class="section-title">Write game logic<br/><span class="blue">your way</span></h2>
+        <p class="section-lead" style="margin-top:16px">
+          SuperMaker 16 is designed to be extended. Game logic lives in source files
+          alongside the engine, so you bring your own language — today with Wiz,
+          with more on the way.
+        </p>
+        <div class="lang-list">
+          <div class="lang-card">
+            <div class="lang-name">Wiz</div>
+            <div class="lang-body">
+              <span class="lang-status status-now">✓ Available Now</span>
+              <p>The native language of the engine. Full access to every API, zero overhead.
+              Write entities, behaviors, and game systems directly in the same language
+              as the engine itself.</p>
+            </div>
+          </div>
+          <div class="lang-card">
+            <div class="lang-name">ca65</div>
+            <div class="lang-body">
+              <span class="lang-status status-planned">⧖ Planned</span>
+              <p>Support for the popular ca65 assembler is on the roadmap, enabling
+              compatibility with existing SNES assembly codebases and toolchains.</p>
+            </div>
+          </div>
+          <div class="lang-card">
+            <div class="lang-name">C</div>
+            <div class="lang-body">
+              <span class="lang-status status-planned">⧖ Planned</span>
+              <p>A C language binding is planned, making SuperMaker 16 accessible to a
+              much broader audience without requiring assembly knowledge.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── Download ── -->
+<section id="download">
+  <div class="container">
+    <p class="muted pixel" style="font-size:9px;margin-bottom:12px;letter-spacing:2px;text-align:center">// DOWNLOAD</p>
+    <h2 class="section-title reveal">Ready to build your 16-bit world?</h2>
+    <p class="section-lead reveal">
+      The editor is free to download for Windows. The engine SDK powering your game
+      is open source and available on GitHub.
+    </p>
+    <div class="dl-buttons reveal">
+      <div class="dl-card">
+        <span style="font-size:36px">🪟</span>
+        <span class="platform">Editor — Windows x64</span>
+        <span class="version" style="color:var(--blue);font-family:var(--pixel);font-size:8px">PROPRIETARY · FREE TO USE</span>
+        <a href="https://github.com" class="btn-primary" target="_blank" rel="noopener">⬇ Download .zip</a>
+      </div>
+      <div class="dl-card">
+        <span style="font-size:36px">🔓</span>
+        <span class="platform">Engine SDK</span>
+        <span class="version" style="color:var(--green);font-family:var(--pixel);font-size:8px">OPEN SOURCE</span>
+        <a href="https://github.com" class="btn-secondary" target="_blank" rel="noopener" style="font-family:var(--pixel);font-size:9px;padding:12px 24px">View on GitHub</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ── -->
+<footer>
+  <div class="inner">
+    <div>
+      <div class="logo">SUPERMAKER 16</div>
+      <div class="tagline" style="margin-top:6px">For devs who think 16-bit was peak gaming.</div>
+    </div>
+    <div class="foot-links">
+      <a href="https://github.com" target="_blank" rel="noopener">GitHub</a>
+      <a href="#features">Features</a>
+      <a href="#download">Download</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Animate the fake tile map
+  (function() {
+    const canvas = document.getElementById('mapCanvas');
+    if (!canvas) return;
+    const COLS = 16, ROWS = 14;
+    const map = [
+      'tw','tw','tw','tw','tw','tw','tw','tw','tw','tw','tw','tw','tw','tw','tw','tw',
+      'tw','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','tw',
+      'tw','t6','ts','ts','t6','t6','t6','t6','t6','t6','ts','ts','t6','t6','t6','tw',
+      'tw','t6','ts','ts','t6','t6','t6','t6','t6','t6','ts','ts','t6','t6','t6','tw',
+      'tw','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','tw',
+      'tw','t6','t6','t6','t8','t8','t6','t6','t6','t8','t8','t6','t6','t6','t6','tw',
+      'tw','t6','t6','t6','t8','t8','t6','t6','t6','t8','t8','t6','t6','t6','t6','tw',
+      'tw','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','tw',
+      'tw','t6','t6','t6','t6','t6','t5','t5','t5','t6','t6','t6','t6','t6','t6','tw',
+      'tw','t6','t6','t6','t6','t6','t5','t7','t5','t6','t6','t6','t6','t6','t6','tw',
+      'tw','t6','t6','t6','t6','t6','t5','t5','t5','t6','t6','t6','t6','t6','t6','tw',
+      'tw','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','tw',
+      'tw','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','tw',
+      'tw','tw','tw','tw','tw','tw','tw','tw','tw','tw','tw','tw','tw','tw','tw','tw',
+    ];
+    map.forEach(cls => {
+      const tile = document.createElement('div');
+      tile.className = 'tile ' + cls;
+      canvas.appendChild(tile);
+    });
+
+    // entity dots
+    const entities = [
+      {top:'22%', left:'28%'},
+      {top:'55%', left:'60%'},
+      {top:'38%', left:'72%'},
+    ];
+    entities.forEach(pos => {
+      const dot = document.createElement('div');
+      dot.className = 'entity-dot';
+      dot.style.top = pos.top; dot.style.left = pos.left;
+      canvas.appendChild(dot);
+    });
+
+    // player dot
+    const player = document.createElement('div');
+    player.className = 'player-dot';
+    player.style.top = '64%'; player.style.left = '44%';
+    canvas.appendChild(player);
+  })();
+
+  // Scroll reveal
+  const reveals = document.querySelectorAll('.reveal');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); } });
+  }, { threshold: 0.1 });
+  reveals.forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
