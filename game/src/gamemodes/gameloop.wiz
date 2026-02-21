@@ -118,7 +118,7 @@ func exec {
 
         // ms_palettes.process();
 
-        debug_skip.check_skip_buttons();
+        // debug_skip.check_skip_buttons();
 
         // Update HUD (health bars, timer, etc.) before VBlank
         hud.update();
