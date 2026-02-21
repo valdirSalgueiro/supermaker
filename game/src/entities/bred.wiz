@@ -1,0 +1,125 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+// Bred - Basic Grunt Enemy
+// ========================
+// Uses grunt_ai for arcade-style beat 'em up behavior.
+// This file handles initialization and delegates to grunt_ai.process().
+
+import "../memmap";
+
+import "engine/entity_api";
+import "engine/vram-slots";
+import "engine/game/metasprites";
+
+import "grunt_ai";
+import "grunt_anim";
+
+import "gen/entities";
+
+
+namespace entities {
+namespace bred {
+
+
+in code {
+
+
+// Entity init routine.
+//
+// Called when the entity is spawned
+//
+// DB = 0x7e
+#[mem8, idx8]
+func init(entityId : u8 in y, parameter : u8 in a) {
+    // Save init parameter
+    push8(a);
+    
+    // Try to allocate a VRAM slot for dynamic sprites
+    push8(y);  // Save entityId
+    a = vram_slots.allocate_slot();
+    y = pop8();  // Restore entityId
+    
+    if a == vram_slots.NO_SLOT {
+        // No slot available - fail spawn by setting health to 0
+        entities.SoA.health[unaligned y] = a = 0;
+        a = pop8();  // Clean up stack
+        return;
+    }
+    
+    // Store allocated slot
+    entities.SoA.dynamicVramSlot[unaligned y] = a;
+    
+    // Set queue tiles function for dynamic sprite DMA (use generic Dynamic function)
+    a = MsQueueTilesFunction.Dynamic as u8;
+    entities.SoA.msQueueTilesFunction[unaligned y] = a as MsQueueTilesFunction;
+    
+    // Restore init parameter
+    a = pop8();
+
+    // Initialize AI state based on spawn direction
+    // var_0_l = aiState (SPAWN_IN)
+    // var_0_h = aiTimer (spawn walk-in frames)
+    // var_1_l = facing
+    // var_1_h = yLaneOffset
+    
+    entities.SoA.var_0_l[unaligned y] = a = grunt_ai.GruntState.SPAWN_IN as u8;
+    entities.SoA.var_0_h[unaligned y] = a = 30;  // Walk in for 30 frames
+    entities.SoA.var_1_h[unaligned y] = a = 0;   // No Y offset initially
+    entities.SoA.var_2_h[unaligned y] = a = grunt_ai.ORBIT_REROLL;
+
+    // Clear variant index (spawn uses walk with no variants)
+    grunt_anim.clear_variant(y);
+
+    // Set initial facing based on spawn parameter
+    if a == init_parameter.left as u8 {
+        entities.SoA.var_1_l[unaligned y] = a = grunt_ai.Facing.LEFT;
+        set_ms_animation(y, ms_animations.walkh);   // Walk left (base sprite)
+    }
+    else {
+        // Default to right for other directions (including right, up, down)
+        entities.SoA.var_1_l[unaligned y] = a = grunt_ai.Facing.RIGHT;
+        set_ms_animation(y, ms_animations.walk);  // Walk right (h-flip)
+    }
+}
+
+
+
+// Entity process routine.
+//
+// Called once per frame.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process(entityId : u8 in y) {
+    // Delegate to grunt AI (handles state machine, movement)
+    grunt_ai.process(y);
+
+    // Update animation based on AI state (handles posture, variants, h-flip)
+    grunt_anim.update_animation(y);
+}
+
+
+// Set metasprite animation
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func set_ms_animation(entityId : u8 in y, animId : u8 in a) {
+    metasprites.set_entity_animation(y, a);
+}
+
+// Set metasprite animation only if different
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func set_ms_animation_if_changed(entityId : u8 in y, animId : u8 in a) {
+    if a != entities.SoA.msAnimationId[unaligned y] {
+        metasprites.set_entity_animation(y, a);
+    }
+}
+
+
+}
+
+}
+}

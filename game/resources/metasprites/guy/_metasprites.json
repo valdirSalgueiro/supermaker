@@ -1,0 +1,328 @@
+{
+  "name": "guy",
+  "palette": "guy",
+  "firstTile": 0,
+  "endTile": 48,
+  "dynamic": true,
+  "framesets": [
+    {
+      "name": "Guy",
+      "source": "FF_Guy.png",
+      "frameWidth": 128,
+      "frameHeight": 128,
+      "autoFlip": "h",
+      "frames": [
+        "frame0",
+        "frame1",
+        "frame2",
+        "frame3",
+        "frame4",
+        "frame5",
+        "frame6",
+        "frame7",
+        "frame8",
+        "frame9",
+        "frame10",
+        "frame11",
+        "frame12",
+        "frame13",
+        "frame14",
+        "frame15",
+        "frame16",
+        "frame17",
+        "frame18",
+        "frame19",
+        "frame20",
+        "frame21",
+        "frame22",
+        "frame23",
+        "frame24",
+        "frame25",
+        "frame26",
+        "frame27",
+        "frame28",
+        "frame29",
+        "frame30",
+        "frame31",
+        "frame32",
+        "frame33",
+        "frame34",
+        "frame35",
+        "frame36",
+        "frame37",
+        "frame38",
+        "frame39",
+        "frame40",
+        "frame41",
+        "frame42",
+        "frame43",
+        "frame44",
+        "frame45",
+        "frame46",
+        "frame47",
+        "frame48",
+        "frame49",
+        "frame50",
+        "frame51",
+        "frame52",
+        "frame53",
+        "frame54",
+        "frame55",
+        "frame56",
+        "frame57",
+        "frame58",
+        "frame59",
+        "frame60",
+        "frame61",
+        "frame62",
+        "frame63",
+        "frame64",
+        "frame65",
+        "frame66",
+        "frame67",
+        "frame68"
+      ],
+      "animations": {
+        "idle": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame0"
+          ],
+          "loop": true
+        },
+        "walk": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame1",
+            "frame2",
+            "frame3",
+            "frame4",
+            "frame5",
+            "frame6",
+            "frame7",
+            "frame8",
+            "frame9",
+            "frame10",
+            "frame11",
+            "frame12"
+          ],
+          "loop": true
+        },
+        "punch1": {
+          "delay-type": "frame",
+          "fixed-delay": 1,
+          "frames": [
+            "frame13",
+            "frame14",
+            "frame14"
+          ],
+          "loop": false
+        },
+        "punch2": {
+          "delay-type": "frame",
+          "fixed-delay": 4,
+          "frames": [
+            "frame15",
+            "frame16"
+          ],
+          "loop": false
+        },
+        "punch3": {
+          "delay-type": "frame",
+          "fixed-delay": 4,
+          "frames": [
+            "frame17",
+            "frame18"
+          ],
+          "loop": false
+        },
+        "kick": {
+          "delay-type": "frame",
+          "fixed-delay": 3,
+          "frames": [
+            "frame19",
+            "frame20",
+            "frame21",
+            "frame22",
+            "frame23"
+          ],
+          "loop": false
+        },
+        "special": {
+          "delay-type": "frame",
+          "fixed-delay": 4,
+          "frames": [
+            "frame27",
+            "frame28",
+            "frame29",
+            "frame30",
+            "frame31",
+            "frame32",
+            "frame33",
+            "frame34",
+            "frame35",
+            "frame36"
+          ],
+          "loop": false
+        },
+        "air_elbow": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame50"
+          ],
+          "loop": false
+        },
+        "jump_start": {
+          "delay-type": "frame",
+          "fixed-delay": 1,
+          "frames": [
+            "frame24"
+          ],
+          "loop": false
+        },
+        "jump": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame25"
+          ],
+          "loop": true
+        },
+        "jump_kick": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame53",
+            "frame54",
+            "frame54",
+            "frame54",
+            "frame54",
+            "frame54",
+            "frame54",
+            "frame53"
+          ],
+          "loop": false
+        },
+        "leap_sequence": {
+          "delay-type": "frame",
+          "fixed-delay": 6,
+          "frames": [
+            "frame25",
+            "frame44",
+            "frame45",
+            "frame46"
+          ],
+          "loop": false
+        },
+        "leap_kick": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame38",
+            "frame39",
+            "frame39",
+            "frame39",
+            "frame39",
+            "frame39",
+            "frame39",
+            "frame38"
+          ],
+          "loop": false
+        },
+        "grab": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame57"
+          ],
+          "loop": false
+        },
+        "grab_kick": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame58"
+          ],
+          "loop": false
+        },
+        "grab_throw": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame59",
+            "frame60"
+          ],
+          "loop": false
+        },
+        "hurt": {
+          "delay-type": "frame",
+          "fixed-delay": 6,
+          "frames": [
+            "frame61"
+          ],
+          "loop": false
+        },
+        "knockdown": {
+          "delay-type": "frame",
+          "fixed-delay": 8,
+          "frames": [
+            "frame62",
+            "frame63",
+            "frame64"
+          ],
+          "loop": false
+        },
+        "recover": {
+          "delay-type": "frame",
+          "fixed-delay": 12,
+          "frames": [
+            "frame64",
+            "frame65",
+            "frame64",
+            "frame65",
+            "frame68"
+          ],
+          "loop": false
+        },
+        "pickup": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame68"
+          ],
+          "loop": false
+        }
+      },
+      "hitboxes": {
+        "frame14": "101 41 27 20",
+        "frame16": "87 60 41 16",
+        "frame18": "89 49 26 14",
+        "frame22-frame23": "79 42 40 86",
+        "frame30": "87 42 41 86",
+        "frame32": "0 42 39 86",
+        "frame37": "41 85 75 19",
+        "frame40": "76 50 30 25",
+        "frame35": "88 42 40 86",
+        "frame58": "64 64 26 28"
+      },
+      "hurtboxes": {
+        "frame0-frame60": "38 42 50 86"
+      },
+      "bounds": "45 42 40 86",
+      "offsets": {
+        "frame19": "8 0",
+        "frame15": "-25 0",
+        "frame16": "-1 0",
+        "frame27": "8 0",
+        "frame28": "5 0",
+        "frame29": "1 0",
+        "frame30": "3 0"
+      },
+      "order": 2,
+      "defaultLayout": "auto 0 0"
+    }
+  ]
+}

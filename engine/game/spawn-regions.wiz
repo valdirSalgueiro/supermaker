@@ -1,0 +1,711 @@
+// Spawn Region System
+// ====================
+// Final Fight-style locked combat room system for beat 'em up gameplay.
+//
+// Design principles:
+// - One active region at a time
+// - Camera locks when region activates, unlocks when cleared
+// - Enemies spawn via explicit spawners (doors/edges), never pre-placed
+// - Sequential spawn entry consumption with cooldown timer
+// - Forward-only camera progression (no backtracking)
+//
+// Copyright (c) 2024
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+import "../entity_api";
+import "entityloop";
+import "camera";
+
+
+namespace spawn_regions {
+
+
+// ═══════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════
+
+let SCREEN_WIDTH = 256;
+
+// Maximum spawn entries per region (fixed array size)
+let MAX_SPAWN_ENTRIES = 8;
+
+// Maximum regions per room
+let MAX_REGIONS = 4;
+
+// Invalid spawner ID (invisible edge spawn)
+let NO_SPAWNER = 0xFFFF;
+
+// Region flags (16-bit for alignment)
+namespace RegionFlags {
+    let LOCK_CAMERA = 0x0001;  // Lock camera when region active
+    let ACTIVE      = 0x8000;  // Runtime: region is currently active
+    let CLEARED     = 0x4000;  // Runtime: region has been cleared
+}
+
+// Clear bits for ~ACTIVE (Wiz needs explicit constant)
+let NOT_ACTIVE = 0x7FFF;
+
+// Offscreen spawn margin (pixels past screen edge)
+let SPAWN_MARGIN = 24;
+
+
+// ═══════════════════════════════════════════════════════════════
+// ROM DATA STRUCTURES (as offset constants)
+// ═══════════════════════════════════════════════════════════════
+
+// Spawn entry: defines one enemy to spawn (8 bytes)
+let SPAWN_ENTRY_SIZE = 8;
+namespace SpawnEntry {
+    let entityType      = 0;   // u16: Entity type ID
+    let relativeX       = 2;   // i16: X offset (signed)
+    let zDepth          = 4;   // u16: World Y position
+    let spawnerEntityId = 6;   // u16: Spawner ID or NO_SPAWNER
+}
+
+// Region header: defines one combat room (16 bytes)
+let REGION_HEADER_SIZE = 16;
+namespace SpawnRegionHeader {
+    let endX             = 0;   // u16: Camera X trigger
+    let spawnDelay       = 2;   // u16: Frames between spawns
+    let maxActiveEnemies = 4;   // u16: Max enemies at once
+    let numEntries       = 6;   // u16: Number of spawn entries
+    let flags            = 8;   // u16: RegionFlags
+    // Followed by numEntries * SpawnEntry
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// RUNTIME STATE
+// ═══════════════════════════════════════════════════════════════
+
+in lowram {
+    // Far pointer to regions array in ROM (3 bytes)
+    var regionsRomPtr : far *u8;
+
+    // Number of regions in current room
+    var numRegions : u8;
+
+    // Index of next region to check
+    var nextRegionIndex : u8;
+
+    // ROM offset to next region header (cumulative, since regions are variable-length)
+    var nextRegionRomOffset : u16;
+
+    // ROM offset to active region header (0xFFFF = none)
+    var activeRegionOffset : u16;
+    
+    // Camera lock bounds
+    var regionStartX : u16;
+    var regionEndX : u16;
+    
+    // Spawn state
+    var spawnCooldownTimer : u16;
+    var nextSpawnEntryIndex : u8;
+    var regionSpawnedCount : u8;
+    
+    // Runtime flags
+    var regionRuntimeFlags : u16;
+    
+    // Room clear flag: set when last region is cleared (all enemies dead)
+    var roomCleared : u8;
+}
+
+
+in code {
+
+
+// ═══════════════════════════════════════════════════════════════
+// INITIALIZATION
+// ═══════════════════════════════════════════════════════════════
+
+// Initialize spawn region system for a new room
+//
+// DB = 0x7e
+#[mem8, idx16]
+func init(romAddr : u16 in xx, romBank : u8 in a, count : u8 in y) {
+    // Store ROM pointer first (a = bank, xx = address)
+    *(&#:regionsRomPtr as *u8) = a;
+    *(&regionsRomPtr as *u16) = xx;
+    
+    // Store count (y = count, need to transfer to a first)
+    // Note: in idx16 mode, y is actually yy (16-bit), but count is passed in low byte
+    a = y as u8;
+    numRegions = a;
+    
+    // Reset state
+    nextRegionIndex = a = 0;
+    nextSpawnEntryIndex = a = 0;
+    regionSpawnedCount = a = 0;
+    roomCleared = a = 0;
+
+    mem16();
+    #[mem16] {
+        nextRegionRomOffset = aa = 0;
+        activeRegionOffset = aa = 0xFFFF;
+        regionStartX = aa = 0;
+        regionEndX = aa = 0;
+        spawnCooldownTimer = aa = 0;
+        regionRuntimeFlags = aa = 0;
+    }
+    mem8();
+}
+
+
+// Initialize with no regions
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func init_empty__inline() {
+    a = 0;
+    y = 0;
+    idx16();
+    #[idx16] {
+        xx = 0;
+        init(xx, a, y);
+    }
+    idx8();
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// CAMERA LOCK QUERY
+// ═══════════════════════════════════════════════════════════════
+
+// Check if camera is locked
+// Returns: carry set if locked
+//
+// DB = 0x7e
+#[mem16, idx16]
+func is_camera_locked() : bool in carry {
+    aa = regionRuntimeFlags;
+    if aa & RegionFlags.ACTIVE != 0 {
+        carry = true;
+    } else {
+        carry = false;
+    }
+    return carry;
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// REGION ACTIVATION CHECK
+// ═══════════════════════════════════════════════════════════════
+
+// Check if player entered a new region
+//
+// DB = 0x7e
+#[mem8, idx8]
+func check_region_entry() {
+var _farPtr : far *u16 in zpTmp_farPtr;
+var _camRight : u16 in zpTmp_word_0;
+var _endX : u16 in zpTmp_word_1;
+var _regionOffset : u16 in zpTmp_word_2;
+
+    // Skip if already active
+    mem16();
+    #[mem16] {
+        aa = regionRuntimeFlags;
+        if aa & RegionFlags.ACTIVE != 0 {
+            mem8();
+            return;
+        }
+    }
+    mem8();
+
+    // Skip if no more regions
+    a = nextRegionIndex;
+    cmp(a, numRegions);
+    if carry {
+        return;
+    }
+
+    // Use cumulative ROM offset (regions are variable-length: header + entries)
+    mem16();
+    #[mem16] {
+        _regionOffset = aa = nextRegionRomOffset;
+    }
+    mem8();
+
+    // Set up far pointer
+    (&<:_farPtr as *u8)[2] = a = *(&#:regionsRomPtr as *u8);
+    mem16();
+    #[mem16] {
+        *(&_farPtr as *u16) = aa = *(&regionsRomPtr as *u16);
+    }
+    mem8();
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        yy = _regionOffset;
+
+        // Read endX (offset 0)
+        _endX = aa = _farPtr[unaligned yy];
+
+        // Compute region startX = endX - SCREEN_WIDTH
+        carry = true;
+        aa -#= SCREEN_WIDTH;
+        
+        // Check trigger: camX >= regionStartX
+        // (Camera reaches region start, lock immediately)
+        cmp(aa, camera.camX);
+        if carry {
+            mem8_idx8();
+            return;
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // ACTIVATE REGION
+        // ═══════════════════════════════════════════════════════════════
+
+        // Compute region startX = endX - SCREEN_WIDTH
+        aa = _endX;
+        carry = true;
+        aa -#= SCREEN_WIDTH;
+        
+        // Lock camera at region start (both min and max)
+        regionStartX = aa;
+        regionEndX = aa;
+        
+        // Immediately snap camera to lock position (prevents 1-pixel jitter)
+        camera.camX = aa;
+
+        yy = _regionOffset;
+
+        // Read spawn delay (offset 2)
+        yy++;
+        yy++;
+        spawnCooldownTimer = aa = _farPtr[unaligned yy];
+
+        // Read flags (offset 8) and set ACTIVE
+        yy++;
+        yy++;
+        yy++;
+        yy++;
+        yy++;
+        yy++;
+        aa = _farPtr[unaligned yy];
+        aa |= RegionFlags.ACTIVE;
+        regionRuntimeFlags = aa;
+
+        // Store active region offset (16-bit now)
+        activeRegionOffset = aa = _regionOffset;
+    }
+    mem8_idx8();
+
+    // Reset spawn tracking
+    nextSpawnEntryIndex = a = 0;
+    regionSpawnedCount = a = 0;
+
+    // Advance region index
+    a = nextRegionIndex;
+    a++;
+    nextRegionIndex = a;
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// SPAWN PROCESSING
+// ═══════════════════════════════════════════════════════════════
+
+// Process the active spawn region
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process_active_region() {
+var _farPtr : far *u16 in zpTmp_farPtr;
+var _maxEnemies : u8 in zpTmp_byte_0;
+var _numEntries : u8 in zpTmp_byte_1;
+var _offset : u16 in zpTmp_word_0;
+
+    // Skip if no active region
+    mem16();
+    #[mem16] {
+        aa = regionRuntimeFlags;
+        if aa & RegionFlags.ACTIVE == 0 {
+            mem8();
+            return;
+        }
+    }
+    mem8();
+
+    // Set up far pointer
+    (&<:_farPtr as *u8)[2] = a = *(&#:regionsRomPtr as *u8);
+    mem16();
+    #[mem16] {
+        *(&_farPtr as *u16) = aa = *(&regionsRomPtr as *u16);
+
+        // Calculate offset to maxActiveEnemies (base + 4)
+        aa = activeRegionOffset;
+        carry = false;
+        aa +#= SpawnRegionHeader.maxActiveEnemies as u16;
+        _offset = aa;
+    }
+
+    idx16();
+    #[mem16, idx16] {
+        yy = _offset;
+        // Read maxActiveEnemies (16-bit value)
+        aa = _farPtr[unaligned yy];
+    }
+    mem8_idx8();
+    _maxEnemies = a;  // Store actual value
+
+    mem16();
+    #[mem16] {
+        // Calculate offset to numEntries (base + 6)
+        aa = activeRegionOffset;
+        carry = false;
+        aa +#= SpawnRegionHeader.numEntries as u16;
+        _offset = aa;
+    }
+
+    idx16();
+    #[mem16, idx16] {
+        yy = _offset;
+        // Read numEntries (16-bit value)
+        aa = _farPtr[unaligned yy];
+    }
+    mem8_idx8();
+    _numEntries = a;  // Store actual value
+
+    // All entries consumed?
+    a = nextSpawnEntryIndex;
+    cmp(a, _numEntries);
+    if carry {
+        a = regionSpawnedCount;
+        if zero {
+            __clear_region();
+        }
+        return;
+    }
+
+    // At enemy cap?
+    a = regionSpawnedCount;
+    cmp(a, _maxEnemies);
+    if carry {
+        return;
+    }
+
+    // Decrement cooldown
+    mem16();
+    #[mem16] {
+        aa = spawnCooldownTimer;
+        if !zero {
+            aa--;
+            spawnCooldownTimer = aa;
+            mem8();
+            return;
+        }
+    }
+    mem8();
+
+    // Spawn next entry
+    __spawn_next_entry();
+}
+
+
+// Spawn the next entry
+//
+// DB = 0x7e
+#[mem8, idx8]
+func __spawn_next_entry() {
+var _farPtr : far *u16 in zpTmp_farPtr;
+var _entryOffset : u16 in zpTmp_word_0;
+var _worldX : u16 in zpTmp_word_1;
+var _worldY : u16 in zpTmp_word_2;
+var _entityType : u16 in zpTmp_word_3;
+var _spawnerEntityId : u16 in zpTmp_word_4;
+
+    // Set up far pointer
+    (&<:_farPtr as *u8)[2] = a = *(&#:regionsRomPtr as *u8);
+    mem16();
+    #[mem16] {
+        *(&_farPtr as *u16) = aa = *(&regionsRomPtr as *u16);
+    }
+    mem8();
+
+    // Calculate entry offset:
+    // activeRegionOffset + REGION_HEADER_SIZE + (nextSpawnEntryIndex * SPAWN_ENTRY_SIZE)
+    a = nextSpawnEntryIndex;
+    a <<= 3;  // * 8
+    <:_entryOffset = a;
+    >:_entryOffset = 0;
+
+    mem16();
+    #[mem16] {
+        aa = _entryOffset;
+        carry = false;
+        aa +#= REGION_HEADER_SIZE as u16;
+        carry = false;
+        aa +#= activeRegionOffset;
+        _entryOffset = aa;
+    }
+
+    idx16();
+    #[mem16, idx16] {
+        yy = _entryOffset;
+        
+        // Read entity type (offset 0)
+        _entityType = aa = _farPtr[unaligned yy];
+        
+        // Read zDepth (offset 4)
+        yy++;
+        yy++;
+        yy++;
+        yy++;
+        _worldY = aa = _farPtr[unaligned yy];
+        
+        // Read spawner ID (offset 6)
+        yy++;
+        yy++;
+            _spawnerEntityId = aa = _farPtr[unaligned yy];
+        
+        aa = _spawnerEntityId;
+        if aa == NO_SPAWNER {
+            // Edge spawn - read relativeX (offset 2)
+            yy = _entryOffset;
+            yy++;
+            yy++;
+            aa = _farPtr[unaligned yy];
+            
+            if aa & 0x8000 != 0 {
+                // Left edge
+                aa = camera.camX;
+                carry = true;
+                aa -#= SPAWN_MARGIN;
+            } else {
+                // Right edge
+                aa = camera.camX;
+                carry = false;
+                aa +#= SCREEN_WIDTH;
+                carry = false;
+                aa +#= SPAWN_MARGIN;
+            }
+            _worldX = aa;
+            
+            aa = _entityType;
+            __do_spawn(aa, _worldX, _worldY);
+        } else {
+            // Signal spawner entity
+            xx = _spawnerEntityId;
+            entities.SoA.var_0[unaligned xx] = aa = 1;
+            entities.SoA.var_1[unaligned xx] = aa = _entityType;
+            entities.SoA.var_2[unaligned xx] = aa = _worldY;
+        }
+    }
+    mem8_idx8();
+    
+    // Advance entry index
+    a = nextSpawnEntryIndex;
+    a++;
+    nextSpawnEntryIndex = a;
+
+    // Reset cooldown
+    (&<:_farPtr as *u8)[2] = a = *(&#:regionsRomPtr as *u8);
+    mem16();
+    #[mem16] {
+        *(&_farPtr as *u16) = aa = *(&regionsRomPtr as *u16);
+
+        // Calculate offset to spawnDelay (activeRegionOffset + 2)
+        aa = activeRegionOffset;
+        carry = false;
+        aa +#= SpawnRegionHeader.spawnDelay as u16;
+    }
+
+    idx16();
+    #[mem16, idx16] {
+        yy = aa;
+        // Read spawnDelay
+        spawnCooldownTimer = aa = _farPtr[unaligned yy];
+    }
+    mem8_idx8();
+}
+
+
+// Actually spawn an entity
+//
+// DB = 0x7e
+#[mem16, idx16]
+func __do_spawn(entityType : u16 in aa, worldX : u16 in zpTmp_word_1, worldY : u16 in zpTmp_word_2) {
+var _entityType : u16 in zpTmp_word_3;
+
+    _entityType = aa;
+    
+    // Increment spawn count
+    mem8();
+    #[mem8] {
+        a = regionSpawnedCount;
+        a++;
+        regionSpawnedCount = a;
+    }
+    mem16();
+    
+    // Call spawn_entity
+    mem8_idx8();
+    #[mem8, idx8] {
+        mem16();
+        #[mem16] {
+            zpTmp_word_0 = aa = zpTmp_word_1;  // worldX
+            zpTmp_word_1 = aa = zpTmp_word_2;  // worldY
+        }
+        mem8();
+        
+        a = <:_entityType;
+        y = 0;
+        entityloop.spawn_entity(zpTmp_word_0, zpTmp_word_1, a, y);
+    }
+    mem16_idx16();
+}
+
+
+// Clear the active region and advance ROM offset to next region
+//
+// DB = 0x7e
+#[mem8, idx8]
+func __clear_region() {
+var _farPtr : far *u16 in zpTmp_farPtr;
+var _numEntries : u16 in zpTmp_word_0;
+
+    // Read numEntries to calculate region size
+    (&<:_farPtr as *u8)[2] = a = *(&#:regionsRomPtr as *u8);
+    mem16();
+    #[mem16] {
+        *(&_farPtr as *u16) = aa = *(&regionsRomPtr as *u16);
+    }
+
+    #[mem16] {
+        // Read numEntries (at activeRegionOffset + 6)
+        aa = activeRegionOffset;
+        carry = false;
+        aa +#= SpawnRegionHeader.numEntries as u16;
+    }
+    idx16();
+    #[mem16, idx16] {
+        yy = aa;
+        _numEntries = aa = _farPtr[unaligned yy];
+
+        // Advance nextRegionRomOffset by: REGION_HEADER_SIZE + (numEntries * SPAWN_ENTRY_SIZE)
+        // numEntries * 8
+        aa = _numEntries;
+        aa <<= 3;
+        carry = false;
+        aa +#= REGION_HEADER_SIZE as u16;
+        carry = false;
+        aa +#= activeRegionOffset;
+        nextRegionRomOffset = aa;
+
+        // Clear flags
+        aa = regionRuntimeFlags;
+        aa &= NOT_ACTIVE;
+        aa |= RegionFlags.CLEARED;
+        regionRuntimeFlags = aa;
+
+        // Mark no active region
+        activeRegionOffset = aa = 0xFFFF;
+    }
+    idx8();
+    mem8();
+
+    // Check if this was the last region
+    a = nextRegionIndex;
+    cmp(a, numRegions);
+    if carry {
+        roomCleared = a = 1;
+    }
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// ENEMY DEATH NOTIFICATION
+// ═══════════════════════════════════════════════════════════════
+
+// Called when an enemy dies
+//
+// DB = 0x7e
+#[mem8, idx8]
+func on_enemy_death() {
+var _farPtr : far *u16 in zpTmp_farPtr;
+var _numEntries : u8 in zpTmp_byte_0;
+var _offset : u16 in zpTmp_word_0;
+
+    // Skip if no active region
+    mem16();
+    #[mem16] {
+        aa = regionRuntimeFlags;
+        if aa & RegionFlags.ACTIVE == 0 {
+            mem8();
+            return;
+        }
+    }
+    mem8();
+
+    // Decrement count
+    a = regionSpawnedCount;
+    if !zero {
+        a--;
+        regionSpawnedCount = a;
+    }
+
+    // Check for clear
+    a = regionSpawnedCount;
+    if zero {
+        // Read numEntries
+        (&<:_farPtr as *u8)[2] = a = *(&#:regionsRomPtr as *u8);
+        mem16();
+        #[mem16] {
+            *(&_farPtr as *u16) = aa = *(&regionsRomPtr as *u16);
+
+            // Calculate offset to numEntries (activeRegionOffset + 6)
+            aa = activeRegionOffset;
+            carry = false;
+            aa +#= SpawnRegionHeader.numEntries as u16;
+            _offset = aa;
+        }
+
+        idx16();
+        #[mem16, idx16] {
+            yy = _offset;
+            // Read numEntries
+            aa = _farPtr[unaligned yy];
+        }
+        mem8_idx8();
+        _numEntries = a;  // Store actual value
+
+        a = nextSpawnEntryIndex;
+        cmp(a, _numEntries);
+        if carry {
+            __clear_region();
+        }
+    }
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// SPAWNER ENTITY SUPPORT
+// ═══════════════════════════════════════════════════════════════
+
+// Called by spawner when ready to spawn
+//
+// DB = 0x7e
+#[mem16, idx16]
+func spawner_do_spawn(spawnerEntityId : u16 in xx, spawnWorldX : u16 in aa) {
+var _worldX : u16 in zpTmp_word_1;
+var _worldY : u16 in zpTmp_word_2;
+var _entityType : u16 in zpTmp_word_3;
+
+    _worldX = aa;
+    
+    _entityType = aa = entities.SoA.var_1[unaligned xx];
+    _worldY = aa = entities.SoA.var_2[unaligned xx];
+    
+    entities.SoA.var_0[unaligned xx] = aa = 0;
+    
+    aa = _entityType;
+    __do_spawn(aa, _worldX, _worldY);
+}
+
+
+}  // in code
+
+}  // namespace spawn_regions

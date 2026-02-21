@@ -1,0 +1,28 @@
+{
+  "starting_dungeon_id": 0,
+  "starting_room_x": 0,
+  "starting_room_y": 0,
+  "edge_transitions_enabled": false,
+  "window_scale": 4,
+  "show_debug_info": true,
+  "room_progression": [
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      1,
+      0,
+      0
+    ],
+    [
+      2,
+      0,
+      0
+    ]
+  ],
+  "door_transition_frames": 60,
+  "_comment_tile_mode": "Tile mode: \u00278x8\u0027 for metatile system, \u002716x16\u0027 for native SNES 16x16 BG tiles",
+  "tile_mode": "16x16"
+}

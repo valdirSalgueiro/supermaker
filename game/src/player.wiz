@@ -1,0 +1,2433 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "hud";
+import "player-hitbox";
+import "memmap";
+import "collision";
+import "entities/grunt_ai";
+import "entities/grunt_anim";
+
+import "engine/entity_api";
+import "engine/entity_utils";
+import "engine/vram-slots";
+import "engine/game/entityloop";
+import "engine/game/dungeon";
+import "engine/game/entity-movement";
+import "engine/gamemodes";
+
+import "engine/registers";
+
+import "engine/audio";
+import "engine/common/math";
+import "engine/game/metatiles";
+import "engine/game/metasprites";
+import "engine/wait-frame";
+
+import "joypad";
+
+import "engine/game/camera";
+import "engine/game/map-system";
+
+import "gen/enums";
+import "gen/entities";
+import "gen/cosine-tables";
+import "gen/game-config";
+import "gen/player-characters";
+import "debug-skip";
+
+namespace player {
+
+// Address of the player's `metasprites.MsFramesetFormat` data
+// Loaded at runtime from player_chars.metasprite_framesets[selectedCharacter]
+
+let _set_ms_animation = metasprites.set_player_animation;
+let _set_ms_animation_if_changed = metasprites.set_player_animation_if_changed;
+let _is_non_looping_animation_running = metasprites.is_player_non_looping_animation_running;
+
+// ═══════════════════════════════════════════════════════════════
+// FACING DIRECTION
+// ═══════════════════════════════════════════════════════════════
+// Facing changes only on LEFT/RIGHT D-pad input.
+// Preserved during UP/DOWN movement and idle.
+
+enum FacingDirection : u8 {
+    RIGHT,  // 0 - facing right
+    LEFT,   // 1 - facing left
+};
+
+
+// ═══════════════════════════════════════════════════════════════
+// PLAYER STATE MACHINE
+// ═══════════════════════════════════════════════════════════════
+// Minimal states: physics drives air behavior, not explicit states.
+// AIR covers all airborne situations (jump, leap, air attacks).
+// LANDING is 1-frame recovery after leap/air-attack.
+
+enum PlayerState : u8 {
+    IDLE,           // 0 - standing still
+    WALKING,        // 1 - moving via D-pad
+    AIR,            // 2 - airborne (jump/leap/air-attack, physics-driven)
+    LANDING,        // 3 - 1-frame recovery after leap/air-attack
+    PUNCH,          // 4 - combo chain (stage tracked by comboStage)
+    HURT,           // 5 - hitstun (stagger from hit, can recover)
+    THROW,          // 6 - throw attack (reserved)
+    SPECIAL,        // 7 - panic special move (X+A)
+    GRAB,           // 8 - grabbing an enemy (reserved)
+    GRABBED,        // 9 - grabbed by enemy (reserved)
+    KNOCKDOWN,      // 10 - knocked to ground (forced recovery)
+    GETUP,          // 11 - rising from knockdown
+};
+
+// Player hurt/knockdown timing and grab constants are now in player_characters.json
+// and accessed via player_chars.* ROM tables indexed by selectedCharacter.
+
+// ── COMPILE-TIME CHARACTER SELECT ───────────────────────────────
+// Change this to 1 for Cody, 0 for Guy.  Recompile to switch.
+let DEFAULT_CHARACTER_ID = 0;
+
+// ═══════════════════════════════════════════════════════════════
+// AIR ANIMATION INTENT (airAnimType)
+// ═══════════════════════════════════════════════════════════════
+// Tracks what animation is playing while AIR state is active.
+// Values >= AIR_ELBOW mean an air attack is committed.
+
+let AIR_JUMP_PREP   = 0;  // Vertical jump preparation (frame 29, grounded, transitions to AIR_JUMP)
+let AIR_JUMP        = 1;  // Vertical jump airborne (frame 30, loops)
+let AIR_LEAP_PREP   = 2;  // Leap preparation (frame 29, grounded, transitions to AIR_LEAP_RISING)
+let AIR_LEAP_RISING = 3;  // Leap rising phase (30->33->34->35, transitions to AIR_LEAP)
+let AIR_LEAP        = 4;  // Leap falling phase (frame 30, loops until landing)
+let AIR_ELBOW       = 5;  // Vertical downward attack (attack threshold)
+let AIR_JUMP_KICK   = 6;  // Vertical jump kick
+let AIR_LEAP_KICK   = 7;  // Moving leap kick
+
+// Combo attack phases (used by comboPhase)
+let COMBO_STARTUP  = 0;   // Pre-active frames (hitbox inactive)
+let COMBO_ACTIVE   = 1;   // Active frames (hitbox live)
+let COMBO_RECOVERY = 2;   // Post-active: short cooldown before returning to IDLE
+
+// Combo chain window: frames after recovery where pressing attack continues the combo.
+// The player returns to IDLE during this window but comboStage is preserved.
+let COMBO_CHAIN_WINDOW = 30;
+
+
+// ═══════════════════════════════════════════════════════════════
+// ANIMATION MAPPING
+// ═══════════════════════════════════════════════════════════════
+// Maps (state, facing) to animation ID.
+// 21 animations (0-20), hflipped versions at +22 offset.
+
+namespace Anim {
+    // Role indices — stable IDs regardless of which character is active.
+    // At runtime, these are mapped to actual metasprite animation indices via player_chars.anim_map.
+    let IDLE_RIGHT        = 0;
+    let WALK_RIGHT        = 1;
+    let ATTACK1_RIGHT     = 2;   // combo attack 1
+    let ATTACK2_RIGHT     = 3;   // combo attack 2
+    let ATTACK3_RIGHT     = 4;   // combo attack 3
+    let ATTACK4_RIGHT     = 5;   // combo attack 4
+    let SPECIAL_RIGHT     = 6;
+    let KNIFE_THROW_RIGHT = 7;
+    let AIR_ELBOW_RIGHT   = 8;
+    let JUMP_START_RIGHT  = 9;
+    let JUMP_RIGHT        = 10;
+    let JUMP_KICK_RIGHT   = 11;
+    let LEAP_SEQUENCE_RIGHT = 12;
+    let LEAP_KICK_RIGHT   = 13;
+    let GRAB_RIGHT        = 14;
+    let GRAB_KICK_RIGHT   = 15;
+    let GRAB_THROW_RIGHT  = 16;
+    let HURT_RIGHT        = 17;
+    let KNOCKDOWN_RIGHT   = 18;
+    let RECOVER_RIGHT     = 19;
+    let PICKUP_RIGHT      = 20;
+    
+    // Left-facing animations (hflipped) - offset by per-character animation count
+    let HFLIP_OFFSET      = 22;  // Compile-time constant for ROM table generation
+    let ANIMATION_COUNT   = 44;  // (no longer used at runtime)
+    
+    let IDLE_LEFT         = IDLE_RIGHT + HFLIP_OFFSET;
+    let WALK_LEFT         = WALK_RIGHT + HFLIP_OFFSET;
+    let ATTACK1_LEFT      = ATTACK1_RIGHT + HFLIP_OFFSET;
+    let ATTACK2_LEFT      = ATTACK2_RIGHT + HFLIP_OFFSET;
+    let ATTACK3_LEFT      = ATTACK3_RIGHT + HFLIP_OFFSET;
+    let ATTACK4_LEFT      = ATTACK4_RIGHT + HFLIP_OFFSET;
+    let SPECIAL_LEFT      = SPECIAL_RIGHT + HFLIP_OFFSET;
+    let KNIFE_THROW_LEFT  = KNIFE_THROW_RIGHT + HFLIP_OFFSET;
+    let AIR_ELBOW_LEFT    = AIR_ELBOW_RIGHT + HFLIP_OFFSET;
+    let JUMP_START_LEFT   = JUMP_START_RIGHT + HFLIP_OFFSET;
+    let JUMP_LEFT         = JUMP_RIGHT + HFLIP_OFFSET;
+    let JUMP_KICK_LEFT    = JUMP_KICK_RIGHT + HFLIP_OFFSET;
+    let LEAP_SEQUENCE_LEFT = LEAP_SEQUENCE_RIGHT + HFLIP_OFFSET;
+    let LEAP_KICK_LEFT    = LEAP_KICK_RIGHT + HFLIP_OFFSET;
+    let GRAB_LEFT         = GRAB_RIGHT + HFLIP_OFFSET;
+    let GRAB_KICK_LEFT    = GRAB_KICK_RIGHT + HFLIP_OFFSET;
+    let GRAB_THROW_LEFT   = GRAB_THROW_RIGHT + HFLIP_OFFSET;
+    let HURT_LEFT         = HURT_RIGHT + HFLIP_OFFSET;
+    let KNOCKDOWN_LEFT    = KNOCKDOWN_RIGHT + HFLIP_OFFSET;
+    let RECOVER_LEFT      = RECOVER_RIGHT + HFLIP_OFFSET;
+    let PICKUP_LEFT       = PICKUP_RIGHT + HFLIP_OFFSET;
+}
+
+
+// Player state variables (previously in gamestate)
+in wram7e {
+    var health : u8;
+    var lives : u8;
+    var selectedCharacter : u8;  // player_chars.CharacterId (0=Guy, 1=Cody)
+}
+
+
+in lowram {
+    // low-ram mirror of the MetaSprite frame
+    // Used in VBlank to load the player's dynamic metasprite tiles
+    var dynamicMsFrameAddr: u16;
+
+    // ── Combo / special state ──────────────────────────────────
+    var comboStage : u8;            // 0-4: which combo hit we're on
+    var comboPhase : u8;            // COMBO_STARTUP / ACTIVE / RECOVERY
+    var comboTimer : u8;            // frames remaining in current phase
+    var comboHitConnected : u8;     // 1 if hit landed during ACTIVE phase
+    var comboChainTimer : u8;       // frames remaining to start next hit and keep combo alive (ticks in IDLE)
+
+    // Damage value armed for current attack (read by collision system).
+    // Bit 7 = knockdown flag, bits 0-6 = damage amount.
+    var currentAttackDamage : u8;
+
+    // Set to 1 by collision.detect_all() when player hitbox hits an enemy.
+    // Read by update_combo() next frame to record a connected hit.
+    // Cleared at the top of every detect_all() call.
+    var playerAttackHit : u8;
+    
+    // ── Hurt / knockdown state ─────────────────────────────────
+    var hurtTimer : u8;             // frames remaining in HURT/KNOCKDOWN/GETUP
+    var knockbackSpeed : u8;        // current knockback velocity (decays to 0)
+    var knockbackDirection : u8;    // direction of knockback (FacingDirection)
+    var godMode : u8;               // 1 = invincible (debug toggle)
+    var hitCounter : u8;            // consecutive hits taken (resets on knockdown/getup)
+
+    // ── Grab state ────────────────────────────────────────────
+    var grabbedEnemyId : u8;        // Entity ID of grabbed enemy (0xFF = none)
+    var grabAttackCount : u8;       // Number of grab attacks performed (max 3)
+    var grabTimer : u8;             // Frames until enemy escapes
+    var grabKickTimer : u8;         // Frames until grab kick animation finishes (blocks input)
+
+    // ── Character-specific cached values ──────────────────────
+    // Loaded from ROM tables at init, indexed by selectedCharacter
+    var maxComboStage : u8;         // combo_stages - 1 (cached)
+    var charComboBase : u8;         // selectedCharacter * MAX_COMBO_STAGES (cached offset)
+    var cachedMoveSpeedX : u16;
+    var cachedMoveSpeedY : u16;
+    var cachedGravity : u16;
+    var cachedJumpVelocity : u16;
+    var cachedHflipOffset : u8;     // hflip_offset from ROM table (per-character)
+    var _msFramesetAddr : u16;      // character-specific metasprite frameset ROM address
+}
+
+in wram7e_roomstate {
+
+// These variables use behavior_vm SoA arrays directly for compatibility
+// Player is always entity ID 0
+
+// Player entity ID is always 0
+let PLAYER_ID = 0;
+
+// Current facing direction (LEFT or RIGHT)
+var facingDirection @ &entities.SoA.var_0_h[0] : u8;
+
+// Current player state (PlayerState enum)
+var playerState @ &entities.SoA.var_1_l[0] : u8;
+
+// Air animation intent (AIR_JUMP, AIR_LEAP, AIR_ELBOW, etc.)
+// Used to track what air animation is playing and enforce one-attack-per-jump
+var airAnimType @ &entities.SoA.var_0_l[0] : u8;
+
+// Z-axis velocity for jump physics (8:8 fixed point, signed)
+// Positive = moving up, decreases by GRAVITY each frame
+var zVelocity @ &entities.SoA.var_2[0] : u16;
+}
+
+// CODE
+// ====
+in code {
+
+// Initialise the player's MetaSprites.
+//
+// Called on dungeon load, just before fade-in.
+//''
+// DB = 0x7e
+#[mem8, idx8]
+func init_metasprites() {
+    // ASSUMES: player entityId is 0
+    
+    // Load character-specific metasprite frameset address from ROM table
+    // selectedCharacter (u8) → index into u16 array
+    zpTmp_byte_0 = a = selectedCharacter;
+    zpTmp_byte_1 = a = 0;
+    
+    mem16_idx16();
+    #[mem16, idx16] {
+        aa = (&zpTmp_byte_0 as *u16)[0];
+        aa <<= 1;  // * 2 for u16 array index
+        xx = aa;
+        _msFramesetAddr = aa = player_chars.metasprite_framesets[unaligned xx];
+    }
+    mem8_idx8();
+
+    // Initialize msFrameAddr to 0 to prevent garbage reads during first VBlank
+    mem16_idx16();
+    #[mem16, idx16] {
+        entities.SoA.msFrameAddr[0] = aa = 0;
+        
+        // Set msLastQueuedFrame to invalid value to force first tile upload
+        entities.SoA.msLastQueuedFrame[0] = aa = 0;
+        
+        xx = _msFramesetAddr;
+        
+        entities.SoA.metaSpriteFrameTable[0] = aa = metasprites.MsFsData.frameTable[unaligned xx];
+        entities.SoA.msAnimationTable[0] = aa = metasprites.MsFsData.animationTable[unaligned xx];
+        
+        // Load entity bounds AABB for camera/collision
+        xx = _msFramesetAddr;
+        (&entities.SoA._boundsLT[0].first as *u16)[0] = aa = metasprites.MsFsData.boundsLT[unaligned xx];
+        xx = _msFramesetAddr;
+        (&entities.SoA._boundsWH[0].first as *u16)[0] = aa = metasprites.MsFsData.boundsWH[unaligned xx];
+    }
+    mem8_idx8();
+
+    // Set player's ms_draw function to dynamic_pattern for DMA tile transfer
+    a = MsDrawFunction.dynamic_pattern as u8;
+    entities.SoA.msDrawFunction[0] = a as MsDrawFunction;
+    
+    // Player uses VRAM slot 0 (reserved, always allocated)
+    entities.SoA.dynamicVramSlot[0] = a = vram_slots.PLAYER_SLOT;
+    
+    // Set player's queue tiles function for dynamic sprite DMA
+    a = MsQueueTilesFunction.Dynamic as u8;
+    entities.SoA.msQueueTilesFunction[0] = a as MsQueueTilesFunction;
+
+    metasprites.init_player_metasprite_animation__inline();
+
+    metasprites.init_entity_metasprite_animation__after_init(PLAYER_ENTITY_ID);
+}
+
+
+
+// GAMESTATE FUNCTIONS
+// ===================
+// DB = 0x7e
+#[mem8, idx8]
+inline func get_roomtoload_player_state__inline() : u8 in a {
+    // return State.WALKING as u8;
+    return 1;
+}
+
+
+// DB = 0x7e
+#[mem8, idx8]
+inline func get_roomtoload_player_direction__inline() : u8 in a {
+    return facingDirection as u8;
+}
+
+
+// DB = 0x7e
+#[mem8, idx8]
+inline func dungeon_loaded__restore_player_state_and_direction__inline(state: u8 in x, direction: u8 in a) {
+    facingDirection = a = a & 3;
+}
+
+
+
+// Initialise player state variables
+//
+// Called by `dungeon.new_game()`
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func new_player_gamestate__inline() {
+    selectedCharacter = a = DEFAULT_CHARACTER_ID;
+    x = selectedCharacter;
+    health = a = player_chars.health[x];
+    lives = a = 3;
+}
+
+
+
+// Reset the player's health when on continue game.
+//
+// Called on continue/restart
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func continue_player_gamestate__inline() {
+    x = selectedCharacter;
+    health = a = player_chars.health[x];
+}
+
+// Initialise the player entity on room load.
+#[mem8, idx8]
+func init()
+{
+    // Clear any active movement
+    entity_movement.clear_velocity_player__inline();
+    
+    // Initialize previous tile tracking from world position
+    
+    // Clear invincibility frames on room load
+    a = 0;
+    iframeCounter = a;
+    
+    // Clear Z-axis state (grounded)
+    entities.SoA.zPos[0] = a;
+    airAnimType = a;
+    comboStage = a;
+    comboPhase = a;
+    comboTimer = a;
+    comboHitConnected = a;
+    comboChainTimer = a;
+    currentAttackDamage = a;
+    playerAttackHit = a;
+    
+    // Clear hurt state (don't clear godMode - persist across rooms)
+    hurtTimer = a;
+    knockbackSpeed = a;
+    knockbackDirection = a;
+    hitCounter = a;
+
+    // Clear grab state
+    grabbedEnemyId = a = 0xFF;  // No enemy grabbed
+    grabAttackCount = a = 0;
+    grabTimer = a = 0;
+    godMode = a = 0;
+    
+    mem16();
+    #[mem16] {
+        zVelocity = aa = 0;
+    }
+    mem8();
+
+    // ── Cache character-specific values from ROM tables ──
+    x = selectedCharacter;
+
+    // Combo base offset = selectedCharacter * MAX_COMBO_STAGES
+    // MAX_COMBO_STAGES = 5, so multiply by 5: (a << 2) + a
+    zpTmp_byte_0 = a = x;
+    a <<= 1;
+    a <<= 1;
+    carry = false;
+    a +#= zpTmp_byte_0;
+    charComboBase = a;
+
+    // Cache max combo stage (stages - 1)
+    x = selectedCharacter;
+    a = player_chars.combo_stages[x];
+    a--;
+    maxComboStage = a;
+
+    // Cache hflip offset (per-character animation count)
+    x = selectedCharacter;
+    cachedHflipOffset = a = player_chars.hflip_offset[x];
+
+    // Cache 16-bit movement/physics values (avoid far ROM reads every frame)
+    // Compose from separate lo/hi byte ROM tables
+    x = selectedCharacter;
+    zpTmp_byte_0 = a = player_chars.move_speed_x_lo[x];
+    zpTmp_byte_1 = a = player_chars.move_speed_x_hi[x];
+    zpTmp_byte_2 = a = player_chars.move_speed_y_lo[x];
+    zpTmp_byte_3 = a = player_chars.move_speed_y_hi[x];
+    zpTmp_byte_4 = a = player_chars.gravity_lo[x];
+    zpTmp_byte_5 = a = player_chars.gravity_hi[x];
+    // zpTmp_byte_0/1 used for move_speed_x, 2/3 for Y, 4/5 for gravity
+    // Need one more pair for jump_velocity — use zpTmp_word_0
+    <:zpTmp_word_0 = a = player_chars.jump_velocity_lo[x];
+    >:zpTmp_word_0 = a = player_chars.jump_velocity_hi[x];
+
+    mem16();
+    #[mem16] {
+        cachedMoveSpeedX = aa = (&zpTmp_byte_0 as *u16)[0];
+        cachedMoveSpeedY = aa = (&zpTmp_byte_2 as *u16)[0];
+        cachedGravity = aa = (&zpTmp_byte_4 as *u16)[0];
+        cachedJumpVelocity = aa = zpTmp_word_0;
+    }
+    mem8();
+
+    // Start in IDLE state
+    playerState = a = PlayerState.IDLE as u8;
+
+    // Set initial animation based on facing direction
+    update_animation();
+}
+
+// PROCESS FUNCTIONS
+// =================
+
+
+// Entity process routine.
+//
+// Called once per frame.
+// Physics-driven state machine: Z-axis physics drives air state, not animation.
+//
+// REQUIRES: entities.currentEntityId = PLAYER_ENTITY_ID;
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process() {
+var _savedXVelocity : u16 in zpTmp_word_0;
+
+    // ═══════════════════════════════════════════════════════════════
+    // DEBUG: God mode toggle (SELECT + START)
+    // ═══════════════════════════════════════════════════════════════
+    a = joypad.pressed_h;
+    if a & joypad.JOYH.SELECT != 0 {
+        a = joypad.current_h;
+        if a & joypad.JOYH.START != 0 {
+            // Both SELECT and START pressed this frame → toggle god mode
+            toggle_god_mode();
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // DEBUG: Character cycle (SELECT + L/R shoulder)
+    // ═══════════════════════════════════════════════════════════════
+    a = joypad.pressed_l;
+    if a & (joypad.JOYL.L | joypad.JOYL.R) != 0 {
+        a = joypad.current_h;
+        if a & joypad.JOYH.SELECT != 0 {
+            // SELECT held + L or R pressed → cycle character
+            a = selectedCharacter;
+            a++;
+            if a >= player_chars.N_CHARACTERS {
+                a = 0;
+            }
+            selectedCharacter = a;
+            // Re-initialize cached values and metasprites
+            init();
+            init_metasprites();
+            hud.refresh_player_section();
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // PHASE 1: Save leap velocity before clearing (leaps maintain horizontal movement)
+    // ═══════════════════════════════════════════════════════════════
+    mem16();
+    #[mem16] {
+        _savedXVelocity = aa = entities.SoA.xVelocity[0];
+    }
+    mem8();
+    
+    entity_movement.clear_velocity_player__inline();
+    
+    // ═══════════════════════════════════════════════════════════════
+    // PHASE 2: Handle LANDING state (1-frame recovery)
+    // ═══════════════════════════════════════════════════════════════
+    a = playerState;
+    if a == PlayerState.LANDING as u8 {
+        // Check if landing animation finished
+        carry = _is_non_looping_animation_running();
+        if !carry {
+            // Landing recovery complete → IDLE
+            playerState = a = PlayerState.IDLE as u8;
+        }
+        // During LANDING: no input, no movement
+        ^goto __apply_velocity_only;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════
+    // PHASE 3: Handle AIR state (physics + optional air attack input)
+    // ═══════════════════════════════════════════════════════════════
+    a = playerState;
+    if a == PlayerState.AIR as u8 {
+        // Restore horizontal velocity for leap states (maintain momentum)
+        // Leap states: AIR_LEAP_PREP(2), AIR_LEAP_RISING(3), AIR_LEAP(4), AIR_LEAP_KICK(7)
+        a = airAnimType;
+        if a >= AIR_LEAP_PREP as u8 {
+            if a < AIR_ELBOW as u8 || a == AIR_LEAP_KICK as u8 {
+                mem16();
+                #[mem16] {
+                    entities.SoA.xVelocity[0] = aa = _savedXVelocity;
+                }
+                mem8();
+            }
+        }
+        
+        // Apply gravity and check landing
+        process_air_physics();
+        
+        // If still airborne after physics, check for air attack input
+        a = playerState;
+        if a == PlayerState.AIR as u8 {
+            process_air_attack_input();
+        }
+        ^goto __apply_velocity_only;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // PHASE 3b: PUNCH (combo) and SPECIAL — timer-driven handlers
+    // ═══════════════════════════════════════════════════════════════
+    a = playerState;
+    if a == PlayerState.PUNCH as u8 {
+        update_combo();
+        ^goto __apply_velocity_only;
+    }
+    if a == PlayerState.SPECIAL as u8 {
+        update_special();
+        ^goto __apply_velocity_only;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════
+    // PHASE 3c: HURT / KNOCKDOWN / GETUP — damage state handlers
+    // ═══════════════════════════════════════════════════════════════
+    a = playerState;
+    if a == PlayerState.HURT as u8 {
+        update_hurt();
+        ^goto __apply_velocity_only;
+    }
+    if a == PlayerState.KNOCKDOWN as u8 {
+        update_knockdown();
+        ^goto __apply_velocity_only;
+    }
+    if a == PlayerState.GETUP as u8 {
+        update_getup();
+        ^goto __apply_velocity_only;
+    }
+    if a == PlayerState.GRAB as u8 {
+        update_grab();
+        ^goto __apply_velocity_only;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // PHASE 4: Check if ground action is still running
+    // ═══════════════════════════════════════════════════════════════
+    a = playerState;
+    if a >= PlayerState.PUNCH as u8 {
+        // In a ground action state - check if animation still playing
+        carry = _is_non_looping_animation_running();
+        if carry {
+            // Action still running - skip input
+            ^goto __apply_velocity_only;
+        }
+        // Action finished - fall through to input processing
+    }
+    
+    // ═══════════════════════════════════════════════════════════════
+    // PHASE 4b: Tick combo chain timer (expires in IDLE → resets combo)
+    // ═══════════════════════════════════════════════════════════════
+    a = comboChainTimer;
+    if !zero {
+        a--;
+        comboChainTimer = a;
+        if zero {
+            // Chain window expired → reset combo
+            comboStage = a;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // PHASE 5: Process grounded input (movement, jump, actions)
+    // ═══════════════════════════════════════════════════════════════
+    process_grounded_input();
+    
+    // ═══════════════════════════════════════════════════════════════
+    // PHASE 6: Update animation based on state
+    // ═══════════════════════════════════════════════════════════════
+    update_animation();
+    
+__apply_velocity_only:
+    // ═══════════════════════════════════════════════════════════════
+    // PHASE 7: Apply velocity to position
+    // ═══════════════════════════════════════════════════════════════
+    entity_movement.apply_velocity_player__inline();
+    
+    // ═══════════════════════════════════════════════════════════════
+    // PHASE 8: Clamp position to valid area
+    // ═══════════════════════════════════════════════════════════════
+    clamp_to_visible_area();
+    y = 0;  // Player is entity 0
+    entity_utils.clamp_to_walk_plane(y);
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// AIR PHYSICS
+// ═══════════════════════════════════════════════════════════════
+// Apply gravity, update zPos, check for landing.
+// Landing ALWAYS wins over animation/state.
+// During AIR_JUMP_PREP, player stays grounded until prep animation finishes.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process_air_physics() {
+var _zVelHi : u8 in zpTmp_byte_0;
+var _magnitude : u8 in zpTmp_byte_1;
+
+    // Check for jump preparation state - player stays grounded during prep
+    a = airAnimType;
+    if a == AIR_JUMP_PREP as u8 {
+        // Check if prep animation finished
+        carry = _is_non_looping_animation_running();
+        if !carry {
+            // Prep animation finished → apply velocity and switch to airborne
+            mem16();
+            #[mem16] {
+                zVelocity = aa = cachedJumpVelocity;
+            }
+            mem8();
+            airAnimType = a = AIR_JUMP as u8;
+            set_air_animation(Anim.JUMP_RIGHT);  // Frame 30 = airborne
+        }
+        // During prep: no gravity, no physics, stay grounded
+        return;
+    }
+    
+    // Check for leap preparation state - player stays grounded during prep
+    // but stores horizontal velocity (will be applied each frame once airborne)
+    if a == AIR_LEAP_PREP as u8 {
+        // Check if prep animation finished
+        carry = _is_non_looping_animation_running();
+        if !carry {
+            // Prep animation finished → apply Z velocity and switch to rising phase
+            mem16();
+            #[mem16] {
+                zVelocity = aa = cachedJumpVelocity;
+            }
+            mem8();
+            airAnimType = a = AIR_LEAP_RISING as u8;
+            set_air_animation(Anim.LEAP_SEQUENCE_RIGHT);  // 30->33->34->35
+        }
+        // During prep: no gravity, no physics, stay grounded
+        return;
+    }
+    
+    // Check for leap rising phase transition to falling phase
+    a = airAnimType;
+    if a == AIR_LEAP_RISING as u8 {
+        carry = _is_non_looping_animation_running();
+        if !carry {
+            // Rising animation finished → switch to falling loop (frame 30)
+            airAnimType = a = AIR_LEAP as u8;
+            set_air_animation(Anim.JUMP_RIGHT);  // Frame 30 = loops until landing
+        }
+    }
+
+    // Apply gravity: zVelocity -= GRAVITY (signed 16-bit)
+    mem16();
+    #[mem16] {
+        aa = zVelocity;
+        carry = true;
+        aa -#= cachedGravity;
+
+        zVelocity = aa;
+    }
+    mem8();
+    
+    // Update zPos: add high byte of zVelocity (integer portion)
+    // zVelocity is signed, so we need signed addition
+    _zVelHi = a = >:zVelocity;  // High byte = integer portion
+    
+    // Check sign bit for signed addition
+    if a & 0x80 != 0 {
+        // Negative velocity (falling) - get magnitude and subtract
+        // Negate: magnitude = 0 - _zVelHi
+        a = 0;
+        carry = true;
+        a -#= _zVelHi;
+        _magnitude = a;
+        
+        // Subtract magnitude from zPos
+        a = entities.SoA.zPos[0];
+        carry = true;
+        a -#= _magnitude;
+        
+        // Check for landing (zPos <= 0 means landed)
+        if !carry {
+            // Landed! (underflow = went below 0)
+            ^goto __handle_landing;
+        }
+        entities.SoA.zPos[0] = a;
+    } else {
+        // Positive velocity (rising) - add to zPos
+        a = entities.SoA.zPos[0];
+        carry = false;
+        a +#= _zVelHi;
+        entities.SoA.zPos[0] = a;
+    }
+    return;
+    
+__handle_landing:
+    // Landing ALWAYS wins - clamp and transition
+    entities.SoA.zPos[0] = a = 0;
+    mem16();
+    #[mem16] {
+        zVelocity = aa = 0;
+    }
+    mem8();
+    
+    // Determine landing state based on airAnimType
+    // All landings show recovery frame (29) for visual polish
+    // Vertical jump has short recovery, leaps/attacks have longer
+    a = airAnimType;
+    if a >= AIR_ELBOW as u8 {
+        // Air attack → longer recovery
+        playerState = a = PlayerState.LANDING as u8;
+        set_air_animation(Anim.JUMP_START_RIGHT);  // Frame 29 = touch ground
+        return;
+    }
+    if a == AIR_LEAP as u8 {
+        // Leap → longer recovery
+        playerState = a = PlayerState.LANDING as u8;
+        set_air_animation(Anim.JUMP_START_RIGHT);  // Frame 29 = touch ground
+        return;
+    }
+    // Vertical jump with no attack → short landing recovery
+    playerState = a = PlayerState.LANDING as u8;
+    set_air_animation(Anim.JUMP_START_RIGHT);  // Frame 29 = touch ground;
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// AIR ATTACK INPUT
+// ═══════════════════════════════════════════════════════════════
+// Check for attack input while airborne.
+// Only one air attack per jump (airAnimType >= AIR_ELBOW blocks).
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process_air_attack_input() {
+    // If already attacking, ignore input
+    a = airAnimType;
+    if a >= AIR_ELBOW as u8 {
+        return;
+    }
+    
+    // Check attack button (A)
+    a = joypad.pressed_l;
+    if a & joypad.JOYL.A == 0 {
+        return;  // No attack pressed
+    }
+    
+    // Attack pressed - determine which attack based on current air state
+    a = airAnimType;
+    if a == AIR_JUMP as u8 {
+        // Vertical jump - check for down+attack (elbow) vs plain attack (kick)
+        a = joypad.current_h;
+        if a & joypad.JOYH.DOWN != 0 {
+            // Down+Attack → Air Elbow
+            airAnimType = a = AIR_ELBOW as u8;
+            set_air_animation(Anim.AIR_ELBOW_RIGHT);
+        } else {
+            // Plain Attack → Jump Kick
+            airAnimType = a = AIR_JUMP_KICK as u8;
+            set_air_animation(Anim.JUMP_KICK_RIGHT);
+        }
+    } else if a == AIR_LEAP_RISING as u8 || a == AIR_LEAP as u8 {
+        // Leap (rising or falling) - leap kick available
+        airAnimType = a = AIR_LEAP_KICK as u8;
+        set_air_animation(Anim.LEAP_KICK_RIGHT);
+    }
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// SET AIR ANIMATION (helper)
+// ═══════════════════════════════════════════════════════════════
+// Sets animation with proper hflip based on facingDirection.
+// Always restarts animation (for air attacks).
+//
+// DB = 0x7e
+// ─── get_ms_anim_index: role index → metasprite animation index ──────
+// Translates abstract role index to character-specific metasprite animation index.
+// Input:  a = role index (from Anim namespace constants)
+// Output: a = metasprite animation index for current character
+// DB = 0x7e
+#[mem8, idx8]
+func get_ms_anim_index(roleIndex : u8 in a) : u8 in a {
+    // anim_map is indexed by: selectedCharacter * N_ANIM_ROLES + roleIndex
+    // We need: selectedCharacter * 21
+    
+    // Save role index
+    zpTmp_byte_1 = a;
+    
+    // Calculate offset: selectedCharacter * 21
+    // 21 = 16 + 4 + 1
+    x = selectedCharacter;
+    zpTmp_byte_0 = a = x;
+    
+    // x * 16
+    a = x;
+    a <<= 1;
+    a <<= 1;
+    a <<= 1;
+    a <<= 1;
+    zpTmp_byte_2 = a;
+    
+    // x * 4
+    a = zpTmp_byte_0;
+    a <<= 1;
+    a <<= 1;
+    zpTmp_byte_3 = a;
+    
+    // Sum: 16 + 4 + 1
+    a = zpTmp_byte_2;
+    carry = false;
+    a +#= zpTmp_byte_3;
+    carry = false;
+    a +#= zpTmp_byte_0;
+    
+    // Add role index
+    carry = false;
+    a +#= zpTmp_byte_1;
+    
+    // Look up in anim_map
+    x = a;
+    a = player_chars.anim_map[x];
+    
+    return a;
+}
+
+#[mem8, idx8]
+func set_air_animation(roleIndex : u8 in a) {
+    // Translate role to metasprite animation index
+    a = get_ms_anim_index(a);
+    
+    x = facingDirection;
+    if x == FacingDirection.LEFT as u8 {
+        carry = false;
+        a +#= cachedHflipOffset;
+    }
+    ^return _set_ms_animation(a);
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// COMBO SYSTEM
+// ═══════════════════════════════════════════════════════════════
+// start_combo_stage  – arm a single combo hit (startup phase)
+// update_combo       – per-frame PUNCH state driver
+// update_special     – per-frame SPECIAL state driver
+
+// Start (or restart) a combo at the given stage.
+// Sets phase → STARTUP, loads timing and animation from the move tables.
+// Called from grounded input (stage 0) and from update_combo on chain.
+//
+// INPUT: a = stage index (0–3)
+// DB = 0x7e
+#[mem8, idx8]
+func start_combo_stage(stage : u8 in a) {
+    // Save stage to memory first since we need it after the function call
+    // (A register will be clobbered by clear_hit_tracking)
+    comboStage = a;
+
+    // Compute flat combo table index: charComboBase + comboStage
+    carry = false;
+    a +#= charComboBase;
+    x = a;
+
+    // Arm the damage value BEFORE clearing hit tracking, so if the enemy
+    // gets hit immediately (during STARTUP), they take the correct damage
+    a = player_chars.combo_damage[x];
+    currentAttackDamage = a;
+
+    // Clear hit tracking so this attack can hit enemies that were
+    // already hit in a previous combo stage
+    collision.clear_hit_tracking();
+
+    // Restore flat table index
+    a = comboStage;
+    carry = false;
+    a +#= charComboBase;
+    x = a;
+    comboPhase = a = COMBO_STARTUP;
+    a = player_chars.combo_startup[x];
+    comboTimer = a;
+    comboHitConnected = a = 0;
+
+    // Play the combo animation (set_air_animation applies hflip)
+    // Restore flat table index again
+    a = comboStage;
+    carry = false;
+    a +#= charComboBase;
+    x = a;
+    a = player_chars.combo_anim_id[x];
+    ^return set_air_animation(a);
+}
+
+
+// Per-frame driver for PUNCH state.
+// Runs the startup → active → recovery FSM, reads the 1-frame-delayed
+// playerAttackHit feedback, and either chains to the next stage or
+// resets to IDLE.
+//
+// NOTE: a hit that lands on the very last ACTIVE frame is detected by
+// detect_all() *after* this function has already transitioned to
+// RECOVERY, so that hit will use recMiss timing.  This is an inherent
+// consequence of the loop order (player.process → detect_all).
+//
+// DB = 0x7e
+#[mem8, idx8]
+func update_combo() {
+    // ── Read hit feedback from previous frame ────────────────────
+    a = playerAttackHit;
+    if !zero {
+        comboHitConnected = a = 1;
+    }
+
+    a = comboPhase;
+
+    // ── STARTUP ─────────────────────────────────────────────────
+    if a == COMBO_STARTUP {
+        a = comboTimer;
+        a--;
+        comboTimer = a;
+        if zero {
+            // Startup expired → arm hitbox (ACTIVE)
+            comboPhase = a = COMBO_ACTIVE;
+            // Compute flat combo table index: charComboBase + comboStage
+            a = comboStage;
+            carry = false;
+            a +#= charComboBase;
+            x = a;
+            a = player_chars.combo_active[x];
+            comboTimer = a;
+            // Arm the damage value that collision will read
+            a = player_chars.combo_damage[x];
+            currentAttackDamage = a;
+        }
+        return;
+    }
+
+    // ── ACTIVE ──────────────────────────────────────────────────
+    if a == COMBO_ACTIVE {
+        a = comboTimer;
+        a--;
+        comboTimer = a;
+        if zero {
+            // Active expired → short recovery cooldown
+            comboPhase = a = COMBO_RECOVERY;
+            a = comboStage;
+            carry = false;
+            a +#= charComboBase;
+            x = a;
+            a = player_chars.combo_recovery[x];
+            comboTimer = a;
+        }
+        return;
+    }
+
+    // ── RECOVERY ────────────────────────────────────────────────
+    // Short cooldown then return to IDLE with chain timer running.
+    a = comboTimer;
+    a--;
+    comboTimer = a;
+    if zero {
+        // Recovery done → return to IDLE
+        playerState = a = PlayerState.IDLE as u8;
+
+        // If hit connected, start the chain window so next attack continues combo.
+        // If missed, combo resets immediately (comboChainTimer stays 0).
+        a = comboHitConnected;
+        if !zero {
+            a = comboStage;
+            cmp(a, maxComboStage);
+            if !carry {
+                // Not at end of combo — arm chain timer
+                comboChainTimer = a = COMBO_CHAIN_WINDOW;
+                return;
+            }
+        }
+        // Miss or combo finished → reset stage
+        comboStage = a = 0;
+        comboChainTimer = a;
+    }
+}
+
+
+// Per-frame driver for SPECIAL state.
+// Runs startup → active → recovery using the special-move constants.
+// Special is airborne - applies gravity and checks for landing.
+// Grants i-frames when recovery begins.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func update_special() {
+var _zVelHi : u8 in zpTmp_byte_0;
+var _magnitude : u8 in zpTmp_byte_1;
+
+    // ── Apply gravity and air physics ───────────────────────────
+    mem16();
+    #[mem16] {
+        aa = zVelocity;
+        carry = true;
+        aa -#= cachedGravity;
+        zVelocity = aa;
+    }
+    mem8();
+
+    // Update zPos based on zVelocity high byte (integer portion)
+    _zVelHi = a = >:zVelocity;
+
+    if a & 0x80 != 0 {
+        // Negative velocity (falling) - get magnitude and subtract
+        a = 0;
+        carry = true;
+        a -#= _zVelHi;
+        _magnitude = a;
+
+        // Subtract magnitude from zPos
+        a = entities.SoA.zPos[0];
+        carry = true;
+        a -#= _magnitude;
+
+        // Check for landing (zPos <= 0 means landed)
+        if !carry {
+            // Landed! End special immediately
+            ^goto __special_landed;
+        }
+        entities.SoA.zPos[0] = a;
+    } else {
+        // Positive velocity (rising) - add to zPos
+        a = entities.SoA.zPos[0];
+        carry = false;
+        a +#= _zVelHi;
+        entities.SoA.zPos[0] = a;
+    }
+
+    // ── Phase-based timer logic ─────────────────────────────────
+    a = comboPhase;
+
+    // ── STARTUP ─────────────────────────────────────────────────
+    if a == COMBO_STARTUP {
+        a = comboTimer;
+        a--;
+        comboTimer = a;
+        if zero {
+            comboPhase = a = COMBO_ACTIVE;
+            x = selectedCharacter;
+            comboTimer = a = player_chars.special_active[x];
+            currentAttackDamage = a = player_chars.special_damage[x];
+        }
+        return;
+    }
+
+    // ── ACTIVE ──────────────────────────────────────────────────
+    if a == COMBO_ACTIVE {
+        a = comboTimer;
+        a--;
+        comboTimer = a;
+        if zero {
+            comboPhase = a = COMBO_RECOVERY;
+            x = selectedCharacter;
+            comboTimer = a = player_chars.special_recovery[x];
+            // Grant i-frames for the recovery window
+            iframeCounter = a = player_chars.special_iframes[x];
+        }
+        return;
+    }
+
+    // ── RECOVERY ────────────────────────────────────────────────
+    a = comboTimer;
+    a--;
+    comboTimer = a;
+    if zero {
+        playerState = a = PlayerState.IDLE as u8;
+    }
+    return;
+
+__special_landed:
+    // Landing ends special - clamp zPos and reset velocity
+    entities.SoA.zPos[0] = a = 0;
+    mem16();
+    #[mem16] {
+        zVelocity = aa = 0;
+    }
+    mem8();
+
+    // Transition to IDLE (or could use LANDING for recovery animation)
+    playerState = a = PlayerState.IDLE as u8;
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// GROUNDED INPUT
+// ═══════════════════════════════════════════════════════════════
+// Process input when player is on the ground.
+// Handles movement, jump initiation, and ground attacks.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process_grounded_input() {
+    // ═══════════════════════════════════════════════════════════════
+    // Check for grab (automatic when close to enemy)
+    // ═══════════════════════════════════════════════════════════════
+    carry = check_for_grab();
+    if carry {
+        // Grab initiated - don't process other input
+        return;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Check simultaneous B+A → Special (must come before standalone B or A)
+    // ═══════════════════════════════════════════════════════════════
+    a = joypad.current_h;
+    if a & joypad.JOYH.B != 0 {
+        a = joypad.current_l;
+        if a & joypad.JOYL.A != 0 {
+            // Both B and A held — trigger special if either was pressed this frame
+            a = joypad.pressed_h;
+            if a & joypad.JOYH.B != 0 { goto __do_special; }
+            a = joypad.pressed_l;
+            if a & joypad.JOYL.A != 0 { goto __do_special; }
+        }
+    }
+    goto __check_jump;
+
+__do_special:
+    // Health gate: special costs HP and cannot kill the player
+    x = selectedCharacter;
+    a = player_chars.special_health_cost[x];
+    a++;  // need health > cost (not >=) to survive
+    zpTmp_byte_0 = a;
+    a = health;
+    cmp(a, zpTmp_byte_0);
+    if !carry {
+        goto __check_jump;  // HP too low — fall through to normal input
+    }
+    x = selectedCharacter;
+    a = health;
+    carry = true;
+    a -#= player_chars.special_health_cost[x];
+    health = a;
+    playerState = a = PlayerState.SPECIAL as u8;
+    comboPhase = a = COMBO_STARTUP;
+    x = selectedCharacter;
+    comboTimer = a = player_chars.special_startup[x];
+
+    // Apply jump impulse - special is airborne
+    mem16();
+    #[mem16] {
+        zVelocity = aa = cachedJumpVelocity;
+    }
+    mem8();
+
+    // Set special animation based on facing direction
+    a = Anim.SPECIAL_RIGHT as u8;  // role index
+    a = get_ms_anim_index(a);  // translate to metasprite index
+    
+    x = facingDirection;
+    if x == FacingDirection.LEFT as u8 {
+        carry = false;
+        a +#= cachedHflipOffset;
+    }
+    metasprites.set_entity_animation(PLAYER_ENTITY_ID, a);
+    return;
+
+__check_jump:
+    // ═══════════════════════════════════════════════════════════════
+    // Check jump button (B) - initiates AIR state
+    // ═══════════════════════════════════════════════════════════════
+    a = joypad.pressed_h;
+    if a & joypad.JOYH.B != 0 {
+        // Jump pressed - initiate jump
+        // For vertical jump: velocity applied after prep animation finishes
+        // For leaps: velocity applied immediately (no prep)
+        
+        // Determine jump type from current D-pad (direction locked at jump start)
+        // First check horizontal input for facing and velocity
+        a = joypad.current_h;
+        if a & joypad.JOYH.LEFT != 0 {
+            // Moving left - leap starts with prep, stores horizontal velocity
+            mem16();
+            #[mem16] {
+                // Store horizontal velocity - will be applied each frame during AIR
+                aa = 0;
+                carry = true;
+                aa -#= cachedMoveSpeedX;
+                entities.SoA.xVelocity[0] = aa;
+            }
+            mem8();
+            facingDirection = a = FacingDirection.LEFT as u8;
+            airAnimType = a = AIR_LEAP_PREP as u8;
+            playerState = a = PlayerState.AIR as u8;
+            set_air_animation(Anim.JUMP_START_RIGHT);  // Frame 29 = prep
+            return;
+        }
+        
+        a = joypad.current_h;
+        if a & joypad.JOYH.RIGHT != 0 {
+            // Moving right - leap starts with prep, stores horizontal velocity
+            mem16();
+            #[mem16] {
+                // Store horizontal velocity - will be applied each frame during AIR
+                entities.SoA.xVelocity[0] = aa = cachedMoveSpeedX;
+            }
+            mem8();
+            facingDirection = a = FacingDirection.RIGHT as u8;
+            airAnimType = a = AIR_LEAP_PREP as u8;
+            playerState = a = PlayerState.AIR as u8;
+            set_air_animation(Anim.JUMP_START_RIGHT);  // Frame 29 = prep
+            return;
+        }
+        
+        // No horizontal input - vertical jump
+        // Start with preparation frame (29), will transition to airborne (30) when animation finishes
+        airAnimType = a = AIR_JUMP_PREP as u8;
+        playerState = a = PlayerState.AIR as u8;
+        set_air_animation(Anim.JUMP_START_RIGHT);  // Frame 29 = preparation
+        return;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════
+    // Check action buttons (ground attacks)
+    // ═══════════════════════════════════════════════════════════════
+    
+    // A button → punch. If chain timer active, continue combo; otherwise start fresh.
+    a = joypad.pressed_l;
+    if a & joypad.JOYL.A != 0 {
+        playerState = a = PlayerState.PUNCH as u8;
+        a = comboChainTimer;
+        if !zero {
+            // Chain timer active → advance to next combo stage
+            comboChainTimer = a = 0;
+            a = comboStage;
+            a++;
+            start_combo_stage(a);
+        } else {
+            start_combo_stage(0);
+        }
+        return;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════
+    // Process D-pad movement input
+    // ═══════════════════════════════════════════════════════════════
+    
+    // Horizontal movement (changes facing)
+    a = joypad.current_h;
+    if a & joypad.JOYH.LEFT != 0 {
+        mem16();
+        #[mem16] {
+            aa = 0;
+            carry = true;
+            aa -#= cachedMoveSpeedX;
+            entities.SoA.xVelocity[0] = aa;
+        }
+        mem8();
+        facingDirection = a = FacingDirection.LEFT as u8;
+        playerState = a = PlayerState.WALKING as u8;
+    } else {
+        a = joypad.current_h;
+        if a & joypad.JOYH.RIGHT != 0 {
+            mem16();
+            #[mem16] {
+                entities.SoA.xVelocity[0] = aa = cachedMoveSpeedX;
+            }
+            mem8();
+            facingDirection = a = FacingDirection.RIGHT as u8;
+            playerState = a = PlayerState.WALKING as u8;
+        }
+    }
+    
+    // Vertical movement (does NOT change facing)
+    a = joypad.current_h;
+    if a & joypad.JOYH.UP != 0 {
+        mem16();
+        #[mem16] {
+            aa = 0;
+            carry = true;
+            aa -#= cachedMoveSpeedY;
+            entities.SoA.yVelocity[0] = aa;
+        }
+        mem8();
+        playerState = a = PlayerState.WALKING as u8;
+    } else {
+        a = joypad.current_h;
+        if a & joypad.JOYH.DOWN != 0 {
+            mem16();
+            #[mem16] {
+                entities.SoA.yVelocity[0] = aa = cachedMoveSpeedY;
+            }
+            mem8();
+            playerState = a = PlayerState.WALKING as u8;
+        }
+    }
+    
+    // If no D-pad input, velocity is 0 → IDLE
+    mem16();
+    #[mem16] {
+        aa = entities.SoA.xVelocity[0];
+        aa |= entities.SoA.yVelocity[0];
+    }
+    mem8();
+    if zero {
+        playerState = a = PlayerState.IDLE as u8;
+    }
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// ANIMATION UPDATE
+// ═══════════════════════════════════════════════════════════════
+// Select animation based on (playerState, facingDirection).
+// AIR state uses airAnimType for animation selection.
+// Uses _set_ms_animation_if_changed to avoid restarting loops.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func update_animation() {
+    // Special handling for AIR state - use airAnimType lookup
+    a = playerState;
+    if a == PlayerState.AIR as u8 {
+        x = airAnimType;
+        a = air_anim_table[x];
+        
+        // Translate role to metasprite animation index
+        a = get_ms_anim_index(a);
+        
+        x = facingDirection;
+        if x == FacingDirection.LEFT as u8 {
+            carry = false;
+            a +#= cachedHflipOffset;
+        }
+        ^return _set_ms_animation(a);
+    }
+
+    // Combo, special, grab, and throw: animation is set directly by those systems;
+    // don't overwrite or restart it here.
+    if a == PlayerState.PUNCH as u8 { return; }
+    if a == PlayerState.SPECIAL as u8 { return; }
+    if a == PlayerState.GRAB as u8 { return; }
+    if a == PlayerState.THROW as u8 { return; }
+
+    // Ground states - use state lookup table
+    x = playerState;
+    a = state_to_anim_table[x];
+    
+    // Translate role to metasprite animation index
+    a = get_ms_anim_index(a);
+    
+    // Add hflip offset if facing left
+    x = facingDirection;
+    if x == FacingDirection.LEFT as u8 {
+        carry = false;
+        a +#= cachedHflipOffset;
+    }
+    
+    // Check if this is an action state (PUNCH and above)
+    x = playerState;
+    if x >= PlayerState.PUNCH as u8 {
+        // Actions always restart animation from frame 0
+        ^return _set_ms_animation(a);
+    }
+    
+    // Movement/Idle: only change if different
+    ^return _set_ms_animation_if_changed(a);
+}
+
+// Animation lookup table: state → base animation (right-facing)
+// Index by PlayerState enum value
+const __state_to_anim_table : [u8] = [
+    Anim.IDLE_RIGHT,        // 0 = IDLE
+    Anim.WALK_RIGHT,        // 1 = WALKING
+    Anim.JUMP_RIGHT,        // 2 = AIR (fallback, normally uses air_anim_table)
+    Anim.JUMP_START_RIGHT,  // 3 = LANDING (frame 29 = touch ground)
+    Anim.ATTACK1_RIGHT,      // 4 = PUNCH (never reached: early return)
+    Anim.HURT_RIGHT,        // 5 = HURT
+    Anim.GRAB_THROW_RIGHT,  // 6 = THROW
+    Anim.SPECIAL_RIGHT,     // 7 = SPECIAL (never reached: early return)
+    Anim.GRAB_RIGHT,        // 8 = GRAB
+    Anim.HURT_RIGHT,        // 9 = GRABBED (player grabbed by enemy - placeholder)
+    Anim.KNOCKDOWN_RIGHT,   // 10 = KNOCKDOWN
+    Anim.RECOVER_RIGHT,     // 11 = GETUP
+];
+let state_to_anim_table = far &__state_to_anim_table as far *u8;
+
+// Air animation lookup table: airAnimType → base animation (right-facing)
+const __air_anim_table : [u8] = [
+    Anim.JUMP_START_RIGHT,     // 0 = AIR_JUMP_PREP (frame 29, preparation)
+    Anim.JUMP_RIGHT,           // 1 = AIR_JUMP (frame 30, airborne loop)
+    Anim.JUMP_START_RIGHT,     // 2 = AIR_LEAP_PREP (frame 29, preparation)
+    Anim.LEAP_SEQUENCE_RIGHT,  // 3 = AIR_LEAP_RISING (30->33->34->35)
+    Anim.JUMP_RIGHT,           // 4 = AIR_LEAP (frame 30, falling loop)
+    Anim.AIR_ELBOW_RIGHT,      // 5 = AIR_ELBOW
+    Anim.JUMP_KICK_RIGHT,      // 6 = AIR_JUMP_KICK
+    Anim.LEAP_KICK_RIGHT,      // 7 = AIR_LEAP_KICK
+];
+let air_anim_table = far &__air_anim_table as far *u8;
+
+// Combo tables and special move constants are now in player_characters.json
+// and accessed via player_chars.* ROM tables indexed by selectedCharacter.
+
+
+// Screen dimensions for AABB clamping
+let SCREEN_WIDTH = 256;
+let SCREEN_HEIGHT = 224;
+
+// Clamp player world position to keep AABB within visible screen area
+// Uses 16-bit math. This is verbose because Wiz/65816 requires:
+// - Separate lo/hi byte access for SoA arrays
+// - Manual mode switching (mem8/mem16)
+// - No direct u8→u16 register cast in mem16 mode
+//
+// Equivalent C code would be:
+//   if(worldX + left < camX) worldX = camX - left;
+//   if(worldX + left + width > camX + 256) worldX = camX + 256 - left - width;
+//   (same for Y)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func clamp_to_visible_area() {
+var _aabbEdge    : u16 in zpTmp_word_0;
+var _camEdge     : u16 in zpTmp_word_1;
+var _leftOffset  : u16 in zpTmp_word_2;
+var _rightOffset : u16 in zpTmp_word_3;
+
+    // =========================
+    // X OFFSETS
+    // =========================
+    (&<:_leftOffset as *u8)[0] = a = entities.SoA.bounds_left[0];
+    (&<:_leftOffset as *u8)[1] = a = 0;
+
+    a = entities.SoA.bounds_left[0];
+    carry = false;
+    a +#= entities.SoA.bounds_width[0];
+    (&<:_rightOffset as *u8)[0] = a;
+    (&<:_rightOffset as *u8)[1] = a = 0;
+
+    // =========================
+    // X AXIS
+    // =========================
+    mem16();
+    #[mem16] {
+        // ---- LEFT edge ----
+        // Clamp so that aabbLeft >= camX
+        // aabbLeft = worldX + leftOffset
+        // We want: worldX + leftOffset >= camX
+        // So: worldX >= camX - leftOffset
+        //
+        // When camX=0 and leftOffset=38: worldX >= -38 (0xFFDA)
+        
+        aa = *((&entities.SoA.worldX_lo[0]) as *u16);
+        carry = false;
+        aa +#= _leftOffset;
+        _aabbEdge = aa;  // aabbLeft
+
+        // Compare aabbLeft with camX
+        // If aabbLeft < camX (unsigned), player went too far left
+        // But we need SIGNED comparison because aabbLeft can wrap
+        // 
+        // Signed comparison: if (aabbLeft - camX) is negative (bit 15 set), clamp
+        aa = _aabbEdge;
+        carry = true;
+        aa -#= camera.camX;
+        // If result is negative (aabbLeft < camX in signed terms), clamp
+        if aa & 0x8000 == 0 {
+            // aabbLeft >= camX, player is within bounds
+            goto __check_right_x;
+        }
+
+        // aabbLeft < camX, clamp: worldX = camX - leftOffset
+        aa = camera.camX;
+        carry = true;
+        aa -#= _leftOffset;
+        *((&entities.SoA.worldX_lo[0]) as *u16) = aa;
+
+__check_right_x:
+        // ---- RIGHT edge ----
+        // NOTE: re-read worldX (may have been clamped above)
+        aa = *((&entities.SoA.worldX_lo[0]) as *u16);
+        carry = false;
+        aa +#= _rightOffset;
+        _aabbEdge = aa;
+
+        aa = camera.camX;
+        carry = false;
+        aa +#= SCREEN_WIDTH as u16;
+        _camEdge = aa;
+
+        // if aabbRight > camRight → clamp
+        cmp(aa, _aabbEdge);
+        if carry {
+            goto __x_done;
+        }
+
+        aa = _camEdge;
+        carry = true;
+        aa -#= _rightOffset;
+        *((&entities.SoA.worldX_lo[0]) as *u16) = aa;
+
+__x_done:
+    }
+    mem8();
+
+    // =========================
+    // Y OFFSETS
+    // =========================
+    (&<:_leftOffset as *u8)[0] = a = entities.SoA.bounds_top[0];
+    (&<:_leftOffset as *u8)[1] = a = 0;
+
+    a = entities.SoA.bounds_top[0];
+    carry = false;
+    a +#= entities.SoA.bounds_height[0];
+    (&<:_rightOffset as *u8)[0] = a;
+    (&<:_rightOffset as *u8)[1] = a = 0;
+
+    // =========================
+    // Y AXIS
+    // =========================
+    mem16();
+    #[mem16] {
+        // ---- TOP edge ----
+        // Clamp so that aabbTop >= camY
+        aa = *((&entities.SoA.worldY_lo[0]) as *u16);
+        carry = false;
+        aa +#= _leftOffset;  // _leftOffset reused for topOffset
+        _aabbEdge = aa;  // aabbTop
+
+        // Signed comparison: if (aabbTop - camY) is negative, clamp
+        aa = _aabbEdge;
+        carry = true;
+        aa -#= camera.camY;
+        if aa & 0x8000 == 0 {
+            goto __check_bottom_y;
+        }
+
+        // aabbTop < camY, clamp: worldY = camY - topOffset
+        aa = camera.camY;
+        carry = true;
+        aa -#= _leftOffset;
+        *((&entities.SoA.worldY_lo[0]) as *u16) = aa;
+
+__check_bottom_y:
+        // ---- BOTTOM edge ----
+        aa = *((&entities.SoA.worldY_lo[0]) as *u16);
+        carry = false;
+        aa +#= _rightOffset;
+        _aabbEdge = aa;
+
+        aa = camera.camY;
+        carry = false;
+        aa +#= SCREEN_HEIGHT as u16;
+        _camEdge = aa;
+
+        cmp(aa, _aabbEdge);
+        if carry {
+            goto __y_done;
+        }
+
+        aa = _camEdge;
+        carry = true;
+        aa -#= _rightOffset;
+        *((&entities.SoA.worldY_lo[0]) as *u16) = aa;
+
+__y_done:
+    }
+    mem8();
+}
+
+// Clamp player AABB vertically to map walk plane (ceiling + floor)
+//
+// ═══════════════════════════════════════════════════════════════════════════
+// DAMAGE HANDLING
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Number of i-frames granted when player is hit
+let PLAYER_IFRAMES = 60;  // 1 second at 60fps
+
+// Handle player taking damage from enemy attack.
+// Applies damage, sets i-frames, triggers hurt or knockdown animation.
+// Knockback direction is based on attacker's facing (pushed in that direction).
+//
+// INPUT: a = damage byte (bit 7 = knockdown flag, bits 0-6 = damage amount)
+//        y = attacker's facing direction (0=RIGHT, 1=LEFT)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func take_damage(damage : u8 in a, attackerFacing : u8 in y) {
+    // Save attacker facing for knockback calculation
+    zpTmp_byte_2 = y;
+
+    // Skip if god mode enabled
+    x = godMode;
+    if !zero { return; }
+
+    // Skip if already in i-frames
+    x = iframeCounter;
+    if !zero { return; }
+
+    // If in GRAB state, release the enemy first
+    x = playerState;
+    if x == PlayerState.GRAB as u8 {
+        // Release grabbed enemy (they return to approach state)
+        y = grabbedEnemyId;
+        if y != 0xFF {
+            grunt_ai.on_grab_released(y);
+        }
+        release_grab();
+    }
+
+    // Save full damage byte (includes knockdown flag)
+    zpTmp_byte_0 = a;
+    zpTmp_byte_1 = a;  // Keep copy for knockdown check
+    
+    // Mask off knockdown flag to get actual damage
+    a &= 0x7F;
+    zpTmp_byte_0 = a;
+    
+    // Subtract damage from health
+    a = health;
+    carry = true;
+    a -#= zpTmp_byte_0;
+    if !carry || zero {
+        // Dead - force knockdown state for death animation
+        health = a = 0;
+        goto __force_knockdown;
+    }
+    health = a;
+    
+    // Check knockdown flag (bit 7 of original damage byte)
+    a = zpTmp_byte_1;
+    if a & 0x80 != 0 {
+        goto __force_knockdown;
+    }
+
+    // Increment hit counter - force knockdown after several consecutive hits
+    a = hitCounter;
+    a++;
+    hitCounter = a;
+    x = selectedCharacter;
+    cmp(a, player_chars.hits_to_knockdown[x]);
+    if carry {
+        goto __force_knockdown;
+    }
+
+    // Regular hitstun
+    iframeCounter = a = PLAYER_IFRAMES;
+    comboTimer = a = 0;  // Interrupt any active combo
+    comboChainTimer = a; // Reset chain window
+    comboStage = a;      // Reset combo stage
+
+    x = selectedCharacter;
+    hurtTimer = a = player_chars.hitstun_frames[x];
+    knockbackSpeed = a = player_chars.knockback_speed[x];
+
+    // Knockback in direction attacker is facing (pushed away from attacker)
+    knockbackDirection = a = zpTmp_byte_2;
+
+    playerState = a = PlayerState.HURT as u8;
+    
+    // Set hurt animation based on facing direction
+    a = Anim.HURT_RIGHT as u8;  // role index
+    a = get_ms_anim_index(a);   // translate to metasprite index
+    
+    x = facingDirection;
+    if x == FacingDirection.LEFT as u8 {
+        carry = false;
+        a +#= cachedHflipOffset;
+    }
+    metasprites.set_entity_animation(PLAYER_ENTITY_ID, a);
+    return;
+    
+__force_knockdown:
+    // Knockdown state (from knockdown flag, death, or hit counter)
+    iframeCounter = a = PLAYER_IFRAMES;
+    comboTimer = a = 0;  // Interrupt any active combo
+    comboChainTimer = a; // Reset chain window
+    comboStage = a;      // Reset combo stage
+    hitCounter = a = 0;  // Reset hit counter
+
+    x = selectedCharacter;
+    hurtTimer = a = player_chars.knockdown_frames[x];
+    knockbackSpeed = a = player_chars.knockback_speed[x];
+
+    // Knockback in direction attacker is facing (pushed away from attacker)
+    knockbackDirection = a = zpTmp_byte_2;
+
+    playerState = a = PlayerState.KNOCKDOWN as u8;
+    
+    // Set knockdown animation based on facing direction
+    a = Anim.KNOCKDOWN_RIGHT as u8;  // role index
+    a = get_ms_anim_index(a);        // translate to metasprite index
+    
+    x = facingDirection;
+    if x == FacingDirection.LEFT as u8 {
+        carry = false;
+        a +#= cachedHflipOffset;
+    }
+    metasprites.set_entity_animation(PLAYER_ENTITY_ID, a);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HURT STATE HANDLERS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// HURT state: Hitstun with knockback, transitions to IDLE when timer expires.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func update_hurt() {
+    // Apply knockback velocity (decays each frame)
+    // apply_knockback();
+    
+    // Decrement timer
+    a = hurtTimer;
+    if !zero {
+        a--;
+        hurtTimer = a;
+        return;
+    }
+    
+    // Timer expired - return to idle
+    playerState = a = PlayerState.IDLE as u8;
+}
+
+
+// KNOCKDOWN state: On the ground, transitions to GETUP when timer expires.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func update_knockdown() {
+    // Apply knockback velocity (decays each frame)
+    apply_knockback();
+    
+    // Decrement timer
+    a = hurtTimer;
+    if !zero {
+        a--;
+        hurtTimer = a;
+        return;
+    }
+    
+    // Check if dead (health == 0)
+    a = health;
+    if zero {
+        // TODO: Trigger death/respawn sequence
+        // For now, stay in knockdown state
+        return;
+    }
+    
+    // Timer expired, still alive - start getting up
+    x = selectedCharacter;
+    hurtTimer = a = player_chars.getup_frames[x];
+    playerState = a = PlayerState.GETUP as u8;
+    
+    // Set recover animation based on facing direction
+    a = Anim.RECOVER_RIGHT as u8;  // role index
+    a = get_ms_anim_index(a);      // translate to metasprite index
+    
+    x = facingDirection;
+    if x == FacingDirection.LEFT as u8 {
+        carry = false;
+        a +#= cachedHflipOffset;
+    }
+    metasprites.set_entity_animation(PLAYER_ENTITY_ID, a);
+}
+
+
+// GETUP state: Rising from ground, transitions to IDLE when timer expires.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func update_getup() {
+    // No knockback during getup (stationary)
+
+    // Decrement timer
+    a = hurtTimer;
+    if !zero {
+        a--;
+        hurtTimer = a;
+        return;
+    }
+
+    // Timer expired - return to idle with fresh i-frames
+    iframeCounter = a = PLAYER_IFRAMES;
+    playerState = a = PlayerState.IDLE as u8;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GRAB STATE HANDLER
+// ═══════════════════════════════════════════════════════════════════════════
+
+// GRAB state: Player is holding an enemy.
+// - Player cannot move
+// - Attack button: grab attack (up to 3, then knockdown)
+// - Attack + opposite direction: throw
+// - Timer expires: enemy escapes
+//
+// DB = 0x7e
+#[mem8, idx8]
+func update_grab() {
+    // No player movement during grab (velocity cleared at start of process)
+
+    // Check if grabbed enemy is still valid
+    y = grabbedEnemyId;
+    if y == 0xFF {
+        // No enemy - shouldn't happen but return to idle
+        playerState = a = PlayerState.IDLE as u8;
+        return;
+    }
+
+    // Check if enemy is still alive and in GRABBED state
+    a = entities.SoA.health[unaligned y];
+    if zero {
+        // Enemy died - release grab and return to idle
+        release_grab();
+        return;
+    }
+    a = entities.SoA.var_0_l[unaligned y];
+    if a != grunt_ai.GruntState.GRABBED as u8 {
+        // Enemy escaped somehow - release grab
+        release_grab();
+        return;
+    }
+
+    // Decrement escape timer
+    a = grabTimer;
+    if !zero {
+        a--;
+        grabTimer = a;
+        if zero {
+            // Timer expired - enemy escapes
+            y = grabbedEnemyId;
+            grunt_ai.on_grab_released(y);
+            release_grab();
+            return;
+        }
+    }
+
+    // Check if grab kick animation is still playing
+    a = grabKickTimer;
+    if !zero {
+        a--;
+        grabKickTimer = a;
+        if zero {
+            // Kick animation finished
+            // Check if we've reached max attacks - if so, knockdown and release
+            a = grabAttackCount;
+            x = selectedCharacter;
+            cmp(a, player_chars.grab_max_attacks[x]);
+            if carry {
+                // Max attacks - knock enemy down and release
+                y = grabbedEnemyId;
+                grunt_anim.clear_variant(y);
+                entities.SoA.var_0_l[unaligned y] = a = grunt_ai.GruntState.KNOCKDOWN as u8;
+                entities.SoA.var_0_h[unaligned y] = a = grunt_ai.KNOCKDOWN_FRAMES;
+                entities.SoA.var_2_l[unaligned y] = a = grunt_ai.KNOCKBACK_SPEED;
+                release_grab();
+                return;
+            }
+
+            // Otherwise, return to grab pose
+            a = Anim.GRAB_RIGHT as u8;  // role index
+            a = get_ms_anim_index(a);  // translate to metasprite index
+            
+            x = facingDirection;
+            if x == FacingDirection.LEFT as u8 {
+                carry = false;
+                a +#= cachedHflipOffset;
+            }
+            metasprites.set_entity_animation(PLAYER_ENTITY_ID, a);
+        }
+        return;  // Wait for kick animation to finish
+    }
+
+    // Check for attack input
+    a = joypad.pressed_l;
+    if a & joypad.JOYL.A != 0 {
+        // Attack pressed - check for throw (any direction + attack)
+        a = joypad.current_h;
+        if a & joypad.JOYH.LEFT != 0 {
+            // Throw left!
+            do_grab_throw__left();
+            return;
+        }
+        if a & joypad.JOYH.RIGHT != 0 {
+            // Throw right!
+            do_grab_throw__right();
+            return;
+        }
+
+        // Regular grab attack (no direction held)
+        do_grab_attack();
+        return;
+    }
+}
+
+
+// Perform a grab attack (knee strike)
+// Increments attack count, knocks down enemy after MAX_GRAB_ATTACKS
+//
+// DB = 0x7e
+#[mem8, idx8]
+func do_grab_attack() {
+    // Increment attack count
+    a = grabAttackCount;
+    a++;
+    grabAttackCount = a;
+
+    // Set grab kick animation based on facing direction
+    a = Anim.GRAB_KICK_RIGHT as u8;  // role index
+    a = get_ms_anim_index(a);  // translate to metasprite index
+    
+    x = facingDirection;
+    if x == FacingDirection.LEFT as u8 {
+        carry = false;
+        a +#= cachedHflipOffset;
+    }
+    metasprites.set_entity_animation(PLAYER_ENTITY_ID, a);
+
+    // Set kick animation timer (blocks input until animation finishes)
+    x = selectedCharacter;
+    grabKickTimer = a = player_chars.grab_attack_frames[x];
+
+    // Reset grab timer (enemy stays grabbed after hit)
+    grabTimer = a = player_chars.grab_escape_frames[x];
+
+    // Arm damage for collision system to apply when hitbox overlaps enemy hurtbox.
+    // Collision system will call on_grab_hit() AND spawn the hit effect.
+    // (Must NOT call on_grab_hit() here — it sets the stun timer which switches
+    //  the enemy to hurt animation before collision runs, removing the hurtbox.)
+    currentAttackDamage = a = player_chars.grab_attack_damage[x];
+
+    // Don't check for max attacks here - let the animation complete first.
+    // The knockdown will happen when grabKickTimer reaches 0 in update_grab().
+
+    // Enemy stays in GRABBED state (on_grab_hit doesn't change state)
+}
+
+
+// Perform a grab throw to the left
+// Knockback direction in grunt_ai: enemy facing RIGHT slides LEFT
+//
+// DB = 0x7e
+#[mem8, idx8]
+func do_grab_throw__left() {
+    // Set state to THROW (animation will play, then PHASE 4 returns to IDLE)
+    playerState = a = PlayerState.THROW as u8;
+
+    // Player faces left when throwing left
+    facingDirection = a = FacingDirection.LEFT as u8;
+    
+    a = Anim.GRAB_THROW_RIGHT as u8;  // role index
+    a = get_ms_anim_index(a);  // translate to metasprite index
+    carry = false;
+    a +#= cachedHflipOffset;  // add hflip offset for LEFT
+    metasprites.set_entity_animation(PLAYER_ENTITY_ID, a);
+
+    // Set enemy facing to RIGHT so they slide LEFT
+    y = grabbedEnemyId;
+    entities.SoA.var_1_l[unaligned y] = a = grunt_ai.Facing.RIGHT;
+
+    // Deal throw damage with knockdown (triggers knockback in grunt_ai.on_hit)
+    x = selectedCharacter;
+    a = player_chars.grab_throw_damage[x];
+    y = grabbedEnemyId;
+    grunt_ai.on_hit(y, a);
+
+    // Clear grab state (enemy is released, state stays THROW until animation finishes)
+    grabbedEnemyId = a = 0xFF;
+    grabAttackCount = a = 0;
+    grabTimer = a = 0;
+}
+
+
+// Perform a grab throw to the right
+// Knockback direction in grunt_ai: enemy facing LEFT slides RIGHT
+//
+// DB = 0x7e
+#[mem8, idx8]
+func do_grab_throw__right() {
+    // Set state to THROW (animation will play, then PHASE 4 returns to IDLE)
+    playerState = a = PlayerState.THROW as u8;
+
+    // Player faces right when throwing right
+    facingDirection = a = FacingDirection.RIGHT as u8;
+    
+    a = Anim.GRAB_THROW_RIGHT as u8;  // role index
+    a = get_ms_anim_index(a);  // translate to metasprite index
+    metasprites.set_entity_animation(PLAYER_ENTITY_ID, a);
+
+    // Set enemy facing to LEFT so they slide RIGHT
+    y = grabbedEnemyId;
+    entities.SoA.var_1_l[unaligned y] = a = grunt_ai.Facing.LEFT;
+
+    // Deal throw damage with knockdown (triggers knockback in grunt_ai.on_hit)
+    x = selectedCharacter;
+    a = player_chars.grab_throw_damage[x];
+    y = grabbedEnemyId;
+    grunt_ai.on_hit(y, a);
+
+    // Clear grab state (enemy is released, state stays THROW until animation finishes)
+    grabbedEnemyId = a = 0xFF;
+    grabAttackCount = a = 0;
+    grabTimer = a = 0;
+}
+
+
+// Release the currently grabbed enemy and return to IDLE state
+//
+// DB = 0x7e
+#[mem8, idx8]
+func release_grab() {
+    grabbedEnemyId = a = 0xFF;
+    grabAttackCount = a = 0;
+    grabTimer = a = 0;
+    playerState = a = PlayerState.IDLE as u8;
+}
+
+
+// Check for nearby enemies and initiate grab if close enough.
+// Called during grounded input processing.
+// Requires player to be pressing D-pad toward the enemy.
+// Returns carry SET if grab was initiated, CLEAR otherwise.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func check_for_grab() : bool in carry {
+var _playerCenterX : u16 in zpTmp_word_0;
+var _playerCenterY : u8 in zpTmp_byte_0;
+var _playerZ : u8 in zpTmp_byte_1;
+var _loopIndex : u8 in zpTmp_byte_2;
+var _bestEnemyId : u8 in zpTmp_byte_3;
+var _bestDistance : u8 in zpTmp_byte_4;
+
+    // Must be pressing D-pad toward facing direction to initiate grab
+    a = facingDirection;
+    if a == FacingDirection.RIGHT as u8 {
+        // Facing right - must be pressing RIGHT
+        a = joypad.current_h;
+        if a & joypad.JOYH.RIGHT == 0 {
+            carry = false;
+            return carry;
+        }
+    } else {
+        // Facing left - must be pressing LEFT
+        a = joypad.current_h;
+        if a & joypad.JOYH.LEFT == 0 {
+            carry = false;
+            return carry;
+        }
+    }
+
+    // Get player center position
+    // playerCenterX = worldX + bounds_left + bounds_width/2
+    a = entities.SoA.bounds_left[0];
+    zpTmp_byte_5 = a;
+    a = entities.SoA.bounds_width[0];
+    a >>>= 1;
+    carry = false;
+    a +#= zpTmp_byte_5;
+    // Zero-extend to 16-bit
+    <:zpTmp_word_1 = a;
+    >:zpTmp_word_1 = 0;
+
+    mem16();
+    #[mem16] {
+        aa = entities.SoA.worldX[0];
+        carry = false;
+        aa +#= zpTmp_word_1;
+        _playerCenterX = aa;
+    }
+    mem8();
+
+    // playerCenterY = worldY_lo + bounds_top + bounds_height/2
+    a = entities.SoA.bounds_top[0];
+    zpTmp_byte_5 = a;
+    a = entities.SoA.bounds_height[0];
+    a >>>= 1;
+    carry = false;
+    a +#= zpTmp_byte_5;
+    carry = false;
+    a +#= entities.SoA.worldY_lo[0];
+    _playerCenterY = a;
+
+    // playerZ
+    _playerZ = a = entities.SoA.zPos[0];
+
+    // Initialize best enemy search
+    _bestEnemyId = a = 0xFF;
+    _bestDistance = a = 0xFF;
+
+    // Loop through active entities (skip entity 0 = player)
+    x = entityloop.numberOfActiveEntities;
+    if zero {
+        carry = false;
+        return carry;
+    }
+
+__loop:
+    x--;
+    if zero {
+        ^goto __check_result;
+    }
+    _loopIndex = x;
+
+    y = entityloop.activeEntitiesTable[x];
+
+    // Skip non-enemies
+    a = entities.SoA._entityFlags[unaligned y];
+    a &= entities.EntityFlags.IS_ENEMY;
+    if zero { ^goto __next; }
+
+    // Check if enemy is grabbable
+    carry = grunt_ai.is_grabbable(y);
+    if !carry { ^goto __next; }
+
+    // Z proximity check
+    a = entities.SoA.zPos[unaligned y];
+    carry = true;
+    a -#= _playerZ;
+    if negative {
+        a ^= 0xff;
+        a++;
+    }
+    x = selectedCharacter;
+    cmp(a, player_chars.grab_distance_z[x]);
+    if carry { ^goto __next; }
+
+    // Y proximity check (walk plane)
+    // Get enemy center Y
+    a = entities.SoA.bounds_top[unaligned y];
+    zpTmp_byte_5 = a;
+    a = entities.SoA.bounds_height[unaligned y];
+    a >>>= 1;
+    carry = false;
+    a +#= zpTmp_byte_5;
+    carry = false;
+    a +#= entities.SoA.worldY_lo[unaligned y];
+    // Now a = enemy center Y
+
+    // dy = enemyCenterY - playerCenterY
+    carry = true;
+    a -#= _playerCenterY;
+    if negative {
+        a ^= 0xff;
+        a++;
+    }
+    // a = abs(dy)
+    x = selectedCharacter;
+    cmp(a, player_chars.grab_distance_y[x]);
+    if carry { ^goto __next; }
+
+    // X proximity check (16-bit)
+    // Get enemy center X
+    a = entities.SoA.bounds_left[unaligned y];
+    zpTmp_byte_5 = a;
+    a = entities.SoA.bounds_width[unaligned y];
+    a >>>= 1;
+    carry = false;
+    a +#= zpTmp_byte_5;
+    <:zpTmp_word_1 = a;
+    >:zpTmp_word_1 = 0;
+
+    mem16();
+    #[mem16] {
+        aa = entities.SoA.worldX[unaligned y];
+        carry = false;
+        aa +#= zpTmp_word_1;
+        // aa = enemy center X
+
+        // dx = enemyCenterX - playerCenterX (signed)
+        carry = true;
+        aa -#= _playerCenterX;
+        zpTmp_word_1 = aa;  // Store full difference
+    }
+    mem8();
+
+    // Check facing direction and distance
+    // Player must be facing toward the enemy
+    // Enemy must be within [GRAB_DISTANCE_X_MIN, GRAB_DISTANCE_X_MAX) range
+    a = facingDirection;
+    if a == FacingDirection.RIGHT as u8 {
+        // Facing right - enemy must be to the right (dx > 0)
+        a = >:zpTmp_word_1;
+        if negative { ^goto __next; }  // Enemy is to the left
+        if !zero { ^goto __next; }     // High byte non-zero = too far
+
+        a = <:zpTmp_word_1;
+        x = selectedCharacter;
+        cmp(a, player_chars.grab_distance_x_min[x]);
+        if !carry { ^goto __next; }  // Too close
+        cmp(a, player_chars.grab_distance_x_max[x]);
+        if carry { ^goto __next; } // Too far
+    } else {
+        // Facing left - enemy must be to the left (dx < 0)
+        a = >:zpTmp_word_1;
+        if !negative { ^goto __next; }  // Enemy is to the right (positive dx)
+
+        // Negate to get absolute value
+        mem16();
+        #[mem16] {
+            aa = 0;
+            carry = true;
+            aa -#= zpTmp_word_1;
+            zpTmp_word_1 = aa;
+        }
+        mem8();
+
+        a = >:zpTmp_word_1;
+        if !zero { ^goto __next; }  // High byte non-zero = too far
+
+        a = <:zpTmp_word_1;
+        x = selectedCharacter;
+        cmp(a, player_chars.grab_distance_x_min[x]);
+        if !carry { ^goto __next; }  // Too close
+        cmp(a, player_chars.grab_distance_x_max[x]);
+        if carry { ^goto __next; } // Too far
+    }
+
+    // This enemy is in grab range!
+    // Check if it's closer than the current best
+    a = <:zpTmp_word_1;  // distance (abs dx)
+    cmp(a, _bestDistance);
+    if carry { ^goto __next; }  // Not closer
+
+    // New best enemy
+    _bestDistance = a;
+    _bestEnemyId = y;
+
+__next:
+    x = _loopIndex;
+    ^goto __loop;
+
+__check_result:
+    // Did we find an enemy to grab?
+    y = _bestEnemyId;
+    if y == 0xFF {
+        carry = false;
+        return carry;
+    }
+
+    // Initiate grab!
+    grabbedEnemyId = y;
+    grabAttackCount = a = 0;
+    grabKickTimer = a = 0;
+    x = selectedCharacter;
+    grabTimer = a = player_chars.grab_escape_frames[x];
+    playerState = a = PlayerState.GRAB as u8;
+
+    // Put enemy in GRABBED state
+    grunt_ai.on_grabbed(y);
+
+    // Force enemy to face opposite direction of player (so they face each other)
+    a = facingDirection;
+    if a == FacingDirection.RIGHT as u8 {
+        // Player faces right, enemy should face left
+        entities.SoA.var_1_l[unaligned y] = a = grunt_ai.Facing.LEFT;
+    } else {
+        // Player faces left, enemy should face right
+        entities.SoA.var_1_l[unaligned y] = a = grunt_ai.Facing.RIGHT;
+    }
+
+    // Set grab animation based on facing direction
+    a = Anim.GRAB_RIGHT as u8;  // role index
+    a = get_ms_anim_index(a);   // translate to metasprite index
+    
+    x = facingDirection;
+    if x == FacingDirection.LEFT as u8 {
+        carry = false;
+        a +#= cachedHflipOffset;
+    }
+    metasprites.set_entity_animation(PLAYER_ENTITY_ID, a);
+
+    carry = true;
+    return carry;
+}
+
+
+// Apply knockback to player position directly (same pattern as grunt_ai).
+// Knockback decays by 1 pixel/frame until it reaches 0.
+// Directly modifies worldX instead of using velocity.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func apply_knockback() {
+    a = knockbackSpeed;
+    if zero { return; }
+    
+    // Zero-extend magnitude to 16-bit for worldX update
+    zpTmp_byte_0 = a;
+    
+    // Slide away: knockbackDirection tells us which way to move
+    // LEFT direction → subtract from worldX, RIGHT direction → add to worldX
+    a = knockbackDirection;
+    if a == FacingDirection.LEFT as u8 {
+        mem16();
+        #[mem16] {
+            aa = (&zpTmp_byte_0 as *u16)[0];
+            aa &= 0x00FF;  // Zero-extend
+            zpTmp_word_0 = aa;
+            
+            aa = entities.SoA.worldX[0];
+            carry = true;
+            aa -#= zpTmp_word_0;
+            entities.SoA.worldX[0] = aa;
+        }
+        mem8();
+    } else {
+        mem16();
+        #[mem16] {
+            aa = (&zpTmp_byte_0 as *u16)[0];
+            aa &= 0x00FF;  // Zero-extend
+            zpTmp_word_0 = aa;
+            
+            aa = entities.SoA.worldX[0];
+            carry = false;
+            aa +#= zpTmp_word_0;
+            entities.SoA.worldX[0] = aa;
+        }
+        mem8();
+    }
+    
+    // Decay knockback by 1 pixel/frame
+    a = knockbackSpeed;
+    a--;
+    knockbackSpeed = a;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DEBUG: GOD MODE
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Toggle god mode (invincibility).
+// When enabled, player takes no damage.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func toggle_god_mode() {
+    a = godMode;
+    if zero {
+        godMode = a = 1;
+    } else {
+        godMode = a = 0;
+    }
+}
+
+// Check if god mode is currently enabled.
+//
+// OUTPUT: carry = 1 if god mode is on, 0 if off
+//
+// DB = 0x7e
+#[mem8, idx8]
+func is_god_mode() : bool in carry {
+    a = godMode;
+    if !zero {
+        carry = true;
+        return true;
+    }
+    carry = false;
+    return false;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WALK PLANE CLAMPING
+// ═══════════════════════════════════════════════════════════════════════════
+// Moved to engine/entity_utils.wiz for shared use by all entities
+
+
+}
+
+}

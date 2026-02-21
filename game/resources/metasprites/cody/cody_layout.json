@@ -1,0 +1,6339 @@
+{
+  "name": "cody",
+  "frame_width": 128,
+  "frame_height": 128,
+  "opt_type": "balanced",
+  "opt_level": "max",
+  "unique_tiles": 2483,
+  "tile_data_bytes": 79456,
+  "frames": [
+    {
+      "name": "sprite0",
+      "index": 0,
+      "sprite_count": 22,
+      "sprites_8x8": 4,
+      "sprites_16x16": 18,
+      "tiles_wasted": 12,
+      "objects": [
+        {
+          "x": 48,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 88,
+          "y": 40,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 40,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 64,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 88,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite1",
+      "index": 1,
+      "sprite_count": 19,
+      "sprites_8x8": 3,
+      "sprites_16x16": 16,
+      "tiles_wasted": 6,
+      "objects": [
+        {
+          "x": 48,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 72,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 80,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite2",
+      "index": 2,
+      "sprite_count": 18,
+      "sprites_8x8": 1,
+      "sprites_16x16": 17,
+      "tiles_wasted": 13,
+      "objects": [
+        {
+          "x": 32,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 72,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite3",
+      "index": 3,
+      "sprite_count": 19,
+      "sprites_8x8": 2,
+      "sprites_16x16": 17,
+      "tiles_wasted": 15,
+      "objects": [
+        {
+          "x": 32,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 56,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 88,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite4",
+      "index": 4,
+      "sprite_count": 16,
+      "sprites_8x8": 1,
+      "sprites_16x16": 15,
+      "tiles_wasted": 13,
+      "objects": [
+        {
+          "x": 48,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite5",
+      "index": 5,
+      "sprite_count": 12,
+      "sprites_8x8": 0,
+      "sprites_16x16": 12,
+      "tiles_wasted": 8,
+      "objects": [
+        {
+          "x": 48,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite6",
+      "index": 6,
+      "sprite_count": 13,
+      "sprites_8x8": 1,
+      "sprites_16x16": 12,
+      "tiles_wasted": 2,
+      "objects": [
+        {
+          "x": 48,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite7",
+      "index": 7,
+      "sprite_count": 19,
+      "sprites_8x8": 8,
+      "sprites_16x16": 11,
+      "tiles_wasted": 0,
+      "objects": [
+        {
+          "x": 64,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 32,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 40,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 88,
+          "y": 72,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 88,
+          "y": 80,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 104,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 88,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite8",
+      "index": 8,
+      "sprite_count": 19,
+      "sprites_8x8": 2,
+      "sprites_16x16": 17,
+      "tiles_wasted": 14,
+      "objects": [
+        {
+          "x": 32,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite9",
+      "index": 9,
+      "sprite_count": 19,
+      "sprites_8x8": 3,
+      "sprites_16x16": 16,
+      "tiles_wasted": 13,
+      "objects": [
+        {
+          "x": 32,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 72,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 104,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite10",
+      "index": 10,
+      "sprite_count": 15,
+      "sprites_8x8": 0,
+      "sprites_16x16": 15,
+      "tiles_wasted": 11,
+      "objects": [
+        {
+          "x": 48,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite11",
+      "index": 11,
+      "sprite_count": 13,
+      "sprites_8x8": 0,
+      "sprites_16x16": 13,
+      "tiles_wasted": 13,
+      "objects": [
+        {
+          "x": 48,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite12",
+      "index": 12,
+      "sprite_count": 13,
+      "sprites_8x8": 1,
+      "sprites_16x16": 12,
+      "tiles_wasted": 2,
+      "objects": [
+        {
+          "x": 48,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite13",
+      "index": 13,
+      "sprite_count": 20,
+      "sprites_8x8": 2,
+      "sprites_16x16": 18,
+      "tiles_wasted": 14,
+      "objects": [
+        {
+          "x": 64,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 40,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 56,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite14",
+      "index": 14,
+      "sprite_count": 20,
+      "sprites_8x8": 3,
+      "sprites_16x16": 17,
+      "tiles_wasted": 9,
+      "objects": [
+        {
+          "x": 64,
+          "y": 16,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 40,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 96,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite15",
+      "index": 15,
+      "sprite_count": 18,
+      "sprites_8x8": 4,
+      "sprites_16x16": 14,
+      "tiles_wasted": 8,
+      "objects": [
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 56,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 72,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 80,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite16",
+      "index": 16,
+      "sprite_count": 20,
+      "sprites_8x8": 3,
+      "sprites_16x16": 17,
+      "tiles_wasted": 16,
+      "objects": [
+        {
+          "x": 64,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 40,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 88,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 88,
+          "y": 80,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite17",
+      "index": 17,
+      "sprite_count": 17,
+      "sprites_8x8": 7,
+      "sprites_16x16": 10,
+      "tiles_wasted": 0,
+      "objects": [
+        {
+          "x": 64,
+          "y": 72,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 72,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 72,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 88,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 88,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 88,
+          "y": 88,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 104,
+          "y": 88,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 104,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 104,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 80,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 104,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 88,
+          "y": 104,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite18",
+      "index": 18,
+      "sprite_count": 14,
+      "sprites_8x8": 3,
+      "sprites_16x16": 11,
+      "tiles_wasted": 4,
+      "objects": [
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 72,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 88,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite19",
+      "index": 19,
+      "sprite_count": 16,
+      "sprites_8x8": 2,
+      "sprites_16x16": 14,
+      "tiles_wasted": 13,
+      "objects": [
+        {
+          "x": 80,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 112,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 88,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 112,
+          "y": 96,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite20",
+      "index": 20,
+      "sprite_count": 14,
+      "sprites_8x8": 1,
+      "sprites_16x16": 13,
+      "tiles_wasted": 9,
+      "objects": [
+        {
+          "x": 16,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 104,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite21",
+      "index": 21,
+      "sprite_count": 22,
+      "sprites_8x8": 3,
+      "sprites_16x16": 19,
+      "tiles_wasted": 10,
+      "objects": [
+        {
+          "x": 48,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 40,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 48,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite22",
+      "index": 22,
+      "sprite_count": 26,
+      "sprites_8x8": 11,
+      "sprites_16x16": 15,
+      "tiles_wasted": 0,
+      "objects": [
+        {
+          "x": 56,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 40,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 104,
+          "y": 40,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 88,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 56,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 32,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 40,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 48,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 56,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 72,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 72,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 88,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite23",
+      "index": 23,
+      "sprite_count": 20,
+      "sprites_8x8": 4,
+      "sprites_16x16": 16,
+      "tiles_wasted": 10,
+      "objects": [
+        {
+          "x": 64,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 56,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 56,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 104,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite24",
+      "index": 24,
+      "sprite_count": 25,
+      "sprites_8x8": 4,
+      "sprites_16x16": 21,
+      "tiles_wasted": 19,
+      "objects": [
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 112,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 112,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 56,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 64,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 80,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 104,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite25",
+      "index": 25,
+      "sprite_count": 20,
+      "sprites_8x8": 4,
+      "sprites_16x16": 16,
+      "tiles_wasted": 10,
+      "objects": [
+        {
+          "x": 64,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 56,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 56,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 104,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite26",
+      "index": 26,
+      "sprite_count": 18,
+      "sprites_8x8": 1,
+      "sprites_16x16": 17,
+      "tiles_wasted": 14,
+      "objects": [
+        {
+          "x": 80,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 56,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite27",
+      "index": 27,
+      "sprite_count": 26,
+      "sprites_8x8": 12,
+      "sprites_16x16": 14,
+      "tiles_wasted": 0,
+      "objects": [
+        {
+          "x": 56,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 56,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 56,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 72,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 72,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 88,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 104,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 104,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 48,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 88,
+          "y": 72,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 88,
+          "y": 80,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 80,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 88,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite28",
+      "index": 28,
+      "sprite_count": 26,
+      "sprites_8x8": 6,
+      "sprites_16x16": 20,
+      "tiles_wasted": 14,
+      "objects": [
+        {
+          "x": 80,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 40,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 40,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 56,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 64,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 104,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite29",
+      "index": 29,
+      "sprite_count": 23,
+      "sprites_8x8": 3,
+      "sprites_16x16": 20,
+      "tiles_wasted": 15,
+      "objects": [
+        {
+          "x": 64,
+          "y": 16,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 16,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 24,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 104,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite30",
+      "index": 30,
+      "sprite_count": 22,
+      "sprites_8x8": 9,
+      "sprites_16x16": 13,
+      "tiles_wasted": 0,
+      "objects": [
+        {
+          "x": 64,
+          "y": 40,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 40,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 56,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 56,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 56,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 112,
+          "y": 56,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 72,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 88,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 88,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 104,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 104,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 80,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 88,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite31",
+      "index": 31,
+      "sprite_count": 15,
+      "sprites_8x8": 1,
+      "sprites_16x16": 14,
+      "tiles_wasted": 12,
+      "objects": [
+        {
+          "x": 32,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 96,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite32",
+      "index": 32,
+      "sprite_count": 18,
+      "sprites_8x8": 2,
+      "sprites_16x16": 16,
+      "tiles_wasted": 11,
+      "objects": [
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 112,
+          "y": 72,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite33",
+      "index": 33,
+      "sprite_count": 18,
+      "sprites_8x8": 4,
+      "sprites_16x16": 14,
+      "tiles_wasted": 9,
+      "objects": [
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 104,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite34",
+      "index": 34,
+      "sprite_count": 17,
+      "sprites_8x8": 3,
+      "sprites_16x16": 14,
+      "tiles_wasted": 8,
+      "objects": [
+        {
+          "x": 16,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 0,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 40,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 40,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 88,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite35",
+      "index": 35,
+      "sprite_count": 19,
+      "sprites_8x8": 5,
+      "sprites_16x16": 14,
+      "tiles_wasted": 7,
+      "objects": [
+        {
+          "x": 48,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 40,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 72,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 80,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 88,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 96,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite36",
+      "index": 36,
+      "sprite_count": 23,
+      "sprites_8x8": 11,
+      "sprites_16x16": 12,
+      "tiles_wasted": 0,
+      "objects": [
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 8,
+          "y": 72,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 8,
+          "y": 88,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 104,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 104,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 104,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 112,
+          "y": 104,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 72,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 72,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 80,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 88,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 96,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite37",
+      "index": 37,
+      "sprite_count": 17,
+      "sprites_8x8": 3,
+      "sprites_16x16": 14,
+      "tiles_wasted": 15,
+      "objects": [
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 56,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 80,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite38",
+      "index": 38,
+      "sprite_count": 22,
+      "sprites_8x8": 10,
+      "sprites_16x16": 12,
+      "tiles_wasted": 0,
+      "objects": [
+        {
+          "x": 40,
+          "y": 56,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 56,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 72,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 72,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 72,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 88,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 88,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 88,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 0,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 64,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 64,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 72,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 80,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 80,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 88,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 104,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 104,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 104,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 88,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite39",
+      "index": 39,
+      "sprite_count": 15,
+      "sprites_8x8": 3,
+      "sprites_16x16": 12,
+      "tiles_wasted": 8,
+      "objects": [
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 72,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 72,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite40",
+      "index": 40,
+      "sprite_count": 19,
+      "sprites_8x8": 9,
+      "sprites_16x16": 10,
+      "tiles_wasted": 0,
+      "objects": [
+        {
+          "x": 56,
+          "y": 40,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 56,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 56,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 88,
+          "y": 56,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 72,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 72,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 88,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 104,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 40,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 48,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 88,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 88,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 104,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite41",
+      "index": 41,
+      "sprite_count": 23,
+      "sprites_8x8": 12,
+      "sprites_16x16": 11,
+      "tiles_wasted": 0,
+      "objects": [
+        {
+          "x": 104,
+          "y": 40,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 56,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 88,
+          "y": 56,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 72,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 88,
+          "y": 72,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 104,
+          "y": 72,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 88,
+          "y": 48,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 104,
+          "y": 56,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 112,
+          "y": 56,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 104,
+          "y": 64,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 72,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 88,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 88,
+          "y": 88,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 88,
+          "y": 96,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 104,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 88,
+          "y": 104,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite42",
+      "index": 42,
+      "sprite_count": 17,
+      "sprites_8x8": 3,
+      "sprites_16x16": 14,
+      "tiles_wasted": 8,
+      "objects": [
+        {
+          "x": 16,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 0,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 40,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 40,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 88,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite43",
+      "index": 43,
+      "sprite_count": 19,
+      "sprites_8x8": 5,
+      "sprites_16x16": 14,
+      "tiles_wasted": 7,
+      "objects": [
+        {
+          "x": 48,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 40,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 72,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 80,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 88,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 96,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite44",
+      "index": 44,
+      "sprite_count": 23,
+      "sprites_8x8": 11,
+      "sprites_16x16": 12,
+      "tiles_wasted": 0,
+      "objects": [
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 8,
+          "y": 72,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 8,
+          "y": 88,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 104,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 104,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 104,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 112,
+          "y": 104,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 72,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 72,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 80,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 88,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 96,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite45",
+      "index": 45,
+      "sprite_count": 16,
+      "sprites_8x8": 0,
+      "sprites_16x16": 16,
+      "tiles_wasted": 10,
+      "objects": [
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite46",
+      "index": 46,
+      "sprite_count": 20,
+      "sprites_8x8": 3,
+      "sprites_16x16": 17,
+      "tiles_wasted": 13,
+      "objects": [
+        {
+          "x": 64,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 40,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 40,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 56,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite47",
+      "index": 47,
+      "sprite_count": 18,
+      "sprites_8x8": 2,
+      "sprites_16x16": 16,
+      "tiles_wasted": 7,
+      "objects": [
+        {
+          "x": 32,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 32,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 48,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 80,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite48",
+      "index": 48,
+      "sprite_count": 17,
+      "sprites_8x8": 2,
+      "sprites_16x16": 15,
+      "tiles_wasted": 9,
+      "objects": [
+        {
+          "x": 0,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 0,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 0,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 72,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 24,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite49",
+      "index": 49,
+      "sprite_count": 17,
+      "sprites_8x8": 3,
+      "sprites_16x16": 14,
+      "tiles_wasted": 7,
+      "objects": [
+        {
+          "x": 16,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 0,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 112,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 88,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 88,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 8,
+          "y": 104,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite50",
+      "index": 50,
+      "sprite_count": 15,
+      "sprites_8x8": 2,
+      "sprites_16x16": 13,
+      "tiles_wasted": 8,
+      "objects": [
+        {
+          "x": 48,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 0,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 32,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 96,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 88,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 8,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite51",
+      "index": 51,
+      "sprite_count": 16,
+      "sprites_8x8": 5,
+      "sprites_16x16": 11,
+      "tiles_wasted": 0,
+      "objects": [
+        {
+          "x": 56,
+          "y": 64,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 72,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 88,
+          "y": 80,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 64,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 80,
+          "y": 96,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 40,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 56,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 112,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 64,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 48,
+          "y": 72,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 72,
+          "y": 88,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 88,
+          "y": 112,
+          "size": "8x8",
+          "palette": 0
+        },
+        {
+          "x": 88,
+          "y": 120,
+          "size": "8x8",
+          "palette": 0
+        }
+      ]
+    }
+  ]
+}

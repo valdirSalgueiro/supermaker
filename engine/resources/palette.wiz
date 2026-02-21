@@ -1,0 +1,85 @@
+// Copyright (c) 2023, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+import "../registers";
+
+import "resources";
+
+import "gen/enums";
+
+
+namespace palette {
+
+struct _RamDataFormat {
+    n_colors : u8,
+};
+
+
+in code {
+
+
+// REQUIRES: Force-Blank
+// Uses DMA channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+func load_palette__forceblank(paletteId : resources.palettes in a) {
+var _ppuData : resources.PpuData_Dma0 in resources.ppuData;
+
+var _header : _RamDataFormat in zpTmp_byte_0;
+
+    _ppuData = resources.load_resource__fixed_ram_and_ppu_data__forceblank_inline(resources.ResourceType.palette, a, &_header as *u8, sizeof(typeof(_header)));
+
+    aa = direct_page;
+    a = _header.n_colors;
+    mem16();
+    #[mem16] {
+        // DMA size
+        yy = aa = aa << 1;
+    }
+    mem8();
+
+    CGADD = 0;
+    ^return resources.dma_to_cgram__forceblank(_ppuData, yy);
+}
+
+
+// Load a palette resource at a specific CGRAM index.
+//
+// cgIndex: CGRAM color index (0-255)
+//   - BG palettes: 0-127 (8 palettes × 16 colors, or 32 palettes × 4 colors)
+//   - Sprite palettes: 128-255 (8 palettes × 16 colors)
+//   - Example: Sprite palette 7 starts at index 128 + 7*16 = 240
+//
+// REQUIRES: Force-Blank
+// Uses DMA channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+func load_palette__index__forceblank(paletteId : resources.palettes in a, cgIndex : u8 in zpTmp_byte_1) {
+var _ppuData : resources.PpuData_Dma0 in resources.ppuData;
+
+var _header : _RamDataFormat in zpTmp_byte_0;
+var _cgIndex : u8 in zpTmp_byte_1;
+
+    _ppuData = resources.load_resource__fixed_ram_and_ppu_data__forceblank_inline(resources.ResourceType.palette, a, &_header as *u8, sizeof(typeof(_header)));
+
+    aa = direct_page;
+    a = _header.n_colors;
+    mem16();
+    #[mem16] {
+        // DMA size
+        yy = aa = aa << 1;
+    }
+    mem8();
+
+    CGADD = a = _cgIndex;
+    ^return resources.dma_to_cgram__forceblank(_ppuData, yy);
+}
+
+}
+
+}
+
+

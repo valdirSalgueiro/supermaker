@@ -1,0 +1,539 @@
+// Unified Map System - ROM Only
+// ==============================
+// All maps are treated as scrolling maps with ROM-based tile data.
+// A "fixed" room is simply a scrolling map of exactly one screen (16x14).
+//
+// Key principles:
+// - Map tile data stays in ROM, accessed via far pointers
+// - Tile properties come from tileset (not stored per-tile in RAM)
+// - Unified drawing/scrolling logic for all room types
+// - No RAM support - everything from ROM
+//
+// Copyright (c) 2024
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+import "../registers";
+import "../registers_math.wiz";
+import "../vram-map";
+import "../wait-frame";
+import "../resources/dma";
+import "../resources/resources";
+
+import "metatiles";
+import "room";
+
+
+namespace map_system {
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+let TILE_SIZE = 16;
+let SCREEN_WIDTH_TILES = 16;
+let SCREEN_HEIGHT_TILES = 14;
+let TILEMAP_WIDTH = 32;  // VRAM tilemap width (hardware limit)
+
+// Tile property bits (from tileset)
+let TILE_PROPERTY_SOLID_BIT = 7;
+
+
+// ============================================================================
+// Zeropage Variables (fast access during gameplay)
+// ============================================================================
+
+in zeropage {
+    // Map dimensions (copied from room header)
+    var mapWidth : u8;
+    var mapHeight : u8;
+    
+    // Player AABB bottom must not exceed mapFloorY
+    // Player AABB top must not be less than mapCeilingY
+    var mapFloorY : u8;
+    var mapCeilingY : u8;
+    
+    // Camera position (pixels, 16-bit for scrolling)
+    var cameraX_lo : u8;
+    var cameraX_hi : u8;
+    
+    // Maximum camera X (pixels) - calculated from map width
+    var cameraMaxX_lo : u8;
+    var cameraMaxX_hi : u8;
+    
+    // Current leftmost visible tile column (for scroll updates)
+    var visibleLeftColumn : u8;
+    
+    // Far pointer to BG1 map data in ROM
+    var bg1MapPtr_lo : u8;
+    var bg1MapPtr_hi : u8;
+    var bg1MapPtr_bank : u8;
+    
+    // Far pointer to BG2 map data in ROM
+    var bg2MapPtr_lo : u8;
+    var bg2MapPtr_hi : u8;
+    var bg2MapPtr_bank : u8;
+}
+
+
+// ============================================================================
+// Low RAM Variables
+// ============================================================================
+
+in lowram {
+    // Column buffer for VBlank updates (BG1 only for now)
+    namespace BG1Buffer {
+        var tiles_lo : [u8 ; SCREEN_HEIGHT_TILES];
+        var tiles_hi : [u8 ; SCREEN_HEIGHT_TILES];
+        var column   : u8;   // VRAM column to write (0-31)
+        var pending  : u8;   // Non-zero if buffer needs flush
+    }
+}
+
+
+// ============================================================================
+// Code
+// ============================================================================
+
+in code {
+
+
+// Initialize the map system (call during force-blank / room load)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func init() {
+    cameraX_lo = 0;
+    cameraX_hi = 0;
+    visibleLeftColumn = 0;
+    BG1Buffer.pending = 0;
+    mapWidth = 0;
+    mapHeight = 0;
+    
+    // Default floor to bottom of screen (224), ceiling to top (0)
+    mapFloorY = a = 224;
+    mapCeilingY = a = 0;
+    
+    bg1MapPtr_lo = 0;
+    bg1MapPtr_hi = 0;
+    bg1MapPtr_bank = 0;
+    bg2MapPtr_lo = 0;
+    bg2MapPtr_hi = 0;
+    bg2MapPtr_bank = 0;
+}
+
+
+// Setup map system from room data
+// Call after room header and map pointer are loaded
+//
+// Uses: currentRoom_width, currentRoom_height, currentRoom_floorY, mapDataPtr_*, bg2DataPtr_*, hasBG2
+//
+// DB = 0x7e
+#[mem8, idx8]
+func setup_from_room() {
+    // Copy dimensions from room
+    mapWidth = a = currentRoom_width;
+    mapHeight = a = currentRoom_height;
+    
+    // Copy floor Y and ceiling Y from room (walk plane constraints)
+    mapFloorY = a = currentRoom_floorY;
+    mapCeilingY = a = currentRoom_ceilingY;
+    
+    // Copy BG1 map data pointer from room
+    bg1MapPtr_lo = a = mapDataPtr_lo;
+    bg1MapPtr_hi = a = mapDataPtr_hi;
+    bg1MapPtr_bank = a = mapDataPtr_bank;
+    
+    // Copy BG2 map data pointer from room (if present)
+    bg2MapPtr_lo = a = bg2DataPtr_lo;
+    bg2MapPtr_hi = a = bg2DataPtr_hi;
+    bg2MapPtr_bank = a = bg2DataPtr_bank;
+    
+    // Calculate max camera X: (mapWidth - SCREEN_WIDTH_TILES) * TILE_SIZE
+    // If map fits on one screen, cameraMaxX = 0 (no scrolling)
+    a = mapWidth;
+    carry = true;
+    a -#= SCREEN_WIDTH_TILES;
+    if negative {
+        a = 0;
+    }
+    
+    // Multiply by TILE_SIZE (16): high = a>>4 (always 0 for small maps), low = a<<4
+    x = a;
+    cameraMaxX_lo = a = a << 4;
+    a = x;
+    a >>>= 4;
+    cameraMaxX_hi = a;
+    
+    // Reset camera position
+    cameraX_lo = 0;
+    cameraX_hi = 0;
+    visibleLeftColumn = 0;
+    BG1Buffer.pending = 0;
+}
+
+
+// Draw the initial visible portion of the map to VRAM
+// Draws first 32 columns (or mapWidth if smaller), 14 rows
+//
+// REQUIRES: Force-Blank, Tileset loaded, map system setup
+//
+// DB = 0x7e
+#[mem8, idx8]
+func draw_initial_map__forceblank() {
+    // Setup far pointer to BG1 map data in ROM
+    (&<:zpTmp_farPtr as *u8)[0] = a = bg1MapPtr_lo;
+    (&<:zpTmp_farPtr as *u8)[1] = a = bg1MapPtr_hi;
+    (&<:zpTmp_farPtr as *u8)[2] = a = bg1MapPtr_bank;
+
+    // Set VRAM address for BG1 tilemap
+    *(far &VMAIN) = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
+    *(far &VMADDL) = a = <:VRAM_METATILE_MAP_WADDR;
+    *(far &VMADDH) = a = >:VRAM_METATILE_MAP_WADDR;
+
+    _draw_layer__forceblank();
+
+    // Draw BG2 if present
+    a = hasBG2;
+    if !zero {
+        (&<:zpTmp_farPtr as *u8)[0] = a = bg2MapPtr_lo;
+        (&<:zpTmp_farPtr as *u8)[1] = a = bg2MapPtr_hi;
+        (&<:zpTmp_farPtr as *u8)[2] = a = bg2MapPtr_bank;
+
+        *(far &VMAIN) = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
+        *(far &VMADDL) = a = <:VRAM_SECOND_LAYER_MAP_WADDR;
+        *(far &VMADDH) = a = >:VRAM_SECOND_LAYER_MAP_WADDR;
+
+        _draw_layer__forceblank();
+    } else {
+        // Clear BG2 VRAM if room has no BG2 layer (prevents old data from showing)
+        _clear_bg2_vram__forceblank();
+    }
+}
+
+
+// Read a u16 tile from ROM, compute tileset lookup + SNES flip mask.
+//
+// Expects:
+//   _mapPtr (zpTmp_farPtr) = far pointer to map data
+//   _mapOffset (zpTmp_word_0) = current byte offset into map data
+//
+// Returns:
+//   A = tilemap_low (ready for VMDATAL or buffer)
+//   zpTmp_byte_2 (_tileFlags) = tilemap_high | flip_mask (ready for VMDATAH or buffer)
+//   _mapOffset advanced by 2
+//
+// Clobbers: X, Y, zpTmp_byte_2, zpTmp_byte_3
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func _read_tile_with_flip() {
+var _mapPtr    : far *u8 in zpTmp_farPtr;
+var _mapOffset : u16 in zpTmp_word_0;
+var _tileFlags : u8 in zpTmp_byte_2;
+var _tileId    : u8 in zpTmp_byte_3;
+
+    // Read tile_id (low byte of u16 tile word)
+    idx16();
+    #[idx16] {
+        yy = _mapOffset;
+        a = _mapPtr[yy];
+    }
+    idx8();
+    _tileId = a;
+
+    // Read flags byte (high byte at _mapOffset + 1)
+    idx16();
+    #[idx16] {
+        yy = _mapOffset;
+        yy++;
+        a = _mapPtr[yy];
+    }
+    idx8();
+
+    // Compute SNES flip OR mask: hflip stays at bit 6, vflip shifts bit 5 → bit 7
+    x = a;
+    a = a & 0x40;       // hflip at SNES bit 6 (same position)
+    _tileFlags = a;
+    a = x;
+    a = a & 0x20;       // vflip at stored bit 5
+    a <<= 1;            // → bit 6
+    a <<= 1;            // → bit 7 (SNES vflip)
+    a = a | _tileFlags;
+    _tileFlags = a;
+
+    // Advance map offset by 2 (u16 tile) before tileset lookup so A is free for return
+    mem16();
+    #[mem16] {
+        aa = _mapOffset;
+        aa++;
+        aa++;
+        _mapOffset = aa;
+    }
+    mem8();
+
+    // Tileset lookup + flip merge
+    y = _tileId;
+    a = metatiles.tileset.tilemap_high[y];
+    a = a | _tileFlags;
+    _tileFlags = a;     // high byte saved in _tileFlags
+    a = metatiles.tileset.tilemap_low[y];
+    // Returns: A = low byte, _tileFlags = high byte with flip
+}
+
+
+// Internal: draw a single layer to VRAM (used for both BG1 and BG2)
+//
+// Expects:
+//   zpTmp_farPtr = far pointer to map data already set
+//   VRAM address already configured via VMADDL/VMADDH
+//
+// REQUIRES: Force-Blank
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _draw_layer__forceblank() {
+var _rowsLeft   : u8 in zpTmp_byte_4;
+var _colsLeft   : u8 in zpTmp_byte_5;
+var _mapOffset  : u16 in zpTmp_word_0;
+var _colsToDraw : u8 in zpTmp_byte_6;
+var _skipAmount : u8 in zpTmp_byte_7;
+
+    mem16();
+    #[mem16] {
+        _mapOffset = aa = 0;
+    }
+    mem8();
+
+    // Determine columns to draw (min of mapWidth and TILEMAP_WIDTH)
+    a = mapWidth;
+    if a >= TILEMAP_WIDTH {
+        a = TILEMAP_WIDTH;
+    }
+    _colsToDraw = a;
+
+    // Calculate skip amount for row advance (mapWidth - colsToDraw) * 2 bytes (u16 tiles)
+    a = mapWidth;
+    carry = true;
+    a -#= _colsToDraw;
+    a <<= 1;
+    _skipAmount = a;
+
+    // Draw 14 rows
+    _rowsLeft = a = SCREEN_HEIGHT_TILES;
+    do {
+        _colsLeft = a = _colsToDraw;
+
+        do {
+            _read_tile_with_flip();
+            // A = tilemap_low, zpTmp_byte_2 = tilemap_high | flip
+            *(far &VMDATAL) = a;
+            *(far &VMDATAH) = a = zpTmp_byte_2;
+
+            _colsLeft--;
+        } while !zero;
+
+        // Add skip amount for row advance (in bytes)
+        a = _skipAmount;
+        if !zero {
+            carry = false;
+            a = <:_mapOffset;
+            a +#= _skipAmount;
+            (&<:_mapOffset as *u8)[0] = a;
+            a = >:_mapOffset;
+            a +#= 0;
+            (&>:_mapOffset as *u8)[0] = a;
+        }
+
+        _rowsLeft--;
+    } while !zero;
+}
+
+
+// Get tile ID at a map position (reads from ROM)
+//
+// Parameters:
+//   tileX - tile X coordinate (0 to mapWidth-1)
+//   tileY - tile Y coordinate (0 to mapHeight-1)
+//
+// Returns: tile ID in A
+//
+// DB = 0x7e
+#[mem8, idx8]
+func get_tile_id(tileX : u8 in x, tileY : u8 in y) : u8 in a {
+var _mapPtr : far *u8 in zpTmp_farPtr;
+var _offset : u16 in zpTmp_word_0;
+var _tileX : u8 in zpTmp_byte_4;
+var _tileY : u8 in zpTmp_byte_5;
+
+    // Save registers
+    _tileX = x;
+    _tileY = y;
+    
+    // Setup far pointer
+    (&<:_mapPtr as *u8)[0] = a = bg1MapPtr_lo;
+    (&<:_mapPtr as *u8)[1] = a = bg1MapPtr_hi;
+    (&<:_mapPtr as *u8)[2] = a = bg1MapPtr_bank;
+    
+    // Calculate offset: tileY * mapWidth + tileX
+    // Use hardware multiply
+    *(far &WRMPYA) = a = _tileY;
+    *(far &WRMPYB) = a = mapWidth;
+    nop(); nop(); nop(); nop();  // Wait for multiply
+    
+    // Add tileX to result
+    carry = false;
+    a = *(far &RDMPYL as *u8);
+    a +#= _tileX;
+    (&<:_offset as *u8)[0] = a;
+    a = *(far &RDMPYH as *u8);
+    a +#= 0;
+    (&>:_offset as *u8)[0] = a;
+
+    // Convert tile offset to byte offset (* 2 for u16 tiles)
+    mem16();
+    #[mem16] {
+        carry = false;
+        aa = _offset;
+        aa <<= 1;
+        _offset = aa;
+    }
+    mem8();
+
+    // Read tile_id (low byte of u16 tile word)
+    idx16();
+    #[idx16] {
+        yy = _offset;
+        a = _mapPtr[yy];
+    }
+    idx8();
+
+    return a;
+}
+
+
+// Get tile property at a map position
+// Reads tile ID from ROM, then looks up property from tileset
+//
+// Parameters:
+//   tileX - tile X coordinate
+//   tileY - tile Y coordinate
+//
+// Returns: tile property byte in A
+//
+// DB = 0x7e
+#[mem8, idx8]
+func get_tile_property(tileX : u8 in x, tileY : u8 in y) : u8 in a {
+    a = get_tile_id(x, y);
+    y = a;
+    a = metatiles.tileset.properties[y];
+    return a;
+}
+
+
+// Check if tile at position is solid
+//
+// Parameters:
+//   tileX - tile X coordinate
+//   tileY - tile Y coordinate
+//
+// Returns: carry set if solid, clear if passable
+//
+// DB = 0x7e
+#[mem8, idx8]
+func is_tile_solid(tileX : u8 in x, tileY : u8 in y) : bool in carry {
+    a = get_tile_property(x, y);
+    a = a & (1 << TILE_PROPERTY_SOLID_BIT);
+    if !zero {
+        carry = true;
+        return true;
+    }
+    carry = false;
+    return false;
+}
+
+
+// VBlank handler - flush pending column buffers to VRAM
+// Call during VBlank for scroll updates
+//
+// DB = 0x80
+#[mem8, idx8]
+func process_vblank() {
+    // Process BG1 buffer if pending
+    a = BG1Buffer.pending;
+    if !zero {
+        *(far &VMAIN) = a = VMAIN_INCREMENT_32 | VMAIN_INCREMENT_HIGH;
+        
+        // Set VRAM address: BG1 base + column
+        a = BG1Buffer.column;
+        *(far &VMADDL) = a;
+        *(far &VMADDH) = a = >:VRAM_METATILE_MAP_WADDR;
+        
+        // Write 14 tiles
+        x = 0;
+        do {
+            *(far &VMDATAL) = a = BG1Buffer.tiles_lo[x];
+            *(far &VMDATAH) = a = BG1Buffer.tiles_hi[x];
+            x++;
+        } while x < SCREEN_HEIGHT_TILES;
+        
+        BG1Buffer.pending = 0;
+    }
+}
+
+
+// Update camera position (call during frame update, not VBlank)
+// This prepares column buffer if scroll crossed tile boundary
+//
+// Parameters:
+//   newCameraX - new camera X position in pixels (16-bit: hi in X, lo in A)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func update_camera(newCameraX_lo : u8 in a, newCameraX_hi : u8 in x) {
+    // TODO: Implement scroll logic
+    // For now, just store the camera position (no actual scrolling yet)
+    cameraX_lo = a;
+    cameraX_hi = x;
+}
+
+
+// Clear BG2 VRAM (used when loading a room without BG2)
+// Fills the entire BG2 tilemap area with tile 0 (empty)
+//
+// REQUIRES: Force-Blank
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _clear_bg2_vram__forceblank() {
+var _tilesLeft : u16 in zpTmp_word_0;
+
+    *(far &VMAIN) = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
+    *(far &VMADDL) = a = <:VRAM_SECOND_LAYER_MAP_WADDR;
+    *(far &VMADDH) = a = >:VRAM_SECOND_LAYER_MAP_WADDR;
+
+    // Clear 32x32 tilemap (1024 tiles = 2048 bytes)
+    // Each tile is 2 bytes (tilemap_low + tilemap_high)
+    mem16();
+    #[mem16] {
+        _tilesLeft = aa = 1024;
+    }
+    mem8();
+
+    do {
+        *(far &VMDATAL) = a = 0;  // Tile ID 0
+        *(far &VMDATAH) = a = 0;  // No flip, palette 0
+
+        mem16();
+        #[mem16] {
+            aa = _tilesLeft;
+            aa--;
+            _tilesLeft = aa;
+        }
+        mem8();
+        a = >:_tilesLeft;
+    } while !zero;
+}
+
+}  // end of code block
+}  // end of map_system namespace

@@ -1,0 +1,210 @@
+// Copyright (c) 2023, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "player";
+import "joypad";
+import "rng";
+import "hud";
+
+import "gen/enums";
+import "gen/game-config";
+
+import "engine/audio";
+import "engine/entity_api";
+import "engine/game/metasprites";
+import "engine/resources/resources";
+
+import "engine/game/dungeon";
+import "engine/game/map-system";
+import "engine/game/camera";
+
+import "gamemodes/gameloop";
+
+
+namespace engine_hooks {
+
+
+// WaitFrame
+// =========
+
+
+// Vertical blank hook.
+//
+// Called by `wait_frame()`.
+//
+// MUST NOT modify zpTmp variables.
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func wait_frame__vblank__inline() {
+    // ui.transfer_buffer__vblank();
+
+    // Flush queued player dynamic tile DMAs (queue was built before wait_frame)
+    idx8();
+    #[idx8] {
+        metasprites.dynamic_tiles.flush_dynamic_tiles__vblank__inline();
+        
+        // Process map system column buffer (handles both BG1 and BG2)
+        map_system.process_vblank();
+    }
+    idx16();
+    
+    // Shadow system VBlank transfer
+    // shadows.transfer_to_vram__vblank();
+}
+
+
+
+// After Vertical-Blank hook.
+//
+// Called by `wait_frame()`, after the screen is re-enabled.
+//
+// MUST NOT modify zpTmp variables.
+//
+// DB = 0x80
+#[mem16, idx16]
+inline func wait_frame__after_vblank__mem16_idx16__inline() {
+    rng.increment_rng();
+}
+
+
+
+// After Vertical-Blank hook.
+//
+// Called by `wait_frame()`, after the screen is re-enabled.
+//
+// MUST NOT modify zpTmp variables.
+//
+// DB = 0x80
+#[mem8, idx8]
+inline func wait_frame__after_vblank__mem8_idx8__inline() {
+    joypad.update_state__inline();
+}
+
+
+// Textbox
+// =======
+
+const joypad_pressed @ &joypad.pressed : u16;
+const joypad_pressed_l @ &<:joypad.pressed : u8;
+const joypad_pressed_h @ &>:joypad.pressed : u8;
+
+
+
+// GameState
+// =========
+
+// Called by `dungeon.new_game()`.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func gamestate__new_game__inline() {
+    player.new_player_gamestate__inline();
+}
+
+
+// Called on continue/restart.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func gamestate__continue_game__inline() {
+    // Reset to starting position from game_config.json
+    dungeon.roomToLoad.dungeon = a = game_config.STARTING_DUNGEON_ID;
+    dungeon.roomToLoad.room_x = a = game_config.STARTING_ROOM_X;
+    dungeon.roomToLoad.room_y = a = game_config.STARTING_ROOM_Y;
+    dungeon.roomToLoad.player_x_lo = a = game_config.STARTING_PIXEL_X;
+    dungeon.roomToLoad.player_x_hi = a = 0;
+    dungeon.roomToLoad.player_y_lo = a = game_config.STARTING_PIXEL_Y;
+    dungeon.roomToLoad.player_y_hi = a = 0;
+
+    player.continue_player_gamestate__inline();
+}
+
+
+
+// Room Loading
+// ============
+
+// Return the player state byte to store in gamestate data and RoomToLoad.
+//
+// DB = 0x7e
+#[mem8, idx8]
+let get_roomtoload_player_state__inline = player.get_roomtoload_player_state__inline;
+
+
+// Return the direction byte to store in gamestate data and RoomToLoad.
+//
+// DB = 0x7e
+#[mem8, idx8]
+let get_roomtoload_player_direction__inline = player.get_roomtoload_player_direction__inline;
+
+
+// Initialise the player entity's state and direction.
+//
+// Called on dungeon load, after the room has been loaded into memory.
+//
+// Arguments are the values returned by `get_roomtoload_player_state__inline()`
+// and `get_roomtoload_player_direction__inline()`.
+//
+// DB = 0x7e
+#[mem8, idx8]
+let dungeon_loaded__restore_player_state_and_direction__inline = player.dungeon_loaded__restore_player_state_and_direction__inline;
+
+
+// Reset player MetaSprites.
+//
+// Called on dungeon load, just before fade-in.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func init_player_metasprites__inline() {
+    player.init_metasprites();
+}
+
+
+
+// Room Transitions
+// ================
+
+
+// Setup the PPU while the screen is disabled.
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func load_dungeon__setup_ppu__forceblank() {
+    // ui.setup_ppu__forceblank();
+}
+
+
+
+// Initialize subsystems after the PPU is setup.
+//
+// Called after `room_transitions__setup_ppu__forceblank()`.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func load_dungeon__init() {
+    // Initialize HUD system
+    hud.init();
+
+    // ::TODO move into engine::
+    a = dungeon.dungeonData.song;
+    if a < resources.N_SONGS {
+        audio.load_song_if_changed(dungeon.dungeonData.song as resources.songs);
+    }
+}
+
+
+
+// Initialise the player subsystem.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func room_transitions__reset_player__inline() {
+    player.init();
+    // Note: camera.init() is called in dungeon.__finish_loading_room()
+    // after _set_player_pos() sets the correct player position from TMX
+}
+
+}
+

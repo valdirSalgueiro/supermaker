@@ -1,0 +1,1262 @@
+// Copyright (c) 2023, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+import "registers";
+
+import "resources/resources";
+
+import "gen/enums";
+
+
+// MUST NOT modify zpTmp variables.
+namespace audio {
+
+// ::TODO add menu to set/clear monoFlag::
+
+
+// Default Configuration
+//
+// Custom to unnamed-snes-engine.  Not TAD
+    // must be between MIN_TRANSFER_PER_FRAME and MAX_TRANSFER_PER_FRAME
+    let DEFAULT_TRANSFER_PER_FRAME = 256;
+    // Must not contain RELOAD_COMMON_AUDIO_DATA
+    let TAD_DEFAULT_FLAGS = Flags.PLAY_SONG_IMMEDIATELY | Flags.RESET_GLOBAL_VOLUMES_ON_SONG_START;
+    let TAD_DEFAULT_AUDIO_MODE = AudioMode.MONO;
+
+
+
+// Address to store the loader (in Audio-RAM).
+// Address (in Audio-RAM) to execute after loading the Loader.
+// MUST match LOADER_ADDR in `audio-driver/src/common_memmap.wiz`
+let LOADER_ARAM_ADDR = 0x200;
+
+
+// Maximum pan value (100% to the right)
+let MAX_PAN = 128;
+let CENTER_PAN = MAX_PAN / 2;
+
+
+// MUST BE > 0
+let MIN_TRANSFER_PER_FRAME = 32;
+// The loader can transfer ~849 bytes per 60Hz frame SlowROM or FastROM
+let MAX_TRANSFER_PER_FRAME = 800;
+
+let N_SONGS = resources.N_SONGS;
+
+
+// MUST match `audio-driver/src/io-commands.wiz`
+namespace IO {
+    namespace ToDriver {
+        // The command to execute.
+        //
+        //      iiicccci
+        //         cccc = command
+        //            0 = reserved for future expansion
+        //            i = command id, MUST be different on every command.
+        //                Used to detect when a new command has been sent to the driver.
+        //
+        // NOTES:
+        //  * The command will only be execute if the `command` byte has changed.
+        //  * This value MUST be written last.
+        //  * The command and parameter bytes MUST NOT change unless the previous command
+        //    has been acknowledged.
+        extern writeonly command @ &APUIO_OUT_0 : u8;
+
+        let COMMAND_MASK   = 0b00011110;
+        let COMMAND_I_MASK = 0b11100001;
+
+        // The two command parameter bytes
+        extern writeonly parameter0 @ &APUIO_OUT_1 : u8;
+        extern writeonly parameter1 @ &APUIO_OUT_2 : u8;
+
+
+        // Writing `SWITCH_TO_LOADER` to this port should stop execution and start the loader.
+        //
+        // If the audio-driver is running; if the `_SWITCH_TO_LOADER_BIT` is set,
+        // the audio driver will stop and execute the loader.
+        //
+        // If the loader is in the middle of a transfer and both the `_SWITCH_TO_LOADER_BIT`
+        // and MSB (bit 7) bits are set, the loader will restart.
+        extern writeonly switch_to_loader @ &APUIO_OUT_3 : u8;
+
+        let _SWITCH_TO_LOADER_BIT = 5;
+        let SWITCH_TO_LOADER = 0x80 | (1 << _SWITCH_TO_LOADER_BIT);
+    }
+
+    namespace ToScpu {
+        // Audio driver command acknowledgment.
+        //
+        // Acknowledgment of the `ToDriver.command` byte.  Not used in the loader.
+        //
+        // After the command has been processed, the `IO.ToDriver.command` value will be written to this port.
+        extern const command_ack @ &APUIO_IN_0 : u8;
+
+
+        // The mode the S-SMP is currently executing.
+        //
+        // Used by both the loader and the audio-driver.
+        //
+        // NOTE: The IPL sets this value after at has cleared the zero-page.
+        //       Do not read this value immediately after reset.
+        //       Make sure enough time has passed for the IPL to set IO Port 1
+        //       to 0xbb before reading this port.
+        extern const mode @ &APUIO_IN_1 : u8;
+
+        // The S-SMP is at the start of the IPL, waiting for the ready signal.
+        let MODE_IPL = 0xbb;
+
+        // The S-SMP is running the loader.
+        let MODE_LOADER = 0x4c;         // 'L', Loader.LOADER_READY_L
+
+        // The S-SMP is running the audio-driver.
+        let MODE_AUDIO_DRIVER = 0x61 ;  // 'a'
+    }
+}
+
+// MUST match CommandFunctionTable in `audio-driver.wiz`.
+enum Command : u8 {
+    // Pause the song and sound effect channels.
+    // * IO commands will still be executed when the audio-driver is paused.
+    // * The audio driver starts paused unless the `LoaderDataType.PLAY_SONG_BIT` is set.
+    PAUSE = 0,
+
+    // Pauses the music channels, sound effects will continue to play.
+    // Unpauses the sound effects channels.
+    PAUSE_MUSIC_PLAY_SFX = 2,
+
+    // Unpauses the music and sound effect channels.
+    UNPAUSE = 4,
+
+    // Play a sound effect
+    //  * parameter0: sound effect id
+    //  * parameter1: pan (0-128) (not bounds checked)
+    //
+    // The sound-effect might not play if both sound effect channels are active.
+    // See the Sound Effects documentation for more details
+    //
+    // CAUTION: a PLAY_SOUND_EFFECT command has a higher priority than the sound-effect queue.
+    PLAY_SOUND_EFFECT = 6,
+
+    // Stop all active sound effects
+    STOP_SOUND_EFFECTS = 8,
+
+    // Set the main volume
+    //  * parameter0: signed i8 volume
+    //
+    // NOTE: The main volume is reset whenever a new song is loaded.
+    SET_MAIN_VOLUME = 10,
+
+    // Enables or disables music channels.
+    //  * parameter0: A bitmask of the 8 music channels that can send key-on events
+    //
+    // NOTE: The music channels bitmask is reset whenever a new song is loaded.
+    SET_MUSIC_CHANNELS = 12,
+
+    // Set the song tempo.
+    //  * parameter0: The new S-DSP TIMER_0 register value
+    //    (MUST be >= MIN_TICK_CLOCK 64, is bounds checked)
+    //
+    // NOTE: The song can still change the tempo.
+    SET_SONG_TEMPO = 14,
+
+    // Set the global music volume
+    //  * parameter0: the music volume.
+    //    A 255 music-volume will not modify the channel volume.
+    //
+    // NOTE: If the `RESET_GLOBAL_VOLUMES_ON_SONG_START` flag is set, the global volumes
+    // will be reset when a songs starts.
+    SET_GLOBAL_MUSIC_VOLUME = 16,
+
+    // Set the global sound-effect volume
+    //  * parameter0: the music volume.
+    //    A 255 sfx-volume will not modify the channel volume.
+    //
+    // NOTE: If the `RESET_GLOBAL_VOLUMES_ON_SONG_START` flag is set, the global volumes
+    // will be reset when a songs starts.
+    SET_GLOBAL_SFX_VOLUME = 18,
+
+    // Set the global music and sound-effect volumes
+    //  * parameter0: the music volume.
+    //  * parameter1: the sound-effect volume.
+    //
+    // NOTE: If the `RESET_GLOBAL_VOLUMES_ON_SONG_START` flag is set, the global volumes
+    // will be reset when a songs starts.
+    SET_GLOBAL_VOLUMES = 20,
+};
+
+
+// MUST match `audio-driver/src/io-commands.wiz`
+namespace LoaderDataType {
+    let CODE             = 0;
+    let COMMON_DATA      = 1;
+
+    let SONG_DATA_FLAG            = 1 << 7;
+    let PLAY_SONG_FLAG            = 1 << 6;
+    let RESET_GLOBAL_VOLUMES_FLAG = 1 << 5;
+
+    let STEREO_FLAG               = 1 << 1;
+    let SURROUND_FLAG             = 1 << 0;
+};
+
+namespace Flags {
+    let RELOAD_COMMON_AUDIO_DATA = 1 << 7;
+    let PLAY_SONG_IMMEDIATELY = 1 << 6;
+    let RESET_GLOBAL_VOLUMES_ON_SONG_START = 1 << 5;
+
+    let _ALL_FLAGS = RELOAD_COMMON_AUDIO_DATA | PLAY_SONG_IMMEDIATELY | RESET_GLOBAL_VOLUMES_ON_SONG_START;
+}
+
+enum AudioMode : u8 {
+    MONO = 0,
+    STEREO = 1,
+    SURROUND = 2,
+}
+
+enum State : u8 {
+    NULL                                =    0,
+    // Waiting for loader to send the ready signal before loading common-audio-data
+    WAITING_FOR_LOADER_COMMON           = 0x7b,
+    // Waiting for loader to send the ready signal before loading song data
+    WAITING_FOR_LOADER_SONG             = 0x7c,
+    // Loading common audio data.
+    LOADING_COMMON_AUDIO_DATA           = 0x7d,
+    // Loading a song and the LoaderDataType.PLAY_SONG_FLAG was clear.
+    LOADING_SONG_DATA_PAUSED            = 0x7e,
+    // Loading a song and the LoaderDataType.PLAY_SONG_FLAG was set.
+    LOADING_SONG_DATA_PLAY              = 0x7f,
+    // Song is loaded into audio-RAM and the audio driver is paused.
+    // No play-sound-effect commands will be sent when the driver is paused.
+    PAUSED                              = 0x80,
+    // Song is loaded into Audio-RAM and the audio driver is playing sfx (song paused).
+    PLAYING_SFX                         = 0x81,
+    // Song is loaded into audio-RAM and the audio driver is playing the song.
+    PLAYING                             = 0x82,
+}
+
+let __FIRST_WAITING_STATE = State.WAITING_FOR_LOADER_COMMON;
+let __FIRST_LOADING_STATE = State.LOADING_COMMON_AUDIO_DATA;
+let __FIRST_LOADING_SONG_STATE = State.LOADING_SONG_DATA_PAUSED;
+
+
+in rodata0 {
+    const __LoaderBinary = embed "gen/audio-loader.bin";
+
+    let Loader = far &__LoaderBinary as far * const u8;
+    let LOADER_SIZE = sizeof(typeof(__LoaderBinary));
+
+    const AudioDriver = embed "gen/audio-driver.bin";
+}
+
+
+in zeropage {
+    // The previous `command` sent to the S-SMP audio driver.
+    var _previousCommand : u8;
+}
+
+
+in lowram {
+    // Current audio driver state
+    var _state : State;
+
+    // See `Flags` namespace
+    var flags : u8;
+
+    // Mono/Stereo/Surround audio mode.
+    // Changes to `audioMode` will not take effect until the next song is loaded into Audio-RAM.
+    var audioMode : AudioMode;
+
+    // Number of bytes to transfer on per `Process` call
+    //
+    // MUST be > 0
+    var _bytesToTransferPerFrame : u16;
+}
+
+// There are 4 queues (in order of priority)
+
+// Queue 1 - remaining data to transfer into Audio-RAM
+//
+// Used by the `LOADING_*` states.
+in lowram {
+    // A pointer to the remaining data to transfer
+    var _dataToTransfer_addr : u16;
+    var _dataToTransfer_bank : u8;
+
+    // The remaining number of bytes to transfer
+    var _dataToTransfer_size : u16;
+
+    // The previous value written to the loader spinLock.
+    var _dataToTransfer_prevSpinLock : u8;
+}
+
+
+// Queue 2 - The next song to load into Audio-RAM
+in lowram {
+    // The next song to load into Audio-RAM
+    // Used by the `WAITING_FOR_LOADER_SONG` state
+    // If this value is 0 or > N_SONGS, a blank silent song will be loaded instead.
+    var _nextSong : u8;
+}
+
+
+// Queue 3 - The next command to send to the audio driver (and parameter)
+in lowram {
+    // The next `Command` to send to the audio driver.
+    // If this value is negative, the queue is empty.
+    var _nextCommand_id : u8;
+
+    // The two parameters of the next command (if any)
+    var _nextCommand_parameter0 : u8;
+    var _nextCommand_parameter1 : u8;
+}
+
+
+// Queue 4 - The next sound effect to play
+in zeropage {
+    // The sound effect to play next.
+    //
+    // Lower sound effect indexes take priority over higher sound effect indexes (as defined by the
+    // project file sound effect export order).
+    //
+    // If `sfxQueue_sfx = $ff`, then the queue is considered empty.
+    var sfxQueue_sfx : u8;
+
+    // The pan value for the next sound effect to play.
+    var sfxQueue_pan : u8;
+}
+
+
+in code {
+
+
+// This callback will be called by `process()` when the common audio data or song
+// data need to be loaded into Audio-RAM.
+//
+// This subroutine is responsible for determining if the input is a valid song.
+// If the input is *common audio data* this function MUST return data with carry set.
+//
+// INPUT:
+//    A = 0 - load common audio data
+//              (This function MUST return carry set with a valid address/size if A=0)
+//    A >= 1 - load song data
+//
+// OUTPUT:
+//    carry set if input (`a`) is valid
+//    A:X = far address
+//    Y = data size
+//
+//
+// LIFETIME:
+//
+//  * The data MUST remain in memory while it is being transferred to Audio-RAM
+//    (which may take several frames).
+//  * The data can be freed on the next `load_audio_data()` call.
+//  * The data can be freed when the state changes to PAUSED, PLAYING_SFX or PLAYING.
+//  * The data can be freed if the `is_loader_active()` function returns false.
+//  * The `finish_loading_data()` subroutine can be used to flush decompressed
+//    memory into Audio-RAM.  The data can be freed immediately after a
+//    `finish_loading_data()` call.
+//
+// This function MUST NOT call `process()` or `load_song()`.
+// It is allowed to call `finish_loading_data()`.
+//
+// DB access registers
+#[mem8, idx16]
+func load_audio_data(id: u8 in a) : bool in carry {
+    if a < N_SONGS {
+        resources.load_resource__dynamic_ram_no_copy__inline_axy(resources.ResourceType.audio_data, a);
+        return true;
+    }
+    return false;
+}
+
+
+
+// Initialises the audio driver:
+//
+//  * Loads the loader into Audio-RAM
+//  * Loads the audio driver into Audio-RAM
+//  * Sets the song to 0 (silence)
+//  * Initialises `flags` and `audioMode`
+//  * Queues a common audio data transfer
+//
+// This function will require multiple frames of execution time.
+//
+// REQUIRES: S-SMP reset
+//
+// TIMING:
+//  * Should be called more than 40 scanlines after reset
+//  * MUST NOT be called when interrupts are enabled
+//  * MUST be called after `resources_over_usb2snes` init.
+//  * `setup__inline()` MUST be called before any other audio functions.
+//
+// DB access registers
+#[mem8, idx16]
+inline func setup__inline() {
+    // ::TODO add a loader/IPL/driver test::
+
+    __Loader.transfer_loader_via_ipl__inline();
+
+    _state = State.NULL;
+
+    // Assumes (TAD_DEFAULT_FLAGS) & Flags.RELOAD_COMMON_AUDIO_DATA == 0
+    // Assumes (TAD_DEFAULT_FLAGS) & Flags._ALL_FLAGS == (TAD_DEFAULT_FLAGS)
+    // Assumes (TAD_DEFAULT_AUDIO_MODE) >= 0 && (TAD_DEFAULT_AUDIO_MODE) < TAD_N_AUDIO_MODES
+    // Assumes flags + 1 == audioMode
+    *(&flags as *u16) = xx = (TAD_DEFAULT_FLAGS) | (TAD_DEFAULT_AUDIO_MODE as u16 << 8) ;
+
+    _bytesToTransferPerFrame = xx = DEFAULT_TRANSFER_PER_FRAME;
+
+    __Loader.set_data_to_transfer(#:far &AudioDriver, &AudioDriver as u16, sizeof(typeof(AudioDriver)));
+
+    a = 0xff;
+
+    _nextSong = 0;
+    _nextCommand_id = a;
+    sfxQueue_sfx = a;
+
+    do {
+        carry = __Loader.check_ready_and_send_loader_data_type(LoaderDataType.CODE);
+    } while !carry;
+
+    do {
+        carry = __Loader.transfer_data();
+    } while !carry;
+
+    a = State.WAITING_FOR_LOADER_COMMON as u8;
+    _state = a as State;
+}
+
+
+
+// Sends a command to the audio driver.
+//
+// REQUIRES: state == PAUSED or state == PLAYING
+// REQUIRES: The previous command has been processed by the audio-driver.
+// REQUIRES: `_nextCommand_id` is a valid command.
+//
+// DB access registers
+#[mem8, idx8]
+func __process__send_command__return_idx16(previousCommand: u8 in a, nextCommand: u8 in y) {
+    a &= IO.ToDriver.COMMAND_I_MASK;
+    a ^= IO.ToDriver.COMMAND_I_MASK;
+    a |= _nextCommand_id;
+
+    IO.ToDriver.parameter0 = x = _nextCommand_parameter0;
+    IO.ToDriver.parameter1 = x = _nextCommand_parameter1;
+    IO.ToDriver.command = a;
+    _previousCommand = a;
+
+    if y < Command.UNPAUSE as u8 + 1 {
+        // Assumes Command.PAUSE == 0
+        // Assumes Command.PAUSE_MUSIC_PLAY_SFX == 2
+        // Assumes Command.UNPAUSE == 4
+        // Assumes (Command.PAUSE >> 1) & 3 | 0x80 == State.PAUSED
+        // Assumes (Command.PAUSE_MUSIC_PLAY_SFX >> 1) & 3 | 0x80 == State.PLAYING_SFX
+        // Assumes (Command.UNPAUSE >> 1) & 3 | 0x80 == State.PLAYING
+        a = ((a >>> 1) & 3) | 0x80;
+        _state = a as State;
+    }
+
+    // Reset the command queue
+    _nextCommand_id = y = 0xff;
+
+    idx16();
+    return;
+}
+
+
+
+// Send a play-sound-effect command to the audio driver.
+//
+// REQUIRES: state == PLAYING
+// REQUIRES: The previous command has been processed by the audio-driver.
+//
+// DB access registers
+#[mem8, idx8]
+inline func __process__send_sfx_command__inline(previousCommand : u8 in a, sfx: u8 in y) {
+    // Send play_sound_effect command
+    // Clear the non i bits of commands
+    a &= IO.ToDriver.COMMAND_I_MASK as u8;
+    //  Change the i bits and set the play sound effect command
+    a ^= IO.ToDriver.COMMAND_I_MASK | (Command.PLAY_SOUND_EFFECT as u8);
+
+    // parameter 0 = sfx_id
+    IO.ToDriver.parameter0 = y;
+
+    // parameter 1 = pan
+    y = sfxQueue_pan;
+    if y >= MAX_PAN + 1 {
+        y = CENTER_PAN;
+    }
+    IO.ToDriver.parameter1 = y;
+
+    IO.ToDriver.command = a;
+    _previousCommand = a;
+
+    // Reset the SFX queue
+    y = 0xff;
+    sfxQueue_sfx = y;
+    sfxQueue_pan = y;
+}
+
+
+
+// Processes the next queue.
+//
+// This function will do one of the following, depending on the state:
+//  * Transfer data to the Audio-RAM
+//  * Wait for the loader and call `load_audio_data()` when the loader is ready to receive new data
+//  * Send a command to the audio driver
+//  * Send a play-sound effect command to the audio driver
+//
+// NOTES: The command and sound-effect queues will be reset after a new song is loaded into Audio-RAM.
+//
+// TIMING:
+//  * Should be called once per frame.
+//  * MUST be called after `setup__inline()`.
+//  * MUST NOT be called in an interrupt.
+//
+// DB access registers
+#[mem8, idx16]
+func process() {
+    a = _state as u8;
+    if negative {
+        // Playing or paused state
+        idx8();
+        #[idx8] {
+            x = a;
+
+            a = _previousCommand;
+            if a == IO.ToScpu.command_ack {
+                // Previous command has been processed
+
+                y = _nextCommand_id;
+                goto __process__send_command__return_idx16 if !negative;
+
+                // Assumes State.PAUSED < $81
+                // Assumes State.PLAYING >= $81
+                // Assumes State.PLAYING_SFX >= $81
+                // x = _state
+                x--;
+                if negative {
+                    // Playing state
+                    y = sfxQueue_sfx;
+                    if y != 0xff {
+                        __process__send_sfx_command__inline(a, y);
+                    }
+                }
+            }
+        }
+        idx16();
+        return;
+    }
+
+    // Song is not loaded into Audio-RAM
+
+    // Assumes __FIRST_LOADING_STATE > __FIRST_WAITING_STATE
+    // Assumes __FIRST_LOADING_STATE = State.WAITING_FOR_LOADER_SONG + 1
+    goto __process__loading if a >= __FIRST_LOADING_STATE as u8;
+    goto __process__waiting_for_loader if a >= __FIRST_WAITING_STATE as u8;
+}
+
+
+
+// Process the WAITING_FOR_LOADER_* states.
+//
+// IN: A = state
+//
+// DB access registers
+#[mem8, idx16]
+func __process__waiting_for_loader(state: u8 in a) {
+    if a == State.WAITING_FOR_LOADER_COMMON as u8 {
+        // Common audio data
+        carry = __Loader.check_ready_and_send_loader_data_type(LoaderDataType.COMMON_DATA);
+        goto Return if !carry;
+
+        // Must store state AFTER `load_audio_data()`
+        // `load_audio_data()` might call `finish_loading_data()`.
+        a = State.LOADING_COMMON_AUDIO_DATA as u8;
+        push8(a);
+
+        a = 0;
+    }
+    else {
+        // Songs
+
+        // `flags` MUST NOT have the stereo/surround loader flag set
+        // ASSUMES Flags._ALL_FLAGS & LoaderDataType.STEREO_FLAG == 0
+        // ASSUMES Flags._ALL_FLAGS & LoaderDataType.SURROUND_FLAG == 0
+
+        // SONG_DATA_FLAG must always be sent and it also masks the RELOAD_COMMON_AUDIO_DATA flag in LoaderDataType
+        // ASSUMES Flags.RELOAD_COMMON_AUDIO_DATA == LoaderDataType.SONG_DATA_FLAG
+
+        // ASSUMES Flags.PLAY_SONG_IMMEDIATELY == LoaderDataType.PLAY_SONG_FLAG
+        // ASSUMES Flags.RESET_GLOBAL_VOLUMES_ON_SONG_START == LoaderDataType.RESET_GLOBAL_VOLUMES_FLAG
+
+        // Clear unused flags
+        a = 0xff ^ Flags._ALL_FLAGS;
+        test_and_reset(flags, a);
+
+        // Convert `audioMode` to LoaderDataType and combine with `flags`
+        // ASSUMES ((0 + 1) & 3) == LoaderDataType.SURROUND_FLAG (mono)
+        // ASSUMES ((1 + 1) & 3) == LoaderDataType.STEREO_FLAG (stereo)
+        // ASSUMES ((2 + 1) & 3) == LoaderDataType.STEREO_FLAG | LoaderDataType.SURROUND_FLAG (surround)
+        a = audioMode as u8;
+        a++;
+        a &= 3;
+
+        a = a | flags | LoaderDataType.SONG_DATA_FLAG;
+
+        carry = __Loader.check_ready_and_send_loader_data_type(a);
+        goto Return if !carry;
+
+        // assumes Flags.PLAY_SONG_IMMEDIATELY == 0x40
+        // assumes State.LOADING_SONG_DATA_PAUSED + 1 == State.LOADING_SONG_DATA_PLAY
+        a = flags;
+        a <<<= 2;
+        // carry = PLAY_SONG_IMMEDIATELY flag
+        a = 0 +# (State.LOADING_SONG_DATA_PAUSED as u8);
+        push8(a);
+
+        a = _nextSong;
+        goto UseBlankSong if zero;
+    }
+
+    carry = load_audio_data(a);
+    goto DataIsValid if carry;
+        UseBlankSong:
+            // The blank song is a single zero byte.
+            // ::HACK use the 3rd byte of `ldy #1` (which is `0x00`) for the blank song data::
+            yy = 1;
+        _AfterLdy:
+            xx = &_AfterLdy as u16 - 1;
+            a = #:far &_AfterLdy;
+DataIsValid:
+
+    // STACK holds next state
+    // A:X = data address
+    // Y = data size
+    __Loader.set_data_to_transfer(a, xx, yy);
+
+    a = pop8();
+    _state = a as State;
+
+Return:
+}
+
+
+
+// Process the LOADING_* states
+//
+// DB access registers
+#[mem8, idx16]
+func __process__loading() {
+    carry = __Loader.transfer_data();
+    if carry {
+        a = _state as u8;
+        if a == State.LOADING_COMMON_AUDIO_DATA as u8 {
+            // Loader is still active
+            a = State.WAITING_FOR_LOADER_SONG as u8;
+        }
+        else {
+            // Song audio data was loaded into Audio-RAM.
+            // Loader has finished, audio driver is now active.
+
+            _previousCommand = 0;
+
+            // Reset command and SFX queues
+            a = 0xff;
+            _nextCommand_id = a;
+            sfxQueue_sfx = a;
+            sfxQueue_pan = a;
+
+            // Use `_state` to determine if the song is playing or paused.
+            // Cannot use `flags` as it may have changed after the `LoaderDataType` was sent to
+            // the loader (while the song was loaded).
+
+            // Assumes ((State::LOADING_SONG_DATA_PAUSED & 1) << 1) | $80 = State::PAUSED
+            // Assumes ((State::LOADING_SONG_DATA_PLAY & 1) << 1) | $80 = State::PLAYING
+            a = _state as u8;
+            a = ((a & 1) << 1) | 0x80;
+        }
+        _state = a as State;
+    }
+}
+
+
+
+// Finish loading the data into audio-RAM.
+//
+// This function can be safely called by `load_audio_data()`.
+//
+// This function may require multiple frames of execution time.
+//
+// DB access registers
+#[mem8, idx16]
+func finish_loading_data() {
+    while { carry = is_loader_active(); } && carry {
+        __process__loading();
+    }
+}
+
+
+
+// Adds a command to the queue if the queue is empty.
+//
+// The command queue can only hold 1 command.
+// Returns true if the command was added to the queue.
+//
+// MUST NOT be used to send a play-sound-effect command.
+//
+// KEEP: Y
+//
+// DB access lowram
+#[mem8, idx8]
+func queue_command(command : Command in a, parameter0: u8 in x, parameter1: u8 in y) : bool in carry {
+    bit(_nextCommand_id);
+    if negative {
+        _nextCommand_id = a = a & IO.ToDriver.COMMAND_MASK;
+        _nextCommand_parameter0 = x;
+        _nextCommand_parameter1 = y;
+
+        return true;
+    }
+
+    return false;
+}
+
+// Queue command with no parameter
+//
+// WARNING: will send the x register value to the audio driver.
+//
+// KEEP: Y
+let queue_command_no_parameter = queue_command as func(command : Command in a): bool in carry;
+
+
+
+// Adds a command to the queue, overriding any previously unsent commands.
+//
+// MUST NOT be used to send a play-sound-effect command.
+// The command queue can only hold 1 command.
+//
+// KEEP: Y
+//
+// DB access lowram
+#[mem8, idx8]
+func queue_command_override(command : Command in a, parameter0: u8 in x, parameter1: u8 in y) {
+    _nextCommand_id = a = a & IO.ToDriver.COMMAND_MASK;
+    _nextCommand_parameter0 = x;
+    _nextCommand_parameter1 = x;
+}
+
+// Adds a command with no parameter to the queue, overriding any previously unsent commands.
+//
+// WARNING: will send the x register value to the audio driver.
+//
+// KEEP: Y
+let queue_command_override_no_parameter = queue_command_override as func(command : Command in a);
+
+
+
+// Queue the next sound effect to play, with panning.
+//
+// NOTE: Only 1 sound effect can be played at a time
+// NOTE: Lower sound effect IDs take priority over higher sound effect IDs.
+// NOTE: `effect_id` 0xff is NULL (no sound effect)
+//
+// KEEP: Y, X
+//
+// DB access lowram
+#[mem8, idx8]
+func queue_panned_sound_effect(effect_id : sound_effects in a, pan: u8 in x) {
+    if a < sfxQueue_sfx {
+        sfxQueue_sfx = a;
+        sfxQueue_pan = x;
+    }
+}
+
+
+
+// Queue the next sound effect to play with center pan.
+//
+// NOTE: Only 1 sound effect can be played at a time.
+// NOTE: Lower sound effect IDs take priority over higher sound effect IDs.
+// NOTE: `effect_id` 0xff is NULL (no sound effect)
+//
+// KEEP: Y, X
+//
+// Can be called with a 16 bit Index register.
+//
+// DB access lowram
+#[mem8]
+func queue_sound_effect(effect_id : sound_effects in a) {
+    if a < sfxQueue_sfx {
+        sfxQueue_sfx = a;
+        sfxQueue_pan = a = CENTER_PAN;
+    }
+}
+
+
+// Disables the audio driver, starts the loader and queues a song or common-audio-data transfer.
+//
+// This subroutine will clear the `RELOAD_COMMON_AUDIO_DATA` flag.
+//
+// CAUTION: `song_song()` will switch the state to `WAITING_FOR_LOADER_*`.  `load_audio_data()` will
+// not be called until `process()` is called **and** the audio-driver has switched to the loader.
+// While the state remains `WAITING_FOR_LOADER_*`, no audio data will be transferred and calling
+// `finish_loading_data()` will not transfer any audio data.
+//
+// CAUTION: The audio driver starts in the paused state if the `PLAY_SONG_IMMEDIATELY`
+// flag is clear when `process()` receives the ready signal from the loader.
+//
+// IN: A = 0 - play a blank (silent song)
+// IN: A >= 1 - Play song number `A`
+//
+// KEEP: Y
+//
+// DB access lowram
+#[mem8]
+func load_song(songId : resources.songs in a) {
+    // CAUTION: Spaghetti code
+
+    _nextSong = a;
+
+    a = Flags.RELOAD_COMMON_AUDIO_DATA;
+    test_and_reset(flags, a);
+    if !zero {
+        // Common audio data requested
+        a = State.WAITING_FOR_LOADER_COMMON as u8;
+    }
+    else {
+        a = _state as u8;
+        goto Return if a < __FIRST_LOADING_SONG_STATE as u8;
+
+            // State is not NULL, WAITING_FOR_LOADER_* or LOADING_COMMON_AUDIO_DATA
+            a = State.WAITING_FOR_LOADER_SONG as u8;
+    }
+
+    _state = a as State;
+
+    __Loader.send_switch_to_loader_command__inline__db_unknown();
+
+Return:
+}
+
+
+
+// Calls `load_song()` if `songId` != the song used in the last `load_song()` call.
+//
+// See: `load_song()`
+//
+// Return true if `load_song()` was called.
+//
+// DB access lowram
+#[mem8]
+func load_song_if_changed(songId : resources.songs in a) : bool in carry {
+    if a != _nextSong {
+        load_song(a as resources.songs);
+        return true;
+    }
+    return false;
+}
+
+
+
+// Returns the songId used in the last `load_song()` call.
+//
+// KEEP: Y, X
+//
+// DB access lowram
+#[mem8]
+inline func get_song() : u8 in a {
+    return _nextSong;
+}
+
+
+
+// If this subroutine is called, the common audio data will be reloaded into Audio-RAM.
+// This will not take effect until the next `load_song` call.
+//
+// DB access lowram
+#[mem8]
+func reload_common_audio_data() {
+    a = Flags.RELOAD_COMMON_AUDIO_DATA;
+    test_and_set(flags, a);
+}
+
+
+
+// Clears the `PLAY_SONG_IMMEDIATELY` flag.
+// This will not take effect until the next `load_song` call.
+//
+// DB access lowram
+#[mem8]
+func songs_start_immediately() {
+    a = Flags.PLAY_SONG_IMMEDIATELY;
+    test_and_set(flags, a);
+}
+
+
+
+// Clears the `PLAY_SONG_IMMEDIATELY` flag.
+//
+// DB access lowram
+#[mem8]
+func songs_start_paused() {
+    a = Flags.PLAY_SONG_IMMEDIATELY;
+    test_and_reset(flags, a);
+}
+
+
+// Not porting `Tad_GlobalVolumesResetOnSongStart`
+// Not porting `Tad_GlobalVolumesPersist`
+
+
+// Sets the audio mode
+//
+// DB access lowram
+#[mem8]
+inline func set_audio_mode(mode : AudioMode in a) {
+    audioMode = a as AudioMode;
+}
+
+
+
+// Sets the number of bytes to transfer to Audio-RAM per `process()` call.
+//
+// The value will be clamped from MIN_TRANSFER_PER_FRAME to MAX_TRANSFER_PER_FRAME.
+//
+// INPUT: X = number of bytes to transfer on every Tad_Process call.
+//
+// DB access lowram
+#[mem8, idx16]
+func set_transfer_size(bytes_per_frame: u16 in xx) {
+    if xx >= MAX_TRANSFER_PER_FRAME {
+        xx = MAX_TRANSFER_PER_FRAME;
+    }
+    if xx < MIN_TRANSFER_PER_FRAME {
+        xx = MIN_TRANSFER_PER_FRAME;
+    }
+    _bytesToTransferPerFrame = xx;
+}
+
+
+
+// Returns true if the loader is still using data returned by `load_audio_data()`.
+//
+// DB access lowram
+#[mem8]
+func is_loader_active() : bool in carry {
+    // Assumes NULL and WAITING_FOR_LOADER_* are < __FIRST_LOADING_STATE
+    // Assumes (State.PAUSED | State.PLAYING) & 0x7f < __FIRST_LOADING_STATE state.
+    a = _state as u8;
+    a &= 0x7f;
+    cmp(a, __FIRST_LOADING_STATE as u8);
+
+    return carry;
+}
+
+
+
+// Return true if a song is loaded into audio-RAM and the audio-driver is active.
+//
+// NOTE: The audio driver may be in a paused state.
+//
+// DB access lowram
+#[mem8]
+func is_song_loaded() : bool in carry {
+    a = _state as u8;
+    cmp(a, State.PAUSED as u8);
+    return carry;
+}
+
+
+
+// Return true if the song is loaded into audio-RAM and sound effects are not paused
+//
+// DB access lowram
+#[mem8]
+func is_sfx_playing() : bool in carry {
+    a = _state as u8;
+    cmp(a, State.PLAYING_SFX as u8);
+    return carry;
+}
+
+
+
+// Return true if the song is loaded into audio-RAM and the audio-driver is playing
+//
+// DB access lowram
+#[mem8]
+func is_song_playing() : bool in carry {
+    a = _state as u8;
+    cmp(a, State.PLAYING as u8);
+    return carry;
+}
+
+
+
+namespace __Loader {
+
+// REQUIRES: S-SMP reset and no data has been written to it yet
+//
+// This function MUST only be called once.  There is no way to reset the S-SMP and restart the IPL.
+//
+// DB access registers
+#[mem8, idx16]
+inline func transfer_loader_via_ipl__inline() {
+    // ::TODO add a 'running IPL' check::
+
+    // Clear start command port (just in case APUIO_OUT_0 has a $cc in it)
+    // SOURCE: `blarggapu.s` from lorom-template, originally written by blargg (Shay Green)
+    APUIO_OUT_0 = 0;
+
+    // Wait for a response from the IPL
+    yy = 0xbbaa;
+    do {
+    } while yy != APUIO_IN_10;
+
+    xx = LOADER_ARAM_ADDR;
+    a = 0xcc;
+    APUIO_OUT_32 = xx;     // destination ARAM address
+    APUIO_OUT_1 = a;       // non-zero = write data to address
+    APUIO_OUT_0 = a;       // New data command (non-zero and APUIO0 + more than 2, or 0xcc on the first transfer)
+
+
+    // Wait for a response form the IPL
+    do {
+    } while a != APUIO_IN_0;
+
+
+    // Transfer the data
+    idx8();
+    #[idx8] {
+        x = 0;
+        do {
+            // Send the next byte to the IPL
+            APUIO_OUT_1 = a = Loader[x];
+
+            // Tell the IPL the next data is ready
+            APUIO_OUT_0 = x;
+
+            // Wait for a response from the IPL
+            do {
+            } while x != APUIO_IN_0;
+
+            x++;
+        } while x < LOADER_SIZE;
+    }
+    idx16();
+
+    APUIO_OUT_32 = xx = LOADER_ARAM_ADDR;  // A-RAM address
+    APUIO_OUT_1 = 0;                       // zero = execute program at A-RAM address
+    APUIO_OUT_0 = a = LOADER_SIZE + 2;     // New data command (must be at least +2 the previous APUIO_OUT_0 write)
+}
+
+
+
+// Send a *switch-to-loader* command to the audio-driver or loader.
+//
+// DB unknown
+#[mem8, idx16]
+inline func send_switch_to_loader_command__inline__db_unknown() {
+    *(far &IO.ToDriver.switch_to_loader) = a = IO.ToDriver.SWITCH_TO_LOADER;
+}
+
+
+
+// Send the LoaderDataType to the loader if the loader is ready.
+//
+// Assumes loader just started OR a `SWITCH_TO_LOADER` message was sent to the audio driver/loader.
+//
+// DB access registers
+#[mem8, idx16]
+func check_ready_and_send_loader_data_type(loader_data_type : u8 in a) : bool in carry {
+    // Test if the loader is ready
+    xx = ('L' as u16) | ('D' as u16 << 8);
+    if xx == APUIO_IN_32 {
+        // Send the ready signal and the LoaderDataType.
+        APUIO_OUT_1 = a;
+        APUIO_OUT_2 = a = 'L';
+        APUIO_OUT_3 = a = 'D';
+
+        // The S-CPU must wait for the loader to write 0 to the spinlock before transferring data.
+        _dataToTransfer_prevSpinLock = 0;
+
+        return true;
+    }
+    return false;
+}
+
+
+
+// Set the data transfer queue
+//
+// DB access registers
+#[mem8, idx16]
+func set_data_to_transfer(bank_: u8 in a, addr: u16 in xx, size: u16 in yy) {
+    _dataToTransfer_addr = xx;
+    _dataToTransfer_bank = a;
+    _dataToTransfer_size = yy;
+}
+
+
+
+// Transfer data to the audio loader.
+//
+// ASSUMES: `check_ready_and_send_loader_data_type` and `set_data_to_transfer` were previously called.
+//
+// Returns true if all data in the transfer queue was sent to Audio-RAM.
+//
+// NOTE: This function may read one byte past the end of the `_dataToTransfer` queue.
+//
+// DB access registers
+#[mem8, idx16]
+func transfer_data() : bool in carry {
+    // APUIO register aliases for zeropage access
+    //
+    // Accessible when D = 0x2100
+    extern writeonly _DP_APUIO_OUT_1 @ &APUIO_OUT_1 as u8 : u8;
+    extern writeonly _DP_APUIO_OUT_2 @ &APUIO_OUT_2 as u8 : u8;
+    extern writeonly _DP_APUIO_OUT_3 @ &APUIO_OUT_3 as u8 : u8;
+    extern const _DP_APUIO_IN_3 @ &APUIO_IN_3 as u8 : u8;
+
+    // Early exit if the Loader is not ready.
+    // This test doubles as a lock for the previous transfer.
+    //
+    // This also prevents a freeze in `process()` if the loader has crashed/glitched.
+    // (`finish_loading_data()` will freeze if the loader has crashed/glitched.
+    a = _dataToTransfer_prevSpinLock;
+    goto ReturnFalse if a != APUIO_IN_3;
+
+    push8(data_bank);
+    push16(direct_page);
+
+    mem16();
+    #[mem16] {
+        // Calculate number of words to write
+        aa = _dataToTransfer_size;
+        if aa >= _bytesToTransferPerFrame {
+            aa = _bytesToTransferPerFrame;
+        }
+        aa++;   // required
+        aa >>>= 1;
+
+        // Prevent corrupting all of audio-RAM if n_loops == 0
+        if zero {
+            aa++;
+        }
+        xx = aa;
+
+        // Reverse subtract `_dataToTransfer_size` with clamping
+        aa <<= 1;     // convert number of words to number of bytes
+        aa ^= 0xffff;
+        carry = true;
+        aa +#= _dataToTransfer_size;
+        if !carry {
+            aa = 0;
+        }
+        _dataToTransfer_size = aa;
+
+        aa = 0x2100;
+
+        direct_page = aa;
+// DP = 0x2100
+    }
+    mem8();
+
+    a = _dataToTransfer_bank;
+    yy = _dataToTransfer_addr;
+
+    push8(a);
+    data_bank = pop8();
+// DB = dataToTransfer bank
+
+    // SPAGHETTI CODE
+    // manually creating the loop with labels to optimise the bank-overflow test
+    {
+    Loop:
+        // xx = number of words to write
+        // yy = data address (using yy to force addr,y addressing mode)
+
+        _DP_APUIO_OUT_1 = a = (0 as *u8)[yy];
+        yy++;
+        // The bank overflow test must be done here as `_dataToTransfer_ptr` might point to an odd memory address.
+        goto BankOverflow_1 if zero;
+    BankOverflow_1_Resume:
+
+        _DP_APUIO_OUT_2 = a = (0 as *u8)[yy];
+
+        // Increment the spinLock value.
+        //
+        // The upper 4 bits of the spinlock must be clear.
+        // Cannot be 0.  Zero is used to spinlock the loader init before this loop starts
+        //               (see Loader Step 3 in `terrific-audio-driver/audio-driver/src/io-commands.wiz`)
+        //
+        // yy = address of the data, it should always increment by 2.
+        a = y & 7;
+        a++;
+        _DP_APUIO_OUT_3 = a;
+
+        yy++;
+        // The bank overflow test must be done here as `_dataToTransfer_ptr` might point to an odd memory address.
+        goto BankOverflow_2 if zero;
+    BankOverflow_2_Resume:
+
+        xx--;
+        goto EndLoop if zero;
+
+        // Spinloop until the S-SMP has acknowledged the transfer
+        do {
+        } while a != _DP_APUIO_IN_3;
+
+        goto Loop;
+
+
+    // The first byte overflowed into the next bank.
+    BankOverflow_1:
+        // Not implementing bank wrapping.
+        // Resources subsystem ensures no data crosses a bank boundary.
+        irqcall(1); // Break
+        goto BankOverflow_1_Resume;
+
+    // The second byte overflowed into the next bank.
+    BankOverflow_2:
+        irqcall(2); // Break
+        goto BankOverflow_2_Resume;
+    }
+EndLoop:
+
+    direct_page = pop16();
+    data_bank = pop8();
+// DB access registers
+// D = 0
+
+    _dataToTransfer_addr = yy;
+    _dataToTransfer_prevSpinLock = a;
+
+    yy = _dataToTransfer_size;
+    if zero {
+        // End of data transfer
+
+        // Wait for Loader to acknowledge the last write
+        a = _dataToTransfer_prevSpinLock;
+        do {
+        } while a != APUIO_IN_3;
+
+        // 0x80 = no more data to transfer
+        // MUST NOT set `IO.ToDriver.SWITCH_TO_LOADER_BIT`
+        APUIO_OUT_3 = a = 0x80;
+
+        return true;
+    }
+
+ReturnFalse:
+    return false;
+}
+
+}
+}
+}
+

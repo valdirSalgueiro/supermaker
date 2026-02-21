@@ -1,0 +1,965 @@
+// Collision Detection System
+// ==========================
+// AABB collision detection for player vs enemies.
+// Checks player hitbox against enemy hurtboxes (player attacks enemies)
+// and enemy hitboxes against player hurtbox (enemies attack player).
+//
+// Uses arcade-style approach:
+//   - Trust frame data for hitbox activation (0x80 = no hitbox)
+//   - Z-axis proximity check before AABB test
+//   - Multi-hit prevention via hit tracking bitmask
+//
+// DB = 0x7e (all functions)
+
+import "memmap";
+
+import "engine/entity_api";
+import "engine/game/entityloop";
+import "engine/game/metasprites";
+import "engine/game/camera";
+
+import "player";
+import "player-hitbox";
+
+import "entities/grunt_ai";
+
+import "gen/enums";
+import "gen/entities";
+
+import "hud";
+
+
+namespace collision {
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Z-axis tolerance for collision (pixels)
+// Entities must be within this Z distance to collide
+let Z_TOLERANCE = 10;
+
+// WorldY vertical tolerance (pixels)
+// Entities' bottom edges must be within this distance to collide
+// This prevents hits when entities are at very different vertical positions
+let WORLDY_TOLERANCE = 10;
+
+// Player attack damage is now read from player.currentAttackDamage
+// (set by the combo/special system when entering ACTIVE phase).
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HIT TRACKING
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Bitmask tracking which enemies were hit by current player attack.
+// Cleared when player attack ends (hitbox becomes invalid).
+// Prevents same attack from hitting same enemy multiple times.
+//
+// Bits 0-20 correspond to entity IDs 0-20 (N_ENTITIES = 21)
+// We use 3 bytes (24 bits) to cover all entities.
+
+in lowram {
+    // Per-entity hit flag: 0 = not hit this swing, 1 = hit.
+    // Indexed by entity number (entityId >>> 1).  21 bytes, one per entity slot.
+    var hitThisSwing : [u8; 21];
+
+    // Tracks whether player had a valid hitbox last frame
+    // Used to detect when to clear hitThisSwing
+    var playerHadHitbox : u8;
+}
+
+
+// Temporary AABB for enemy collision box computation
+in zeropage {
+    var _enemyBox : entities.U8Aabb;
+    // 16-bit X coordinates for offscreen collision detection
+    var _enemyBox_left16 : u16;
+    var _enemyBox_right16 : u16;
+    // Note: 16-bit screen positions stored in zpTmp_word_2 (X) and zpTmp_word_3 (Y)
+}
+
+// Frame width for hitbox origin adjustment when facing left.
+// For left-facing frames, the metasprite tool negates offsets,
+// expecting origin at frame x=128 instead of x=0.
+let ENEMY_FRAME_WIDTH = 128;
+
+
+in code {
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPER FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Check if player and enemy worldY bottom edges are within tolerance.
+// Y register = enemy entity ID
+// Returns carry SET if within tolerance, CLEAR if too far
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _check_worldy_proximity(entityId : u8 in y) : bool in carry {
+    // Player bottom = worldY + bounds_top + bounds_height
+    zpTmp_byte_0 = a = entities.SoA.worldY_lo[PLAYER_ENTITY_ID];
+    a = entities.SoA.bounds_top[PLAYER_ENTITY_ID];
+    a += zpTmp_byte_0;
+    a += entities.SoA.bounds_height[PLAYER_ENTITY_ID];
+    zpTmp_byte_0 = a;  // Player bottom
+    
+    // Enemy bottom = worldY + bounds_top + bounds_height
+    zpTmp_byte_1 = a = entities.SoA.worldY_lo[unaligned y];
+    a = entities.SoA.bounds_top[unaligned y];
+    a += zpTmp_byte_1;
+    a += entities.SoA.bounds_height[unaligned y];
+    // A now contains enemy bottom
+    
+    // Compute abs(enemy_bottom - player_bottom)
+    carry = true;
+    a -#= zpTmp_byte_0;
+    if negative {
+        a ^= 0xff;
+        a++;
+    }
+    
+    // Return carry=1 if within tolerance, carry=0 if too far
+    if a >= WORLDY_TOLERANCE {
+        return false;
+    }
+    return true;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN COLLISION ENTRY POINT
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Run all collision detection for the frame.
+// Call after player hitbox update and entity processing.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func detect_all() {
+    // Clear hit-feedback flag; set to 1 below if a hit lands this frame
+    player.playerAttackHit = a = 0;
+
+    // Check if player hitbox is valid this frame (0xFFFF sentinel = no hitbox)
+    mem16();
+    #[mem16] {
+        aa = player.playerHitbox_left16;
+        aa++;  // 0xFFFF + 1 = 0, sets zero flag
+    }
+    mem8();
+    if !zero {
+        // Player has valid hitbox - check against enemy hurtboxes
+        detect_player_hits_enemies();
+        playerHadHitbox = a = 1;
+    } else {
+        // Player hitbox invalid - clear hit tracking if we had one last frame
+        a = playerHadHitbox;
+        if !zero {
+            _clear_hit_tracking();
+            playerHadHitbox = a = 0;
+        }
+    }
+    
+    // Check enemy hitboxes against player hurtbox
+    detect_enemies_hit_player();
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PLAYER HITS ENEMIES
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Check player hitbox against all enemy hurtboxes.
+// Calls grunt_ai.on_hit() for each enemy hit.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func detect_player_hits_enemies() {
+    // Get player Z for proximity check
+    a = entities.SoA.zPos[PLAYER_ENTITY_ID];
+    _tempA = a;  // Save player Z
+    
+    // Loop through active entities (skip entity 0 = player)
+    x = entityloop.numberOfActiveEntities;
+    if zero { return; }
+    
+__loop:
+    x--;
+    __currentEntityTablePos = x;  // Save loop index early
+    y = entityloop.activeEntitiesTable[x];
+    
+    // Skip player entity (entity 0)
+    if zero { goto __next; }
+    
+    // Skip non-enemies
+    a = entities.SoA._entityFlags[unaligned y];
+    a &= entities.EntityFlags.IS_ENEMY;
+    if zero { goto __next; }
+    
+    // Skip already-hit enemies this swing
+    carry = _check_hit_tracking(y);
+    if carry { goto __next; }
+    
+    // Z proximity check (early out)
+    a = entities.SoA.zPos[unaligned y];
+    carry = true;
+    a -#= _tempA;  // enemy.z - player.z
+    if negative {
+        // Result is negative, negate it
+        a ^= 0xff;
+        a++;
+    }
+    // A now contains abs(enemy.z - player.z)
+    if a >= Z_TOLERANCE { goto __next; }
+    
+    // WorldY proximity check (compare bottom edges)
+    carry = _check_worldy_proximity(y);
+    if !carry { goto __next; }
+    
+    // Compute enemy hurtbox in screen coords
+    _compute_enemy_hurtbox(y);
+    
+    // Check if enemy has valid hurtbox (0xFFFF sentinel = no hurtbox)
+    mem16();
+    #[mem16] {
+        aa = _enemyBox_left16;
+        aa++;  // 0xFFFF + 1 = 0
+    }
+    mem8();
+    if zero { goto __next; }
+    
+    // AABB overlap test: player hitbox vs enemy hurtbox
+    carry = _aabb_overlap__player_hitbox_vs_enemy_box();
+    if !carry { goto __next; }
+    
+    // HIT! Mark enemy as hit this swing
+    y = entities.currentEntityId;
+    _set_hit_tracking(y);
+
+    // Spawn hit effect at overlap midpoint (for all hits, including grab kicks)
+    _spawn_hit_effect();
+
+    // Restore entity ID (spawn_hit_effect clobbers y register)
+    y = entities.currentEntityId;
+
+    // Handle grabbed enemies differently: use on_grab_hit (keeps them grabbed)
+    a = entities.SoA.var_0_l[unaligned y];
+    if a == grunt_ai.GruntState.GRABBED as u8 {
+        a = player.currentAttackDamage;
+        grunt_ai.on_grab_hit(y, a);
+        goto __next;
+    }
+
+    // Call enemy's on_hit handler with damage armed by combo/special.
+    // Bit 7 = knockdown flag, bits 0-6 = amount.
+    a = player.currentAttackDamage;
+    grunt_ai.on_hit(y, a);
+
+    // Signal to the combo system that a hit connected this frame
+    player.playerAttackHit = a = 1;
+    
+__next:
+    x = __currentEntityTablePos;
+    if !zero { goto __loop; }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENEMIES HIT PLAYER
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Check all enemy hitboxes against player hurtbox.
+// Calls player damage handler on hit.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func detect_enemies_hit_player() {
+    // Check if player hurtbox is valid (not in i-frames, 0xFFFF sentinel = no hurtbox)
+    mem16();
+    #[mem16] {
+        aa = player.playerHurtbox_left16;
+        aa++;  // 0xFFFF + 1 = 0
+    }
+    mem8();
+    if zero { return; }
+    
+    // Get player Z for proximity check
+    a = entities.SoA.zPos[PLAYER_ENTITY_ID];
+    _tempA = a;  // Save player Z
+    
+    // Loop through active entities (skip entity 0 = player)
+    x = entityloop.numberOfActiveEntities;
+    if zero { return; }
+    
+__loop:
+    x--;
+    __currentEntityTablePos = x;  // Save loop index early
+    y = entityloop.activeEntitiesTable[x];
+    
+    // Skip player entity (entity 0)
+    if zero { goto __next; }
+    
+    // Skip non-enemies
+    a = entities.SoA._entityFlags[unaligned y];
+    a &= entities.EntityFlags.IS_ENEMY;
+    if zero { goto __next; }
+    
+    // Z proximity check (early out)
+    a = entities.SoA.zPos[unaligned y];
+    carry = true;
+    a -#= _tempA;  // enemy.z - player.z
+    if negative {
+        // Result is negative, negate it
+        a ^= 0xff;
+        a++;
+    }
+    // A now contains abs(enemy.z - player.z)
+    if a >= Z_TOLERANCE { goto __next; }
+    
+    // WorldY proximity check (compare bottom edges)
+    carry = _check_worldy_proximity(y);
+    if !carry { goto __next; }
+    
+    // Compute enemy hitbox in screen coords
+    _compute_enemy_hitbox(y);
+    
+    // Check if enemy has valid hitbox (0xFFFF sentinel = no hitbox)
+    mem16();
+    #[mem16] {
+        aa = _enemyBox_left16;
+        aa++;  // 0xFFFF + 1 = 0
+    }
+    mem8();
+    if zero { goto __next; }
+    
+    // AABB overlap test: enemy hitbox vs player hurtbox
+    carry = _aabb_overlap__enemy_box_vs_player_hurtbox();
+    if !carry { goto __next; }
+    
+    // HIT! Player takes damage
+    // Spawn hit effect at overlap midpoint (using playerHurtbox vs enemy hitbox)
+    _spawn_hit_effect_player_hurt();
+
+    // Use grunt attack damage constant (TODO: per-entity damage when more enemy types)
+    // Pass enemy's facing direction for knockback (var_1_l = facing)
+    y = entities.currentEntityId;
+    hud.show_enemy_hud(y);
+    x = entities.SoA.var_1_l[unaligned y];  // Enemy facing direction
+    y = x;  // Move to y register for take_damage parameter
+    a = grunt_ai.GRUNT_ATTACK_DAMAGE;
+    player.take_damage(a, y);
+
+    // Only one enemy can hit player per frame (simplifies i-frame logic)
+    return;
+    
+__next:
+    x = __currentEntityTablePos;
+    if !zero { goto __loop; }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENEMY COLLISION BOX COMPUTATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Temporary for loop index preservation
+in lowram {
+    var __currentEntityTablePos : u8;
+}
+
+
+// Compute enemy's hurtbox in screen coordinates.
+// Result stored in _enemyBox.
+//
+// INPUT: y = entityId (byte index)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _compute_enemy_hurtbox(entityId : u8 in y) {
+    entities.currentEntityId = y;
+    
+    // Zero-extend entityId to 16-bit for array access (needed by _compute_screen_position)
+    <:zpTmp_word_5 = a = y;
+    >:zpTmp_word_5 = 0;
+    
+    // Get enemy's screen position (world - camera) as 16-bit signed values
+    _compute_screen_position(y);
+    
+    // Get metasprite frame address
+    idx16();
+    mem16();
+    #[mem16, idx16] {
+        yy = zpTmp_word_5;
+        aa = entities.SoA.msFrameAddr[unaligned yy];
+        xx = aa;
+    }
+    mem8();
+    #[mem8, idx16] {
+        // Check for no hurtbox (sentinel: hurtbox_x == 0xFF)
+        a = metasprites.MsDataFormat.hurtbox_x[xx] as u8;
+        if a == metasprites.MsDataFormat.NO_AABB_VALUE {
+            // No hurtbox for this frame
+            _enemyBox.left = a = 0xff;
+            _enemyBox.right = 0;
+            _enemyBox.top = a = 0xff;
+            _enemyBox.bottom = 0;
+            mem16();
+            #[mem16] {
+                _enemyBox_left16 = aa = 0xFFFF;
+                _enemyBox_right16 = aa;
+            }
+            mem8();
+            idx8();
+            return;
+        }
+
+        // Hurtbox is XYWH frame-absolute (u8). No FRAME_WIDTH adjustment needed —
+        // the Python tool pre-mirrors X for left-facing frames, so screenX is always
+        // the sprite's left edge for both facings.
+        //
+        // screen_left  = screenX + hurtbox_x
+        // screen_right = screenX + hurtbox_x + hurtbox_w
+        // screen_top   = screenY + hurtbox_y
+        // screen_bottom = screenY + hurtbox_y + hurtbox_h
+
+        _add_offset_to_screen_x(a);    // a = hurtbox_x
+        _enemyBox.left = a;
+        mem16(); #[mem16] { _enemyBox_left16 = aa = zpTmp_word_4; } mem8();
+
+        a = metasprites.MsDataFormat.hurtbox_x[xx] as u8;
+        carry = false;
+        a +#= metasprites.MsDataFormat.hurtbox_w[xx] as u8;
+        _add_offset_to_screen_x(a);
+        _enemyBox.right = a;
+        mem16(); #[mem16] { _enemyBox_right16 = aa = zpTmp_word_4; } mem8();
+
+        a = metasprites.MsDataFormat.hurtbox_y[xx] as u8;
+        _add_offset_to_screen_y(a);
+        _enemyBox.top = a;
+
+        a = metasprites.MsDataFormat.hurtbox_y[xx] as u8;
+        carry = false;
+        a +#= metasprites.MsDataFormat.hurtbox_h[xx] as u8;
+        _add_offset_to_screen_y(a);
+        _enemyBox.bottom = a;
+    }
+    idx8();
+}
+
+
+// Compute enemy's hitbox in screen coordinates.
+// Result stored in _enemyBox.
+//
+// INPUT: y = entityId (byte index)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _compute_enemy_hitbox(entityId : u8 in y) {
+    entities.currentEntityId = y;
+    
+    // Zero-extend entityId to 16-bit for array access (needed by _compute_screen_position)
+    <:zpTmp_word_5 = a = y;
+    >:zpTmp_word_5 = 0;
+    
+    // Get enemy's screen position (world - camera) as 16-bit signed values
+    _compute_screen_position(y);
+    
+    // Get metasprite frame address
+    idx16();
+    mem16();
+    #[mem16, idx16] {
+        yy = zpTmp_word_5;
+        aa = entities.SoA.msFrameAddr[unaligned yy];
+        xx = aa;
+    }
+    mem8();
+    #[mem8, idx16] {
+        // Check for no hitbox (sentinel: hitbox_x == 0xFF)
+        a = metasprites.MsDataFormat.hitbox_x[xx] as u8;
+        if a == metasprites.MsDataFormat.NO_AABB_VALUE {
+            _enemyBox.left = a = 0xff;
+            _enemyBox.right = 0;
+            _enemyBox.top = a = 0xff;
+            _enemyBox.bottom = 0;
+            mem16();
+            #[mem16] {
+                _enemyBox_left16 = aa = 0xFFFF;
+                _enemyBox_right16 = aa;
+            }
+            mem8();
+            idx8();
+            return;
+        }
+
+        // Hitbox is XYWH frame-absolute (u8). No FRAME_WIDTH adjustment needed.
+        _add_offset_to_screen_x(a);    // a = hitbox_x
+        _enemyBox.left = a;
+        mem16(); #[mem16] { _enemyBox_left16 = aa = zpTmp_word_4; } mem8();
+
+        a = metasprites.MsDataFormat.hitbox_x[xx] as u8;
+        carry = false;
+        a +#= metasprites.MsDataFormat.hitbox_w[xx] as u8;
+        _add_offset_to_screen_x(a);
+        _enemyBox.right = a;
+        mem16(); #[mem16] { _enemyBox_right16 = aa = zpTmp_word_4; } mem8();
+
+        a = metasprites.MsDataFormat.hitbox_y[xx] as u8;
+        _add_offset_to_screen_y(a);
+        _enemyBox.top = a;
+
+        a = metasprites.MsDataFormat.hitbox_y[xx] as u8;
+        carry = false;
+        a +#= metasprites.MsDataFormat.hitbox_h[xx] as u8;
+        _add_offset_to_screen_y(a);
+        _enemyBox.bottom = a;
+    }
+    idx8();
+}
+
+
+// Compute screen position from world position.
+// Screen = World - Camera (kept as 16-bit signed values)
+//
+// Result stored in zpTmp_word_2 (screenX_16) and zpTmp_word_3 (screenY_16)
+//
+// INPUT: y = entityId (byte index)
+// NOTE: zpTmp_word_5 must be set to zero-extended entityId before calling
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _compute_screen_position(entityId : u8 in y) {
+    // screenX_16 = worldX - camX (keep full 16-bit signed result)
+    // zpTmp_word_5 has the zero-extended entityId
+    idx16();
+    mem16();
+    #[mem16, idx16] {
+        yy = zpTmp_word_5;
+        aa = entities.SoA.worldX[unaligned yy];
+        carry = true;
+        aa -#= camera.camX;
+        zpTmp_word_2 = aa;  // screenX_16
+        
+        aa = entities.SoA.worldY[unaligned yy];
+        carry = true;
+        aa -#= camera.camY;
+        zpTmp_word_3 = aa;  // screenY_16
+    }
+    mem8();
+    idx8();
+}
+
+
+// Add u8 offset to 16-bit screen X position (zpTmp_word_2), then clamp to 0-255.
+// Also stores unclamped 16-bit result in zpTmp_word_4 for offscreen collision.
+// Values are frame-absolute pixel positions (0-255), always non-negative.
+//
+// KEEP: xx
+//
+// DB = 0x7e
+#[mem8, idx16]
+func _add_offset_to_screen_x(u8offset : u8 in a) : u8 in a {
+    // Zero-extend the u8 offset to 16-bit
+    zpTmp_byte_0 = a;
+    zpTmp_byte_1 = a = 0;
+
+    // Add offset to screenX_16, clamp negative to 0
+    mem16();
+    #[mem16] {
+        aa = zpTmp_word_2;              // screenX_16
+        aa += *((&zpTmp_byte_0) as *u16);  // + zero-extended offset
+        if negative {
+            aa = 0;
+        }
+        zpTmp_word_4 = aa;  // unclamped 16-bit result for collision
+        if aa >= 256 {
+            aa = 255;
+        }
+    }
+    mem8();
+
+    return a;
+}
+
+
+// Add u8 offset to 16-bit screen Y position (zpTmp_word_3), then clamp to 0-224.
+// Values are frame-absolute pixel positions (0-255), always non-negative.
+//
+// KEEP: xx
+//
+// DB = 0x7e
+#[mem8, idx16]
+func _add_offset_to_screen_y(u8offset : u8 in a) : u8 in a {
+    // Zero-extend the u8 offset to 16-bit
+    zpTmp_byte_0 = a;
+    zpTmp_byte_1 = a = 0;
+
+    // Add offset to screenY_16, clamp result to screen bounds (0-224)
+    mem16();
+    #[mem16] {
+        aa = zpTmp_word_3;              // screenY_16
+        aa += *((&zpTmp_byte_0) as *u16);  // + zero-extended offset
+        if negative {
+            aa = 0;
+        } else if aa >= 224 {
+            aa = 224;
+        }
+    }
+    mem8();
+
+    return a;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AABB OVERLAP TESTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Test if player hitbox overlaps _enemyBox.
+// Returns carry SET if overlap, CLEAR if no overlap.
+// Uses 16-bit X comparisons for offscreen collision support.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _aabb_overlap__player_hitbox_vs_enemy_box() : bool in carry {
+    // Standard AABB overlap test (16-bit X, 8-bit Y):
+    // overlap = !(a.right < b.left || a.left > b.right || 
+    //             a.bottom < b.top || a.top > b.bottom)
+    
+    // player.right16 < enemy.left16 → no overlap
+    mem16();
+    #[mem16] {
+        aa = player.playerHitbox_right16;
+        cmp(aa, _enemyBox_left16);
+    }
+    mem8();
+    if !carry { return carry; }  // a < b means no overlap
+    
+    // enemy.right16 < player.left16 → no overlap
+    mem16();
+    #[mem16] {
+        aa = _enemyBox_right16;
+        cmp(aa, player.playerHitbox_left16);
+    }
+    mem8();
+    if !carry { return carry; }  // a < b means no overlap
+    
+    // player.bottom < enemy.top → no overlap (Y stays 8-bit)
+    a = player.playerHitbox.bottom;
+    cmp(a, _enemyBox.top);
+    if !carry { return carry; }  // a < b means no overlap
+    
+    // enemy.bottom < player.top → no overlap
+    a = _enemyBox.bottom;
+    cmp(a, player.playerHitbox.top);
+    if !carry { return carry; }  // a < b means no overlap
+    
+    // All tests passed - boxes overlap
+    carry = true;
+    return carry;
+}
+
+
+// Test if _enemyBox overlaps player hurtbox.
+// Returns carry SET if overlap, CLEAR if no overlap.
+// Uses 16-bit X comparisons for offscreen collision support.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _aabb_overlap__enemy_box_vs_player_hurtbox() : bool in carry {
+    // enemy.right16 < player.left16 → no overlap
+    mem16();
+    #[mem16] {
+        aa = _enemyBox_right16;
+        cmp(aa, player.playerHurtbox_left16);
+    }
+    mem8();
+    if !carry { return carry; }  // a < b means no overlap
+    
+    // player.right16 < enemy.left16 → no overlap
+    mem16();
+    #[mem16] {
+        aa = player.playerHurtbox_right16;
+        cmp(aa, _enemyBox_left16);
+    }
+    mem8();
+    if !carry { return carry; }  // a < b means no overlap
+    
+    // enemy.bottom < player.top → no overlap (Y stays 8-bit)
+    a = _enemyBox.bottom;
+    cmp(a, player.playerHurtbox.top);
+    if !carry { return carry; }  // a < b means no overlap
+    
+    // player.bottom < enemy.top → no overlap
+    a = player.playerHurtbox.bottom;
+    cmp(a, _enemyBox.top);
+    if !carry { return carry; }  // a < b means no overlap
+    
+    // All tests passed - boxes overlap
+    carry = true;
+    return carry;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HIT TRACKING (MULTI-HIT PREVENTION)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Temporaries for scratch in zeropage (reuse existing)
+in zeropage {
+    var _tempA : u8;
+}
+
+
+// Check if entity was already hit this swing.
+// Returns carry SET if already hit, CLEAR if not.
+//
+// INPUT: y = entityId (byte index)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _check_hit_tracking(entityId : u8 in y) : bool in carry {
+    a = y;
+    a >>>= 1;   // entity number (0-20)
+    x = a;
+    a = hitThisSwing[x];
+    if !zero {
+        carry = true;
+        return carry;
+    }
+    carry = false;
+    return carry;
+}
+
+
+// Mark entity as hit this swing.
+//
+// INPUT: y = entityId (byte index)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _set_hit_tracking(entityId : u8 in y) {
+    a = y;
+    a >>>= 1;   // entity number (0-20)
+    x = a;
+    hitThisSwing[x] = a = 1;
+}
+
+
+// Clear all hit tracking (call when attack ends).
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _clear_hit_tracking() {
+    a = 0;
+    x = 21;
+__loop:
+    x--;
+    hitThisSwing[x] = a;
+    if !zero { goto __loop; }
+}
+
+
+// Public wrapper: clear hit tracking for new combo stage.
+// Call this when starting a new attack that should be able to
+// hit enemies that were already hit in a previous stage.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func clear_hit_tracking() {
+    _clear_hit_tracking();
+}
+
+
+// Initialize collision system.
+// Call on room load.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func init() {
+    _clear_hit_tracking();
+    playerHadHitbox = a = 0;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HIT EFFECT SYSTEM (Entity-based)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Spawn a hit effect entity at a specific screen position.
+// Converts screen coords to world coords and spawns the entity.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func spawn_hit_effect_at(screenX : u8 in a, screenY : u8 in x) {
+    // Convert screen X to world X, centered on hit effect (32x32, xorigin=0)
+    <:zpTmp_word_0 = a;
+    >:zpTmp_word_0 = 0;
+    mem16();
+    #[mem16] {
+        aa = zpTmp_word_0;
+        aa -= 16;
+        aa += camera.camX;
+        zpTmp_word_0 = aa;  // worldX for spawn_entity
+    }
+    mem8();
+
+    // Convert screen Y to world Y, centered on hit effect (32x32, yorigin=4)
+    <:zpTmp_word_1 = a = x;
+    >:zpTmp_word_1 = 0;
+    mem16();
+    #[mem16] {
+        aa = zpTmp_word_1;
+        aa -= 16;
+        aa += camera.camY;
+        zpTmp_word_1 = aa;  // worldY for spawn_entity
+    }
+    mem8();
+
+    // Spawn hit_effect entity
+    // zpTmp_word_0 = worldX, zpTmp_word_1 = worldY (already set)
+    y = 0;  // init parameter (unused)
+    a = entities.EntityTypes.hit_effect as u8;
+    entityloop.spawn_entity(zpTmp_word_0, zpTmp_word_1, a, y);
+}
+
+
+// Spawn a hit effect at the overlap midpoint of player hitbox and enemy hurtbox.
+// Uses playerHitbox and _enemyBox which are already computed (screen coords).
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _spawn_hit_effect() {
+    // Calculate X midpoint of overlap region using 16-bit X coordinates
+    // Overlap X: max(playerHitbox.left16, _enemyBox.left16) to min(playerHitbox.right16, _enemyBox.right16)
+
+    mem16();
+    #[mem16] {
+        // Find overlap left = max(player.left16, enemy.left16)
+        aa = player.playerHitbox_left16;
+        if aa < _enemyBox_left16 {
+            aa = _enemyBox_left16;
+        }
+        zpTmp_word_0 = aa;  // overlapLeft16
+
+        // Find overlap right = min(player.right16, enemy.right16)
+        aa = player.playerHitbox_right16;
+        if aa >= _enemyBox_right16 {
+            aa = _enemyBox_right16;
+        }
+        // Midpoint X = (overlapLeft + overlapRight) / 2
+        aa += zpTmp_word_0;
+        aa >>>= 1;
+        // Center on hit effect sprite (32x32, xorigin=0): subtract frameWidth/2
+        aa -= 16;
+        // Convert to world X: add camX
+        aa += camera.camX;
+        zpTmp_word_0 = aa;  // worldX
+    }
+    mem8();
+
+    // Calculate Y midpoint of overlap region
+    a = player.playerHitbox.top;
+    if a < _enemyBox.top {
+        a = _enemyBox.top;
+    }
+    _tempA = a;  // overlapTop
+
+    a = player.playerHitbox.bottom;
+    if a >= _enemyBox.bottom {
+        a = _enemyBox.bottom;
+    }
+    // Midpoint Y = (overlapTop + overlapBottom) / 2 using 16-bit math
+    <:zpTmp_word_1 = a;
+    >:zpTmp_word_1 = 0;
+    a = _tempA;
+    mem16();
+    #[mem16] {
+        aa &= 0x00FF;
+        aa += zpTmp_word_1;
+        aa >>>= 1;
+        // Center on hit effect sprite (32x32, yorigin=4): subtract frameHeight/2 - yorigin
+        aa -= 16;
+        // Convert to world Y: add camY
+        aa += camera.camY;
+        zpTmp_word_1 = aa;  // worldY
+    }
+    mem8();
+
+    // Spawn hit_effect entity
+    y = 0;  // init parameter (unused)
+    a = entities.EntityTypes.hit_effect as u8;
+    entityloop.spawn_entity(zpTmp_word_0, zpTmp_word_1, a, y);
+}
+
+
+// Spawn a hit effect when player gets hurt (enemy hitbox vs player hurtbox).
+// Uses _enemyBox (enemy hitbox) and playerHurtbox which are already computed.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _spawn_hit_effect_player_hurt() {
+    // Calculate X midpoint of overlap region using 16-bit X coordinates
+    mem16();
+    #[mem16] {
+        // Find overlap left = max(playerHurtbox.left16, _enemyBox.left16)
+        aa = player.playerHurtbox_left16;
+        if aa < _enemyBox_left16 {
+            aa = _enemyBox_left16;
+        }
+        zpTmp_word_0 = aa;  // overlapLeft16
+
+        // Find overlap right = min(playerHurtbox.right16, _enemyBox.right16)
+        aa = player.playerHurtbox_right16;
+        if aa >= _enemyBox_right16 {
+            aa = _enemyBox_right16;
+        }
+        // Midpoint X = (overlapLeft + overlapRight) / 2
+        aa += zpTmp_word_0;
+        aa >>>= 1;
+        // Center on hit effect sprite (32x32, xorigin=0): subtract frameWidth/2
+        aa -= 16;
+        // Convert to world X: add camX
+        aa += camera.camX;
+        zpTmp_word_0 = aa;  // worldX
+    }
+    mem8();
+
+    // Calculate Y midpoint of overlap region
+    a = player.playerHurtbox.top;
+    if a < _enemyBox.top {
+        a = _enemyBox.top;
+    }
+    _tempA = a;  // overlapTop
+
+    a = player.playerHurtbox.bottom;
+    if a >= _enemyBox.bottom {
+        a = _enemyBox.bottom;
+    }
+    // Midpoint Y = (overlapTop + overlapBottom) / 2 using 16-bit math
+    <:zpTmp_word_1 = a;
+    >:zpTmp_word_1 = 0;
+    a = _tempA;
+    mem16();
+    #[mem16] {
+        aa &= 0x00FF;
+        aa += zpTmp_word_1;
+        aa >>>= 1;
+        // Center on hit effect sprite (32x32, yorigin=4): subtract frameHeight/2 - yorigin
+        aa -= 16;
+        // Convert to world Y: add camY
+        aa += camera.camY;
+        zpTmp_word_1 = aa;  // worldY
+    }
+    mem8();
+
+    // Spawn hit_effect entity
+    y = 0;  // init parameter (unused)
+    a = entities.EntityTypes.hit_effect as u8;
+    entityloop.spawn_entity(zpTmp_word_0, zpTmp_word_1, a, y);
+}
+
+
+}  // end in code
+
+
+}  // end namespace collision

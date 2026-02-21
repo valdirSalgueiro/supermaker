@@ -1,0 +1,1964 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+import "../registers";
+
+import "../vram-map";
+import "../vram-slots";
+import "../common/math";
+import "../dma-queue";
+
+import "gen/enums";
+
+
+let DISPLAY_WIDTH = 256;
+let DISPLAY_HEIGHT = 224;
+
+
+namespace metasprites {
+
+let N_OBJECTS = 128;
+
+let SMALL_TILE_DATA_SIZE = 32;
+
+// MetaSprite Frameset Data format in ROM
+struct MsFramesetFormat {
+    drawFunction : u8,
+
+    // List of pointers to `MsDataFormat` entries
+    frameTable : *const *const u8,
+
+    // List of pointers to `AnimationDataFormat` entries
+    animationTable : *const *const u8,
+};
+
+// ::HACK manually create accessors to MsFramesetFormat data ::
+// Header format (9 bytes total):
+//   Bytes 0-3:  bounds (left, top, width, height) - entity bounds AABB
+//   Byte 4:     drawFunction
+//   Bytes 5-6:  frameTable pointer
+//   Bytes 7-8:  animationTable pointer
+namespace MsFsData {
+    let _base = resources.MS_FS_DATA_BANK << 16;
+
+    // Entity bounds AABB (local space offsets)
+    // Used for camera tracking, collision detection, and hitbox defaults
+    let bounds_left   = (_base + 0) as far *u8;
+    let bounds_top    = (_base + 1) as far *u8;
+    let bounds_width  = (_base + 2) as far *u8;
+    let bounds_height = (_base + 3) as far *u8;
+    // Packed 16-bit accessors for reading bounds efficiently (left+top, width+height)
+    let boundsLT  = (_base + 0) as far *u16;  // left (low), top (high)
+    let boundsWH  = (_base + 2) as far *u16;  // width (low), height (high)
+    let drawFunction    = (_base + 4) as far *u8;
+    let frameTable      = (_base + 5) as far *u16;
+    let animationTable  = (_base + 7) as far *u16;
+};
+
+
+// MetaSprite Frame Table Data offset in ROM
+// (word addr table)
+let MetaSpriteFrameTableOffset = MsFsData._base as far *u16;
+
+
+// MetaSprite Animation Table Data offset in ROM
+// (word addr table)
+let MetaSpriteAnimationTableOffset = MsFsData._base as far *u16;
+
+
+// MetaSprite Data in ROM
+namespace MsDataFormat {
+    let _base = resources.MS_FS_DATA_BANK << 16;
+
+
+    // Byte value to use when there is no hitbox or hurtbox (stored in the x field).
+    // 0xFF is safe because no valid box can start at pixel 255 in any frame.
+    let NO_AABB_VALUE = 0xFF;
+
+
+    // The MetaSprite frame's hitbox: frame-absolute pixel position (XYWH, unsigned).
+    //
+    // If `hitbox_x` == `NO_AABB_VALUE` then the frame has no hitbox.
+    let hitbox_x  = (_base + 0) as far *u8;
+    let hitbox_y  = (_base + 1) as far *u8;
+    let hitbox_w  = (_base + 2) as far *u8;
+    let hitbox_h  = (_base + 3) as far *u8;
+
+
+    // The MetaSprite frame's hurtbox: frame-absolute pixel position (XYWH, unsigned).
+    //
+    // If `hurtbox_x` == `NO_AABB_VALUE` then the frame has no hurtbox.
+    let hurtbox_x  = (_base + 4) as far *u8;
+    let hurtbox_y  = (_base + 5) as far *u8;
+    let hurtbox_w  = (_base + 6) as far *u8;
+    let hurtbox_h  = (_base + 7) as far *u8;
+
+
+    // MetaSprite Pattern Id
+    //
+    // Only read if the entity uses multiple MetaSprite patterns.
+    //
+    // (byte index into `metasprites.ms_patterns_table`, masked by `MS_PATTERNS_TABLE_MASK`)
+    let pattern = (_base +  8) as far *u8;
+
+    let xOffset = (_base +  9) as far *u8;
+    let yOffset = (_base + 10) as far *u8;
+
+    // NOTE: Not all `charAttr*` fields will be filled.
+    // Most MetaSprite patterns use less then 4 charAttr words.
+    let charAttr0 = (_base + 11) as far *u16;
+    let charAttr1 = (_base + 13) as far *u16;
+    let charAttr2 = (_base + 15) as far *u16;
+    let charAttr3 = (_base + 17) as far *u16;
+}
+
+
+// Dynamic MetaSprite tile word addresses are stored before the MsDataFormat data in reverse order.
+// This allows the same `msFrameAddr` value to point to both frame data and the tile-address table.
+//
+// KEEP: XX
+#[mem16, idx16]
+inline func __get_dynamic_ms_tile_addr__inline(msFrameAddr: u16 in xx, let i: u16) : u16 in aa {
+    let offset = (i + 1) * 2;
+    return ((MsDataFormat._base as u24 - offset as u24) as far *u16)[unaligned xx];
+}
+
+
+// MetaSprite Animation Data in ROM
+namespace AnimationDataFormat {
+    let _base = resources.MS_FS_DATA_BANK << 16;
+
+
+    // Animation process function index.  First byte of an animation.
+    // (index into `metasprites.animations.AnimationProcessFunctions`)
+    let processFunction  = (_base + 0) as far *u8;
+
+
+    // Each animation frame is two bytes in size.
+
+        // MetaSprite FrameId to show.
+        //
+        // If this value is `END_OF_ANIMATION_BYTE` then the animation is over and there is no `delay` byte
+        //
+        // (element position in MsFramesetFormat.frameTable)
+        let frame       = (_base + 1) as far *u8;
+
+        // Animation delay.
+        //
+        //  * If `delayType` is `frame`, this byte is number of display frames.
+        //
+        // (u8 byte)
+        let delay       = (_base + 2) as far *u8;
+
+
+    // After the last frame, the Animation Data ends with a 0xff byte
+    let END_OF_ANIMATION_BYTE = 0xff;
+}
+
+
+
+// MetaSprite resource RAM data format
+//
+// PPU data contains dynamically-sized 4bpp tile data.
+struct _RamDataFormat {
+    firstTile : u16,
+}
+
+
+
+struct OamEntry {
+    xPos : u8,
+    yPos : u8,
+    char : u8,
+    attr : u8
+};
+
+let OAM_V_FLIP = 0x80;
+let OAM_H_FLIP = 0x40;
+
+let SHADOW_ATTR = 0x20;
+
+
+
+let OFFSCREEN_YPOS = 255 - 16;
+
+let SHADOW_SMALL_CHAR  = 0x00;
+let SHADOW_MEDIUM_CHAR = 0x01;
+let SHADOW_LARGE_CHAR  = 0x10;
+
+
+in zeropage {
+    // The current index within `buffer`.
+    //
+    // `buffer` is read back to front.
+    //
+    // This value if negative if the buffer is full.
+    var bufferPos : u16;
+
+    // Queue of pending bits to write to `hiTableBuffer`.
+    //
+    // Bits are pushed leftwise into the queue using `lsr` or `rol`
+    // instructions.
+    //
+    // An empty queue has the value of `HI_TABLE_QUEUE_INIT_VALUE` (`1`).  This
+    // This allows for the queue-full state to be checked by reading the carry
+    // flag after every second bit-shift.  When the carry flag is set, the
+    // queue is full, and `_hiTableQueue_full()` must be called.
+    //
+    var hiTableQueue : u8;
+
+    let HI_TABLE_QUEUE_INIT_VALUE = 1;
+
+    let INITIAL_BUFFER_POS = (N_OBJECTS - 1) * sizeof(OamEntry);
+
+
+    // Temporary variables to store the metasprite's position on screen
+    var xPos : u16;
+    var yPos : u16;
+    
+    // Temporary variables for dynamic tile transfer
+    var __dyn_large_tile_count : u8;    // Count of 16x16 tiles to transfer
+    var __dyn_small_group_count : u8;   // Count of 8x8 tile groups (4 tiles each) to transfer
+    var __dyn_tile_addr_ptr : u16;      // Pointer to current tile address in ROM
+    var __dyn_vram_addr : u16;          // Current VRAM address
+    var __last_transferred_frame : u16; // Deprecated - kept for compatibility
+    var __dyn_saved_large_tile_count : u8; // Original large_tile_count (saved before loop modifies it)
+    var __dyn_vram_base_offset : u16;   // VRAM base offset for current dynamic sprite
+    var __dyn_char_base : u8;           // Low 8 bits of first tile ID (0 for slot 0, 0/80/160 for slots 1-3)
+    var __dyn_name_table : u8;          // Name table bit (0 for slot 0, 1 for slots 1+)
+    var __dyn_last_frame_cache : [u16; 8]; // Per-spritesheet last transferred frame cache (up to 8 dynamic sprites)
+    var __dyn_cache_index : u8;         // Current spritesheet index for cache lookup
+    
+    // Sprite data pointer for oam_meta_spr_mixed
+    var __sprite_data_ptr : u16;
+}
+
+
+in wram7e {
+    var buffer : [OamEntry ; N_OBJECTS];
+    var hiTableBuffer : [u8 ; N_OBJECTS / 4];
+
+    var hiTableBufferPos : u16;
+
+    var oldBufferPos : u16;
+}
+
+
+in code {
+
+
+// REQUIRES: Force-Blank
+// DB = 0x80
+#[mem8, idx16]
+inline func setup__forceblank() {
+    {
+        push8(data_bank);
+
+        push8(a = 0x7e);
+        data_bank = pop8();
+    // DB = 0x7e
+
+        reset_buffers();
+        
+        // Initialize tile transfer cache to invalid value so first transfer happens
+        mem16();
+        #[mem16] {
+            aa = 0xFFFF;
+            __last_transferred_frame = aa;
+        }
+        mem8();
+
+        data_bank = pop8();
+    }
+
+    update_oam__vblank();
+}
+
+
+
+// Load a MetaSprite Spritesheet into the PPU
+//
+// REQUIRES: Force-Blank
+// Uses DMA Channel 0
+// DB = 0x80
+#[mem8, idx16]
+inline func load_ms_spritesheet_ppu_data__forceblank(spritesheet_id : u8 in a) {
+
+    push8(a);
+
+    // Set OBJ Registers
+    OBJSEL = a = (VRAM_OBJ_WADDR / OBJSEL_BASE_WALIGN) | OBJSEL_SIZE_8_16;
+
+
+    // Load common spritesheet tiles
+    // Assumes resources.ms_spritesheets.common is 0
+    __load_and_transfer_resource_data__forceblank(0);
+
+
+    // Load requested spritesheet
+    // (Assumes resources.ms_spritesheets.common is 0)
+    a = pop8();
+    if !zero {
+        __load_and_transfer_resource_data__forceblank(a);
+    }
+}
+
+
+
+// Load the ms_spritesheet resource and transfer MetaSprite data to the PPU (CGRAM and VRAM)
+//
+// REQUIRES: force-blank
+// Uses DMA channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+func __load_and_transfer_resource_data__forceblank(spritesheet_id : u8 in a) {
+
+var _header : _RamDataFormat in zpTmp_word_0;
+
+var _secondRowVramWaddr : u16 in zpTmp_word_1;
+
+    resources.ppuData = resources.load_resource__fixed_ram_and_ppu_data__forceblank_inline(resources.ResourceType.ms_spritesheet, a, &_header as *u8, sizeof(typeof(_header)));
+
+    mem16();
+    #[mem16] {
+        // Calculate VRAM address of tile data
+
+        aa = _header.firstTile;
+
+        // +# safe, carry will never be set
+        VMADD = aa = ((aa & 0x1ff) << 4) +# VRAM_OBJ_WADDR;
+
+        // Calculate the start of the second row of small tiles
+        _secondRowVramWaddr = aa = aa + 0x10 * SMALL_TILE_DATA_SIZE / 2;
+
+
+        // Transfer first small row of tiles to VRAM
+        // (The first_tile can start in the middle of a VRAM row)
+
+        // Number of tiles in the first row
+        aa = (0x1ff - _header.firstTile) & 0xf;
+        aa++;
+
+        // first DMA transfer size
+        yy = aa <<<= 5;
+    }
+    mem8();
+
+    // Transfer the first row of tiles to VRAM
+    resources.dma_to_vram__forceblank(resources.ppuData, yy);
+
+    // Transfer the remaining tiles to VRAM
+    VMADD = xx = _secondRowVramWaddr;
+    ^return resources.dma_remaining_to_vram__forceblank(resources.ppuData);
+}
+
+
+
+// REQUIRES: VBlank or Force-Blank
+// Uses DMA channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func update_oam__vblank() {
+    // MUST NOT modify zpTmp variables.
+
+    OAMADD = xx = 0;
+
+    // DMA buffer and hiTableBuffer to OAM
+    dma.set_dmap0_and_bbad0__yy(DMAP_TO_PPU | DMAP_TRANSFER_ONE, <:&OAMDATA);
+    A1T0 = xx = &buffer as u16;
+    A1B0 = a = a = #:far &buffer;
+    DAS0 = xx = sizeof(typeof(buffer)) + sizeof(typeof(hiTableBuffer));
+
+    MDMAEN = a = MDMAEN_DMA0;
+}
+
+
+
+// Queue dynamic tile DMA transfers (called outside VBlank)
+//
+// This function builds the DMA queue for dynamic metasprite tiles.
+// Call this during the game loop, then call __flush_dynamic_tiles__vblank() during VBlank.
+//
+// KEEP: XX
+//
+// Called by the auto-generated ms-drawing-functions.wiz
+//
+// Dynamic tile data format (stored BEFORE frame data):
+//   [large_addrs: u16 x large_count (reversed)] [small_group_addrs: u16 x small_count (reversed)]
+//   [small_group_count: u8] [large_tile_count: u8] [MsDataFormat...]
+//                                                  ^-- msFrameAddr points here
+//
+// Runtime reads:
+//   - large_tile_count at msFrameAddr - 1
+//   - small_group_count at msFrameAddr - 2
+//   - large_tile_addr[i] at msFrameAddr - 4 - i*2
+//   - small_group_addr[i] at msFrameAddr - 4 - large_count*2 - i*2
+//
+// VRAM layout:
+//   - Large tiles (16x16) start at tile ID 0, each uses 2 tile IDs (32 VRAM words)
+//   - Small tile groups (4x 8x8) follow, each group uses 2 tile IDs (32 VRAM words)
+//
+// DB = 0x7e
+#[mem8, idx16]
+func __queue_dynamic_tiles(msFrameAddr : u16 in xx) {
+
+    let BYTES_PER_LARGE_DMA = 32 * 2;  // 64 bytes per half of 16x16 tile
+    let BYTES_PER_SMALL_DMA = 32 * 4;  // 128 bytes for 4x 8x8 tiles (one 16x16 group)
+    let MS_DATA_BANK = resources.MS_FS_DATA_BANK;
+    let first_tile_id = 0;
+    
+    // Early exit if this frame was already transferred
+    mem16();
+    #[mem16] {
+        aa = xx;
+        if aa == __last_transferred_frame {
+            mem8();
+            return;
+        }
+        __last_transferred_frame = aa;
+    }
+    mem8();
+    
+    // Read large_tile_count from msFrameAddr - 1
+    // Read small_group_count from msFrameAddr - 2
+    // Note: Must do (base)[xx-n] not (base-n)[xx] to stay in correct bank
+    --xx;
+    __dyn_large_tile_count = a = (MsDataFormat._base as far *u8)[unaligned xx];
+    __dyn_saved_large_tile_count = a;  // Save original value before loop modifies it
+    --xx;
+    __dyn_small_group_count = a = (MsDataFormat._base as far *u8)[unaligned xx];
+    xx++;
+    xx++;
+    
+    // Check if we have any tiles to transfer
+    a = __dyn_large_tile_count;
+    a |= __dyn_small_group_count;
+    if zero {
+        return;
+    }
+    
+    // Note: DMA queue reset is handled at frame start in gameloop.wiz
+    // This allows transfers to span multiple frames when budget is exceeded
+    
+    mem16();
+    #[mem16] {
+        // Store pointer to first large tile address
+        // Address is: MS_DATA_BANK:msFrameAddr - 4
+        aa = xx;
+        aa -= 4;
+        __dyn_tile_addr_ptr = aa;
+        
+        // Initialize VRAM address: first_tile_id * 16 + VRAM_OBJ_WADDR (0x6000)
+        aa = first_tile_id * 16;
+        aa += 0x6000;
+        __dyn_vram_addr = aa;
+    }
+    mem8();
+
+    // === Transfer large tiles (16x16) ===
+    // Each large tile requires 2 DMA transfers (top half and bottom half)
+    a = __dyn_large_tile_count;
+    if !zero {
+        do {
+            // Queue transfer of first half of large sprite tile (top row of 8x8 tiles)
+            mem16();
+            #[mem16] {
+                dma_queue.set_size(aa = BYTES_PER_LARGE_DMA);
+                
+                // Read tile ROM address from the tile address pointer using far addressing
+                xx = __dyn_tile_addr_ptr;
+                aa = ((MS_DATA_BANK << 16) as far *u16)[unaligned xx];
+                xx = aa;
+                yy = __dyn_vram_addr;
+            }
+            mem8();
+            dma_queue.push(a = resources.DYNAMIC_SPRITE_TILES_DATA_BANK, xx, yy);
+
+            // Queue transfer of second half of large sprite tile (bottom row, VRAM + 0x100)
+            mem16();
+            #[mem16] {
+                dma_queue.set_size(aa = BYTES_PER_LARGE_DMA);
+                
+                // Re-read tile address and add offset for second half
+                xx = __dyn_tile_addr_ptr;
+                aa = ((MS_DATA_BANK << 16) as far *u16)[unaligned xx];
+                aa += BYTES_PER_LARGE_DMA;
+                xx = aa;
+                aa = __dyn_vram_addr + 0x0100;
+                yy = aa;
+            }
+            mem8();
+            dma_queue.push(a = resources.DYNAMIC_SPRITE_TILES_DATA_BANK, xx, yy);
+
+            // Advance pointers for next large tile
+            mem16();
+            #[mem16] {
+                // Next tile address (subtract 2 because addresses are stored in reverse)
+                aa = __dyn_tile_addr_ptr;
+                aa -= 2;
+                __dyn_tile_addr_ptr = aa;
+                
+                // Next VRAM address (+32 = 2 tile IDs * 16 bytes per tile ID)
+                aa = __dyn_vram_addr;
+                aa += 32;
+                // Check if we crossed a row boundary (low byte wrapped to 0x00)
+                if (aa & 0x00FF) == 0x00 {
+                    aa += 0x0100;
+                }
+
+                __dyn_vram_addr = aa;
+            }
+            mem8();
+
+            // Decrement large tile count
+            __dyn_large_tile_count--;
+            a = __dyn_large_tile_count;
+        } while !zero;
+    }
+
+    // === Transfer small tile groups (4x 8x8 tiles stored linearly in ROM) ===
+    // Skip if small_group_count == 0 (runtime check - no compile-time flag needed)
+    a = __dyn_small_group_count;
+    if zero {
+       ^goto __queue_complete; 
+    }
+
+    // Calculate VRAM start based on large_tile_count
+    // Large 16x16 tiles use 2 rows (top + bottom), each row = 16 tile IDs = 256 VRAM bytes
+    // For N large tiles: rows_needed = ceil(N/8) * 2
+    // 0 large tiles: rows 0, start at 0x6000
+    // 1-8 large tiles: 2 rows, start at 0x6200
+    // 9-16 large tiles: 4 rows, start at 0x6400
+    
+    // Use the saved original large_tile_count (loop has decremented __dyn_large_tile_count to 0)
+    a = __dyn_saved_large_tile_count;
+    
+    // Use simple comparison for VRAM address
+    // Note: cmp sets carry if A >= value (unsigned comparison)
+    if zero {
+        // large_count == 0
+        mem16(); #[mem16] { __dyn_vram_addr = aa = 0x6000; } mem8();
+    } else {
+        // large_count >= 1, check if >= 9
+        cmp(a, 9);
+        if !carry {
+            // large_count < 9 (i.e., 1-8)
+            mem16(); #[mem16] { __dyn_vram_addr = aa = 0x6200; } mem8();
+        } else {
+            // Check for even larger counts
+            cmp(a, 17);
+            if !carry {
+                // large_count 9-16
+                mem16(); #[mem16] { __dyn_vram_addr = aa = 0x6400; } mem8();
+            } else {
+                cmp(a, 25);
+                if !carry {
+                    // large_count 17-24
+                    mem16(); #[mem16] { __dyn_vram_addr = aa = 0x6600; } mem8();
+                } else {
+                    cmp(a, 33);
+                    if !carry {
+                        // large_count 25-32
+                        mem16(); #[mem16] { __dyn_vram_addr = aa = 0x6800; } mem8();
+                    } else {
+                        cmp(a, 41);
+                        if !carry { 
+                            mem16(); #[mem16] { __dyn_vram_addr = aa = 0x6A00; } mem8(); 
+                        }
+                        else { 
+                            cmp(a, 49);
+                            if !carry { 
+                                mem16(); #[mem16] { __dyn_vram_addr = aa = 0x6C00; } mem8(); 
+                            }
+                            else { 
+                                mem16(); #[mem16] { __dyn_vram_addr = aa = 0x6E00; } mem8(); 
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Upload small tile groups
+    do {
+        // Queue transfer of 4 small tiles linearly (128 bytes)
+        mem16();
+        #[mem16] {
+            dma_queue.set_size(aa = BYTES_PER_SMALL_DMA);
+            
+            xx = __dyn_tile_addr_ptr;
+            aa = ((MS_DATA_BANK << 16) as far *u16)[unaligned xx];
+            xx = aa;
+            yy = __dyn_vram_addr;
+        }
+        mem8();
+        dma_queue.push(a = resources.DYNAMIC_SPRITE_TILES_DATA_BANK, xx, yy);
+
+        // Advance pointers for next small tile group
+        mem16();
+        #[mem16] {
+            aa = __dyn_tile_addr_ptr;
+            aa -= 2;
+            __dyn_tile_addr_ptr = aa;
+            
+            // Next VRAM address (+64 = 4 tile IDs * 16 bytes per tile ID)
+            aa = __dyn_vram_addr;
+            aa += 64;
+            __dyn_vram_addr = aa;
+        }
+        mem8();
+
+        // Decrement small group count
+        __dyn_small_group_count--;
+        a = __dyn_small_group_count;
+    } while !zero;
+
+__queue_complete:
+    // Queue building complete - flush will happen during VBlank
+    return;
+}
+
+
+// Queue row-based dynamic tile DMA transfers for later execution.
+//
+// This function uses a more efficient format where tiles are grouped by VRAM row,
+// allowing fewer DMA transfers (one per VRAM row instead of two per tile).
+//
+// ROM format (stored before MsDataFormat data):
+//   msFrameAddr - 1: row_count (u8)
+//   For each row (at msFrameAddr - 2 - i*6):
+//     - rom_offset (u16): offset within tile data bank
+//     - rom_bank (u8): bank offset from base (added to DYNAMIC_SPRITE_TILES_DATA_BANK)
+//     - vram_row (u8): row index (0-based), used to calculate VRAM address
+//     - size (u16): bytes to transfer for this row (up to 512)
+//
+// Returns:
+//   carry = clear on success (all rows queued)
+//   carry = set on failure (budget exceeded - NOTHING queued)
+//
+// DB = 0x7e
+#[mem8, idx16]
+func __queue_row_based_tiles(msFrameAddr : u16 in xx) : bool in carry {
+
+    let MS_DATA_BANK = resources.MS_FS_DATA_BANK;
+    let TILE_DATA_BASE_BANK = resources.DYNAMIC_SPRITE_TILES_DATA_BANK;
+    let VRAM_OBJ_BASE = 0x6000;
+    
+    // Read row_count from msFrameAddr - 1
+    --xx;
+    a = (MsDataFormat._base as far *u8)[unaligned xx];
+    if zero {
+        carry = false;
+        return false;  // No rows to transfer - success
+    }
+    __dyn_large_tile_count = a;  // Store row count
+    __dyn_small_group_count = a; // Keep a copy for second pass
+    
+    // === PASS 1: Calculate total bytes needed ===
+    // Each descriptor is 6 bytes: [rom_lo][rom_hi][rom_bank][vram_row][size_lo][size_hi]
+    // xx is already at msFrameAddr - 1 after reading row_count
+    // First descriptor starts at (msFrameAddr - 1) - 6 = msFrameAddr - 7
+    mem16();
+    #[mem16] {
+        aa = xx;
+        aa -= 6;  // Points to start of row0_desc
+        __dyn_tile_addr_ptr = aa;
+        
+        // Accumulate total bytes
+        zpTmp_word_0 = aa = 0;  // Total bytes counter
+    }
+    mem8();
+    
+    // Sum up all row sizes
+    do {
+        mem16();
+        #[mem16] {
+            xx = __dyn_tile_addr_ptr;
+            // Size is at offset +4 in descriptor (after rom_lo, rom_hi, rom_bank, vram_row)
+            xx++; xx++; xx++; xx++;  // Skip to size field
+            aa = ((MS_DATA_BANK << 16) as far *u16)[unaligned xx];
+            // Add to total
+            aa += zpTmp_word_0;
+            zpTmp_word_0 = aa;
+            
+            // Move to next descriptor (go back to start, then subtract 6)
+            aa = __dyn_tile_addr_ptr;
+            aa -= 6;
+            __dyn_tile_addr_ptr = aa;
+        }
+        mem8();
+        
+        __dyn_large_tile_count--;
+        a = __dyn_large_tile_count;
+    } while !zero;
+    
+    // === CHECK BUDGET ===
+    mem16();
+    #[mem16] {
+        // Check if total bytes would exceed budget
+        if { dma_queue.would_exceed_budget(aa = zpTmp_word_0); } && carry {
+            // Not enough budget - reject entire transfer (nothing queued)
+            mem8();
+            return true;
+        }
+    }
+    mem8();
+    
+    // === PASS 2: Actually queue the transfers ===
+    // Reset row count and pointer for second pass
+    a = __dyn_small_group_count;
+    __dyn_large_tile_count = a;
+    
+    // Recalculate pointer (msFrameAddr - 7)
+    // msFrameAddr was in xx, but we've modified xx. We need to reconstruct.
+    // Actually, we still have the original calculation basis.
+    // Let's use a different approach: save msFrameAddr at the start.
+    // For now, recalculate from __dyn_tile_addr_ptr which ended up at the last descriptor.
+    // After N iterations of subtracting 6, it's at: original - 6 - 6*N = original - 6*(N+1)
+    // To get back to original - 6, add 6*N
+    mem16();
+    #[mem16] {
+        aa = __dyn_tile_addr_ptr;
+    }
+    idx8();
+    #[mem16, idx8] {
+        y = __dyn_small_group_count;  // N = row count
+        do {
+            aa += 6;
+            y--;
+        } while !zero;
+        __dyn_tile_addr_ptr = aa;  // Back to first descriptor
+    }
+    idx16();
+    mem8();
+    
+    // Process each row
+    do {
+        // Read row descriptor: [rom_offset: u16] [rom_bank: u8] [vram_row: u8] [size: u16]
+        
+        // Read rom_offset (first 2 bytes) - this is the ROM source address offset
+        mem16();
+        #[mem16] {
+            xx = __dyn_tile_addr_ptr;
+            aa = ((MS_DATA_BANK << 16) as far *u16)[unaligned xx];
+            // Save ROM offset for DMA push
+            push16(aa);
+            
+            // Advance xx to rom_bank byte position (offset +2)
+            xx++;
+            xx++;
+        }
+        mem8();
+        
+        // Read rom_bank byte (at original ptr + 2)
+        a = ((MS_DATA_BANK << 16) as far *u8)[unaligned xx];
+        zpTmp_byte_1 = a;  // Store bank delta temporarily
+        
+        // Read vram_row byte (at original ptr + 3)
+        xx++;
+        a = ((MS_DATA_BANK << 16) as far *u8)[unaligned xx];
+        zpTmp_byte_0 = a;  // Store vram_row temporarily
+        
+        // Read size (next 2 bytes, at xx + 1)
+        xx++;
+        mem16();
+        #[mem16] {
+            aa = ((MS_DATA_BANK << 16) as far *u16)[unaligned xx];
+            dma_queue.set_size(aa);
+            
+            // Advance pointer past this descriptor (6 bytes total)
+            aa = __dyn_tile_addr_ptr;
+            aa -= 6;
+            __dyn_tile_addr_ptr = aa;
+            
+            // Calculate VRAM address: VRAM_OBJ_BASE + (vram_row * 0x100)
+            aa = 0;
+        }
+        mem8();
+        // Load vram_row into low byte of aa (aa was just set to 0)
+        a = zpTmp_byte_0;
+        swap_bytes(aa);  // Now high byte = vram_row, low byte = 0 (vram_row * 256)
+        mem16();
+        #[mem16] {
+            aa += VRAM_OBJ_BASE;
+            aa += __dyn_vram_base_offset;  // Add first_tile_id * 16
+            yy = aa;  // yy = VRAM destination word address
+            
+            // Get ROM offset back
+            xx = pop16();
+        }
+        mem8();
+        
+        // Calculate actual bank: TILE_DATA_BASE_BANK + bank_delta
+        a = TILE_DATA_BASE_BANK;
+        a += zpTmp_byte_1;  // Add bank delta from descriptor
+        
+        // Queue the DMA transfer (bank, src_addr, vram_word_addr)
+        // Budget was pre-checked, so this should always succeed
+        dma_queue.push(a, xx, yy);
+        
+        // Decrement row count
+        __dyn_large_tile_count--;
+        a = __dyn_large_tile_count;
+    } while !zero;
+    
+    carry = false;
+    return false;  // Success - all rows queued
+}
+
+
+// Flush queued dynamic tile DMA transfers (VBlank only)
+//
+// REQUIRES: VBlank or Force-Blank
+// Uses DMA channel 0
+//
+// DB = 0x80
+#[mem8, idx8]
+func __flush_dynamic_tiles__vblank() {
+    dma_queue.flush__vblank();
+    
+    // Restore VMAIN to default state (increment on low byte) for subsequent tilemap transfers
+    VMAIN = a = VMAIN_INCREMENT_1;
+}
+
+
+// DB = 0x7e
+#[mem8, idx16]
+func reset_buffers() {
+    xx = (N_OBJECTS - 1) * sizeof(OamEntry);
+    bufferPos = xx;
+    oldBufferPos = xx;
+
+    a = OFFSCREEN_YPOS;
+    do {
+        // ::ANNOY cannot do `buffer[unaligned xx].yPos = a;` ::
+
+        (&buffer[0].yPos)[unaligned xx] = a;
+
+        // subtract 4
+        xx--; xx--; xx--; xx--;
+    } while !negative;
+
+
+    // ::ANNOY cannot run this loop backwards::
+    for xx in 0 .. sizeof(typeof(hiTableBuffer)) - 1 {
+        hiTableBuffer[xx] = a = 0xff;
+    }
+
+    hiTableQueue = a = HI_TABLE_QUEUE_INIT_VALUE;
+    hiTableBufferPos = xx = sizeof(typeof(hiTableBuffer)) - 1;
+}
+
+
+
+// KEEP: Y
+// DB = 0x7e
+#[idx16]
+inline func _decrement_buffer_index(pos : u16 in xx) : u16 in xx {
+    // xx -= sizeof(OamEntry);
+    xx--;
+    xx--;
+    xx--;
+    xx--;
+
+    return xx;
+}
+
+
+
+// Update `hiTableBuffer` and reset the `hiTableQueue`
+// KEEP: X and Y
+// DB = 0x7e
+#[mem8, idx16]
+func _hiTableQueue_full() {
+    push16(xx);
+
+    xx = hiTableBufferPos;
+
+    hiTableBuffer[xx] = a = hiTableQueue;
+    xx--;
+
+    hiTableBufferPos = xx;
+
+
+    hiTableQueue = a = HI_TABLE_QUEUE_INIT_VALUE;
+
+    xx = pop16();
+}
+
+
+
+// Reset the buffer
+//
+// DB = 0x7e
+#[mem8, idx16]
+func reset_buffer() {
+    // NOTE: If I modify this function I must also modify `reset_buffer_and_draw_shadows()`
+
+    hiTableQueue = a = HI_TABLE_QUEUE_INIT_VALUE;
+    hiTableBufferPos = xx = sizeof(typeof(hiTableBuffer)) - 1;
+    bufferPos = xx = INITIAL_BUFFER_POS;
+}
+
+
+
+// NOTE: Resets the buffer positions.
+// MUST be called before any MetaSprites are drawn.
+// DB = 0x7e
+#[mem8, idx16]
+inline func reset_buffer_and_draw_entity_shadows() {
+    // NOTE: If I modify this function, also modify `reset_buffer_and_draw_room_transition_shadows`
+
+    // KEEP: X and Y
+    #[mem8, idx16]
+    inline func _update_hi_table_size_small() {
+        hiTableQueue <<= 1;
+    }
+
+
+    // KEEP: X and Y
+    #[mem8, idx16]
+    inline func _update_hi_table_x9(x9 : bool in carry) {
+        // Invert carry flag
+        a = 0;
+        a +#= 0xff;
+        a >>>= 1;
+
+        hiTableQueue <<<<#= 1;
+        if carry {
+            _hiTableQueue_full();
+        }
+    }
+
+    // KEEP: X and Y
+    #[mem8, idx16]
+    inline func _update_hi_table_x9_0() {
+        hiTableQueue <<= 1;
+        if carry {
+            _hiTableQueue_full();
+        }
+    }
+
+
+    // Reset buffer positions
+    hiTableQueue = a = HI_TABLE_QUEUE_INIT_VALUE;
+    hiTableBufferPos = xx = sizeof(typeof(hiTableBuffer)) - 1;
+
+    // xx = bufferPos
+    xx = INITIAL_BUFFER_POS;
+
+
+    bufferPos = xx;
+}
+
+
+
+// NOTE: Resets the buffer positions.
+// MUST be called before any MetaSprites are drawn.
+//
+// DB = 0x7e
+#[mem8, idx16]
+inline func reset_buffer_and_draw_room_transition_shadows__inline() {
+
+
+    // NOTE: If I modify this function, also modify `reset_buffer_and_draw_entity_shadows`
+
+    // KEEP: X and Y
+    #[mem8, idx16]
+    inline func _update_hi_table_size_small() {
+        hiTableQueue <<= 1;
+    }
+
+
+    // KEEP: X and Y
+    #[mem8, idx16]
+    inline func _update_hi_table_x9(x9 : bool in carry) {
+        hiTableQueue <<<<#= 1;
+        if carry {
+            _hiTableQueue_full();
+        }
+    }
+
+    // yy = room_transitions.SpriteList index
+    idx8();
+    #[idx8] {
+        y = room_transitions.spriteListEnd;
+        y--;
+        y--;
+    }
+    idx16();
+    if negative {
+        ^return;
+    }
+
+
+    // Reset buffer positions
+    hiTableQueue = a = HI_TABLE_QUEUE_INIT_VALUE;
+    hiTableBufferPos = xx = sizeof(typeof(hiTableBuffer)) - 1;
+
+    // xx = bufferPos
+    xx = INITIAL_BUFFER_POS;
+
+
+    bufferPos = xx;
+}
+
+
+
+// Finalise the buffer and hide the unused sprites.
+//
+// DB = 0x7e
+#[mem8, idx16]
+func finalize_buffer() {
+    xx = bufferPos;
+    if negative {
+        // Required to prevent an underflow in `cmp(xx, oldBufferPos)` below
+        xx = 0;
+    }
+    else {
+        // buffer is not empty.
+        // Hide sprites that were on-screen on the previous frame.
+        //
+
+        // Fix a bug where sprite 0 remains on-screen if the buffer was full on the previous frame.
+        a = OFFSCREEN_YPOS;
+        buffer[0].yPos = a;
+
+        // ::ANNOY greater-than comparison `>` operator is not allowed in conditional::
+        // ::: `if xx > oldBufferPos {` ::
+        if { cmp(xx, oldBufferPos); } && carry && !zero {
+            // The previous frame had more sprites on-screen the this frame.
+            // Move them off-screen.
+            do {
+                (&buffer[0].yPos)[unaligned xx] = a;
+
+                // subtract 4
+                xx = _decrement_buffer_index(xx);
+            } while xx != oldBufferPos;
+
+            xx = bufferPos;
+        }
+    }
+    oldBufferPos = xx;
+
+
+    a = hiTableQueue;
+    if a != HI_TABLE_QUEUE_INIT_VALUE {
+        // hiTableQueue is not empty.
+
+        // fill buffer
+        do {
+            a <<= 2;
+        } while !carry;
+
+        xx = hiTableBufferPos;
+        hiTableBuffer[xx] = a;
+    }
+}
+
+// Entity Functions
+// ================
+
+
+// Draw the entity's MetaSprite frame.
+//
+// Also updates `entities.SoA.previousXpos` and `entities.SoA.previousYpos`.
+// Queues dynamic tiles if needed. If queue fails, draws with last successfully queued frame.
+//
+// Converts world position to screen position: screenPos = worldPos - cameraPos
+// This ensures all entities scroll correctly with the camera.
+//
+// All entities (including player at entity 0) use 16-bit world positions from entities.SoA.worldX/Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _draw_entity(entityId : u8 in y) {
+
+    // Death blink effect: skip drawing on certain frames when entity is dead
+    // Skip this check for entity 0 (player) - player uses separate health variable
+    if y != 0 {
+        // Check if entity is dead (health == 0) and has death timer active
+        a = entities.SoA.health[unaligned y];
+        if zero {
+            // Entity is dead - check var_3_h (death timer) for blink pattern
+            // Blink pattern: draw only when bit 2 is set (4 frames on, 4 frames off)
+            a = entities.SoA.var_3_h[unaligned y];
+            if a & 0x02 == 0 {
+                // Blink "off" frame - skip drawing this entity
+                return;
+            }
+        }
+    }
+
+    // Update previousPos from world position low byte
+    a = entities.SoA.worldX_lo[unaligned y];
+    entities.SoA.previousXpos[unaligned y] = a;
+    a = entities.SoA.worldY_lo[unaligned y];
+    entities.SoA.previousYpos[unaligned y] = a;
+    
+    // Save entity ID for later (zero-extend to 16-bit)
+    <:zpTmp_word_3 = a = y;
+    >:zpTmp_word_3 = 0;
+
+    // Calculate screen position: worldPos - cameraPos (16-bit math)
+    mem16_idx16();
+    #[mem16, idx16] {
+        yy = zpTmp_word_3;
+        
+        // Screen X = worldX - camX
+        aa = entities.SoA.worldX[unaligned yy];
+        carry = true;
+        aa -#= camera.camX;
+        xPos = aa;
+        
+        // Screen Y = worldY - camY
+        aa = entities.SoA.worldY[unaligned yy];
+        carry = true;
+        aa -#= camera.camY;
+        yPos = aa;
+    }
+    mem8_idx8();
+    
+    // Subtract zPos from yPos (8-bit subtraction on low byte)
+    a = <:yPos;
+    carry = true;
+    a -#= entities.SoA.zPos[unaligned y];
+    <:yPos = a;
+    if !carry {
+        >:yPos = a = >:yPos - 1;
+    }
+
+    // Save draw function index (properly zero-extended)
+    <:zpTmp_word_4 = a = entities.SoA.msDrawFunction[unaligned y] as u8;
+    >:zpTmp_word_4 = 0;
+    
+    // Save queue tiles function index (properly zero-extended)
+    <:zpTmp_word_2 = a = entities.SoA.msQueueTilesFunction[unaligned y] as u8;
+    >:zpTmp_word_2 = 0;
+    
+    // zpTmp_word_3 already set above
+    
+    // Calculate VRAM base offset and char base from entity's dynamicVramSlot
+    // Slot 0 (player): tiles 0-95 in first name table
+    // Slot 1: tiles 160-255 in first name table (char_base = 160, name_table = 0)
+    // Slots 2+: tiles 256+ in second name table (char_base = (slot-2)*96, name_table = 1)
+    a = entities.SoA.dynamicVramSlot[unaligned y];
+    if a != vram_slots.NO_SLOT {
+        if a == 0 {
+            // Slot 0 (player) - first name table at tile 0
+            __dyn_char_base = a = 0;
+            __dyn_name_table = a = 0;
+            mem16();
+            #[mem16] {
+                __dyn_vram_base_offset = aa = 0;
+            }
+            mem8();
+        } else if a == 1 {
+            // Slot 1 - first name table at tile 160
+            __dyn_char_base = a = vram_slots.SLOT1_BASE_TILE as u8;  // 160
+            __dyn_name_table = a = 0;  // First table
+            mem16();
+            #[mem16] {
+                __dyn_vram_base_offset = aa = vram_slots.SLOT1_VRAM_OFFSET as u16;
+            }
+            mem8();
+        } else {
+            // Slots 2+ - second name table
+            // char_base = (slot-2) * 96 (fits in 8 bits: 0, 96, 192)
+            x = a;
+            x--;
+            x--;  // slot - 2
+            a = 0;
+            if x != 0 {
+                do {
+                    a += vram_slots.TILES_PER_SLOT;
+                    x--;
+                } while !zero;
+            }
+            __dyn_char_base = a;
+            __dyn_name_table = a = 1;  // Second table
+            
+            // vram_offset = SECOND_TABLE_VRAM_OFFSET + char_base * 16
+            mem16();
+            #[mem16] {
+                aa = 0;
+            }
+            mem8();
+            a = __dyn_char_base;
+            mem16();
+            #[mem16] {
+                aa <<= 4;  // * 16
+                aa += vram_slots.SECOND_TABLE_VRAM_OFFSET as u16;
+                __dyn_vram_base_offset = aa;
+            }
+            mem8();
+        }
+    } else {
+        // No slot - use 0 offset (for static sprites)
+        __dyn_char_base = a = 0;
+        __dyn_name_table = a = 0;
+        mem16();
+        #[mem16] {
+            __dyn_vram_base_offset = aa = 0;
+        }
+        mem8();
+    }
+    
+    mem16_idx16();
+    #[mem16, idx16] {
+        // Load zero-extended entity ID
+        yy = zpTmp_word_3;
+        
+        // Get current msFrameAddr
+        aa = entities.SoA.msFrameAddr[unaligned yy];
+        zpTmp_word_1 = aa;  // Save current frame
+        
+        // Check if this frame is already cached
+        if aa != entities.SoA.msLastQueuedFrame[unaligned yy] {
+            // Not cached - need to queue tiles
+            mem8();
+            #[mem8] {
+                yy = zpTmp_word_1;  // msFrameAddr
+                xx = zpTmp_word_2;  // queue function index
+                
+                // Try to queue tiles
+                if { dynamic_tiles.ms_queue_tiles_table[unaligned xx](yy); } && !carry {
+                    // Success - update cache and use new frame
+                    yy = zpTmp_word_3;  // entity ID
+                    mem16();
+                    #[mem16] {
+                        entities.SoA.msLastQueuedFrame[unaligned yy] = aa = zpTmp_word_1;
+                    }
+                    // zpTmp_word_1 has the new frame address for drawing
+                } else {
+                    // Failed - use last cached frame for drawing
+                    yy = zpTmp_word_3;  // entity ID
+                    mem16();
+                    #[mem16] {
+                        zpTmp_word_1 = aa = entities.SoA.msLastQueuedFrame[unaligned yy];
+                    }
+                }
+            }
+        }
+    }
+    mem8();
+    
+    #[mem8, idx16] {
+        yy = zpTmp_word_1;
+        xx = zpTmp_word_4;  // draw function index
+        drawing_functions.ms_draw_function_table[unaligned xx](yy, xPos, yPos);
+    }
+    mem8_idx8();
+}
+
+
+
+// MetaSprite Animations
+// ---------------------
+
+
+
+// Initialise the MetaSprite Animation for the player entity.
+//
+// NOTE: This function does not set the animationId
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func init_player_metasprite_animation__inline() {
+    entities.SoA.msAnimationProcessFunctionIndex[0] = a = animations.NEW_ANIMATION__FUNCTION_ID;
+}
+
+
+
+// Initialise the MetaSprite Animation for an entity.
+//
+// This function MUST be called before the entity's `init` function.
+//
+// NOTE: This function will not populate all of the animation fields,
+//       `init_entity_metasprite_animation__after_init` must be called after entity `init` routine
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem16, idx8]
+inline func init_entity_metasprite_animation__inline(entityId : u8 in y) {
+
+    (&entities.SoA._msAnimationIdAndPfIndex as *u16)[unaligned y] = aa = (animations.NEW_ANIMATION__FUNCTION_ID << 8);
+}
+
+
+
+// Finish initialising an entity's MetaSprite Animation.
+//
+// This function MUST be called AFTER the entity's `init` function.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem16, idx8]
+let init_entity_metasprite_animation__after_init = metasprites.animations._new_animation;
+
+
+
+// Set the entity's MetaSprite animation.
+//
+// NOTE: This function will always restart the animation.
+// NOTE: This function will not immediately change the MetaSprite animation state.
+//
+// KEEP: X and Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+#[fallthrough]
+func set_entity_animation_x(entityId : u8 in y, animationId : u8 in x) {
+    a = x;
+// fallthrough
+}
+
+// Set the entity's MetaSprite animation.
+//
+// NOTE: This function will always restart the animation.
+// NOTE: This function will not immediately change the MetaSprite animation state.
+//
+// KEEP: X and Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func set_entity_animation(entityId : u8 in y, animationId : u8 in a) {
+    entities.SoA.msAnimationId[unaligned y] = a;
+    entities.SoA.msAnimationProcessFunctionIndex[unaligned y] = a = animations.NEW_ANIMATION__FUNCTION_ID;
+}
+
+
+// Set the entity's MetaSprite animation if entity's `msAnimationId` is not `animationId`.
+//
+// If the entity's `msAnimationId` is equal to `animationId` then the animation is unchanged.
+//
+// NOTE: This function will not immediately change the MetaSprite animation state.
+//
+// KEEP: X and Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func set_entity_animation_if_changed(entityId : u8 in y, animationId : u8 in a) {
+    if a != entities.SoA.msAnimationId[y] {
+        entities.SoA.msAnimationId[unaligned y] = a;
+        entities.SoA.msAnimationProcessFunctionIndex[unaligned y] = a = metasprites.animations.NEW_ANIMATION__FUNCTION_ID;
+    }
+}
+
+
+
+// Set the player's MetaSprite animation.
+//
+// NOTE: This function will always restart the animation.
+// NOTE: This function will not immediately change the MetaSprite animation state.
+//
+// KEEP: X and Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func set_player_animation(animationId : u8 in a) {
+    entities.SoA.msAnimationId[PLAYER_ENTITY_ID] = a;
+    entities.SoA.msAnimationProcessFunctionIndex[PLAYER_ENTITY_ID] = a = metasprites.animations.NEW_ANIMATION__FUNCTION_ID;
+}
+
+
+
+// Set the player's MetaSprite animation if the player's `msAnimationId` is not `animationId`.
+//
+// If the player's `msAnimationId` is equal to `animationId` then the animation is unchanged.
+//
+// NOTE: This function will not immediately change the MetaSprite animation state.
+//
+// KEEP: X and Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func set_player_animation_if_changed(animationId : u8 in a) {
+    if a != entities.SoA.msAnimationId[PLAYER_ENTITY_ID] {
+        entities.SoA.msAnimationId[PLAYER_ENTITY_ID] = a;
+        entities.SoA.msAnimationProcessFunctionIndex[PLAYER_ENTITY_ID] = a = metasprites.animations.NEW_ANIMATION__FUNCTION_ID;
+    }
+}
+
+
+
+// Stop the entity's MetaSprite animation.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func stop_entity_animation(entityId : u8 in y) {
+    x = y;
+    entities.SoA.msAnimationProcessFunctionIndex[unaligned x] = animations.DISABLED_FUNCTION_ID;
+}
+
+
+
+// Tests if the entity is running a non-looping animation.
+//
+// Returns `true` if the animation is running and it is a non-looping animation.
+// Returns `true` if the animation process-function is NEW_ANIMATION__FUNCTION_ID.
+// Returns `false` if a non-looping animation is completed or `stop_entity_animation()` has been called.
+// Returns `false` for looping animations to prevent an infinite-loop if this function to used break a loop.
+//
+// KEEP: Y
+// KEEP: X
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func is_entity_non_looping_animation_running(entityId : u8 in y) : bool in carry {
+    // Assumes the non-looping animations and NEW_ANIMATION__FUNCTION_ID are at the end of `AnimationProcessFunctions`
+
+    a = entities.SoA.msAnimationProcessFunctionIndex[unaligned y];
+    cmp(a, metasprites.animations.FIRST_NON_LOOPING_FUNCTION_ID);
+    return carry;
+}
+
+
+
+// Tests if the player is running a non-looping animation.
+//
+// Returns `true` if the animation is running and it is a non-looping animation.
+// Returns `true` if the animation process-function is NEW_ANIMATION__FUNCTION_ID.
+// Returns `false` if a non-looping animation is completed or `stop_entity_animation()` has been called.
+// Returns `false` for looping animations to prevent an infinite-loop if this function to used break a loop.
+//
+// KEEP: Y
+// KEEP: X
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func is_player_non_looping_animation_running() : bool in carry {
+    // Assumes the non-looping animations and NEW_ANIMATION__FUNCTION_ID are at the end of `AnimationProcessFunctions`
+
+    a = entities.SoA.msAnimationProcessFunctionIndex[PLAYER_ENTITY_ID];
+    cmp(a, metasprites.animations.FIRST_NON_LOOPING_FUNCTION_ID);
+    return carry;
+}
+
+
+
+// Process the entity's MetaSprite animation.
+//
+// This function MUST be called after the entity's process routine.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func process_entity_animation(entityId : u8 in y) {
+    x = entities.SoA.msAnimationProcessFunctionIndex[unaligned y];
+
+    animations.AnimationProcessFunctions[unaligned x](y);
+}
+
+
+namespace animations {
+
+
+// Order MUST match `LOOPING_ANIMATION_DELAY_IDS` and `NON_LOOPING_ANIMATION_DELAY_IDS` in `tools/super_maker/metasprite.py`
+const AnimationProcessFunctions = [
+    disabled,
+
+    // Looping process functions
+    frame_count__looping,
+
+    // Unused delay types
+    disabled,
+    disabled,
+    disabled,
+    disabled,
+    disabled,
+    disabled,
+    disabled,
+    disabled,
+    disabled,
+    disabled,
+
+    // Non looping process functions. Should be last
+    frame_count__once,
+
+    // Unused slots
+    disabled,
+    disabled,
+    disabled,
+
+    // A special animation process function to setup the animation in memory.
+    // This must be the 17th function in this table
+    _new_animation,
+];
+
+let DELAY_TYPE_MASK = 0b00011110;
+
+let FRAME_COUNT__LOOPING__FUNCTION_ID = 1 * 2;
+let FRAME_COUNT__ONCE__FUNCTION_ID = 12 * 2;
+
+let FIRST_NON_LOOPING_FUNCTION_ID = 12 * 2;
+
+let DISABLED_FUNCTION_ID = 0;
+let NEW_ANIMATION__FUNCTION_ID = DELAY_TYPE_MASK + 2;
+
+let entities_SoA_msAnimationCounter_u8 = &<:entities.SoA.msAnimationCounter[0] as *u8;
+
+
+
+// Animation Process Routine: Start a new animation.
+//
+// This function is called after entity `init` or after the animation
+// has been changed by a previous `set_player_animation` call.
+//
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _new_animation(entityId : u8 in y) {
+    // Assumes all animation state (except `msAnimationId`, `msAnimationTable` and `metaSpriteFrameTable`) is invalid.
+    // This function is part of an entity's init routine.
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        aa = (&entities.SoA.msAnimationId as *u16)[unaligned yy];
+        xx = aa = ((aa & 0xff) << 1) + entities.SoA.msAnimationTable[unaligned yy];
+        aa = MetaSpriteAnimationTableOffset[unaligned xx];
+
+        entities.SoA.msAnimationAddr[unaligned yy] = aa;
+        entities.SoA.msAnimationPos[unaligned yy] = aa;
+        xx = aa;
+
+        // Calculate metasprite frame address
+        aa = (AnimationDataFormat.frame as far *u16)[unaligned xx];
+        xx = aa = ((aa & 0xff) << 1) +# entities.SoA.metaSpriteFrameTable[unaligned yy];
+        entities.SoA.msFrameAddr[unaligned yy] = aa = MetaSpriteFrameTableOffset[unaligned xx];
+
+        mem8();
+        #[mem8] {
+            xx = entities.SoA.msAnimationAddr[unaligned yy];
+
+            entities.SoA.msAnimationProcessFunctionIndex[unaligned yy] = a = AnimationDataFormat.processFunction[xx] & DELAY_TYPE_MASK;
+
+            // Frame count delay - just copy the delay byte directly
+            entities_SoA_msAnimationCounter_u8[unaligned yy] = a = AnimationDataFormat.delay[xx];
+        }
+    }
+    mem8_idx8();
+}
+
+
+
+// Animation Process Routine:  Does nothing.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func disabled(entityId : u8 in y) {
+}
+
+
+
+// Looping Animation Process Routine:  Delay byte measures display frames.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func frame_count__looping(entityId : u8 in y) {
+
+    a = entities_SoA_msAnimationCounter_u8[unaligned y];
+    if zero {
+        // NOTE: If you modify this code, you MUST ALSO modify `frame_count__once()`
+
+        // Advance to the next MetaSprite frame
+        idx16();
+        #[idx16] {
+            xx = entities.SoA.msAnimationPos[unaligned yy];
+            xx++;
+            xx++;
+
+            a = AnimationDataFormat.frame[xx];
+            if a == AnimationDataFormat.END_OF_ANIMATION_BYTE {
+                // Restart MetaSprite animation
+                xx = entities.SoA.msAnimationAddr[unaligned yy];
+            }
+
+            mem16();
+            #[mem16] {
+                entities.SoA.msAnimationPos[unaligned yy] = aa = xx;
+
+                // Delay must be processed first as calculating `msFrameAddr` clobbers xx.
+                // (wasting 2 cycles on the 16 bit load-store is faster then reloading `msAnimationPos` back into xx later)
+                aa = (AnimationDataFormat.delay as far *u16)[unaligned xx];
+                entities.SoA.msAnimationCounter[unaligned yy] = aa;
+
+                aa = (AnimationDataFormat.frame as far *u16)[unaligned xx];
+                xx = aa = ((aa & 0xff) << 1) +# entities.SoA.metaSpriteFrameTable[unaligned yy];
+                entities.SoA.msFrameAddr[unaligned yy] = aa = MetaSpriteFrameTableOffset[unaligned xx];
+            }
+        }
+        mem8_idx8();
+        return;
+    }
+    else {
+        // msAnimationCounter is non-zero
+        a--;
+        entities_SoA_msAnimationCounter_u8[unaligned y] = a;
+    }
+}
+
+
+
+// Non-Looping Animation Process Routine:  Delay byte measures display frames.
+//
+// KEEP: Y
+//
+// DB = 0x7e
+#[mem8, idx8]
+func frame_count__once(entityId : u8 in y) {
+
+    a = entities_SoA_msAnimationCounter_u8[unaligned y];
+    if zero {
+        // NOTE: If you modify this code, you MUST ALSO modify `frame_count__looping()`
+
+        // Advance to the next MetaSprite frame
+        idx16();
+        #[idx16] {
+            xx = entities.SoA.msAnimationPos[unaligned yy];
+            xx++;
+            xx++;
+
+            a = AnimationDataFormat.frame[xx];
+            goto __end_of_animation__idx16 if a == AnimationDataFormat.END_OF_ANIMATION_BYTE;
+
+            mem16();
+            #[mem16] {
+                entities.SoA.msAnimationPos[unaligned yy] = aa = xx;
+
+                // Delay must be processed first as calculating `msFrameAddr` clobbers xx.
+                // (wasting 2 cycles on the 16 bit load-store is faster then reloading `msAnimationPos` back into xx later)
+                aa = (AnimationDataFormat.delay as far *u16)[unaligned xx];
+                entities.SoA.msAnimationCounter[unaligned yy] = aa;
+
+                aa = (AnimationDataFormat.frame as far *u16)[unaligned xx];
+                xx = aa = ((aa & 0xff) << 1) +# entities.SoA.metaSpriteFrameTable[unaligned yy];
+                entities.SoA.msFrameAddr[unaligned yy] = aa = MetaSpriteFrameTableOffset[unaligned xx];
+            }
+        }
+        mem8_idx8();
+        return;
+    }
+    else {
+        // msAnimationCounter is non-zero
+        a--;
+        entities_SoA_msAnimationCounter_u8[unaligned y] = a;
+    }
+}
+
+
+
+// A non-looping animation has ended.  Change animation process function to `disabled`.
+//
+// KEEP: Y
+//
+// RETURNS with mem8, idx8
+//
+// DB = 0x7e
+#[mem8, idx8]
+func __end_of_animation__idx16() {
+    // This function is called with a idx16, and it needs to return mem8, idx8
+    mem8_idx8();
+
+    x = y;
+    entities.SoA.msAnimationProcessFunctionIndex[unaligned x] = DISABLED_FUNCTION_ID;
+}
+
+
+}
+
+
+
+// MetaSprite Patterns
+// ===================
+
+namespace drawing_functions {
+
+// ::TODO do a thorough test of the drawing functions and confirm partially off-screen sprites works correctly::
+
+
+// Subtract the MsDataFormat offset from the MetaSprite position.
+//
+// KEEP: X and Y
+// DB = 0x7e
+#[mem8, idx16]
+inline func _subtract_ms_offset_from_position(msFrame : u16 in xx, xPos : u16 in metasprites.xPos, yPos : u16 in metasprites.yPos) {
+
+    // MUST not modify xx or yy
+    // Note: MsDataFormat pointers are far pointers to bank 0xC1, explicit far access needed
+
+    <:xPos = a = <:xPos - (MsDataFormat.xOffset as far *u8)[unaligned xx];
+    if !carry {
+        (>:xPos)--;
+    }
+
+    <:yPos = a = <:yPos - (MsDataFormat.yOffset as far *u8)[unaligned xx];
+    if !carry {
+        (>:yPos)--;
+    }
+}
+
+
+
+// KEEP: X and Y
+// DB = 0x7e
+#[mem8, idx16]
+inline func _update_hi_table_size_small() {
+    hiTableQueue <<= 1;
+}
+
+
+
+// KEEP: X and Y
+// DB = 0x7e
+#[mem8, idx16]
+inline func _update_hi_table_size_large() {
+    carry = true;
+    hiTableQueue <<<<#= 1;
+}
+
+
+
+// KEEP: X and Y
+// DB = 0x7e
+#[mem8, idx16]
+inline func _update_hi_table_x8(x8 : bool in carry) {
+    hiTableQueue <<<<#= 1;
+    if carry {
+        _hiTableQueue_full();
+    }
+}
+
+// KEEP: X and Y
+#[mem8, idx16]
+inline func _update_hi_table_x8_invert(x8 : bool in carry) {
+    // Invert carry flag
+    a = 0;
+    a +#= 0xff;
+    a >>>= 1;
+
+    _update_hi_table_x8(carry);
+}
+
+
+
+// KEEP: X and Y
+// DB = 0x7e
+#[mem8, idx16]
+inline func _update_hi_table_x8_xPos() {
+    a = >:xPos >>> 1;
+    _update_hi_table_x8(carry);
+}
+
+
+
+// KEEP: X and Y
+// DB = 0x7e
+#[mem8, idx16]
+inline func _update_hi_table_x8_0() {
+    hiTableQueue <<= 1;
+    if carry {
+        _hiTableQueue_full();
+    }
+}
+
+
+
+// Generic sprite list drawing function for dynamic metasprites.
+// Reads the extended format: 5 bytes per sprite (x, y, char, attr, size)
+// Terminates when x == 0x80 (SPRITE_LIST_END)
+//
+// Frame data format at msFrame (for dynamic metasprites with DMA tiles):
+//   BEFORE msFrame pointer:
+//     [tile_addrs: u16 x tile_count (reversed)] [tile_count: u8]
+//   AT msFrame pointer (MsDataFormat):
+//     [hitbox 4b] [hurtbox 4b] [pattern 1b] [x_off 1b] [y_off 1b] [sprites...]
+//   Sprites start at offset 11 from msFrame, each sprite is 5 bytes: x, y, char, attr, size
+//
+// NOTE: Tile transfer to VRAM happens in VBlank via transfer_Player_tiles__vblank__inline()
+//       This function only processes sprite positions and attributes.
+//
+// DB = 0x7e, DP = 0
+#[mem8, idx16]
+func dynamic_pattern(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) {
+    let SPRITE_LIST_END = 0xFF as u8;
+    let SPRITE_DATA_OFFSET = 11;  // Offset from msFrame to first sprite
+    let SPRITE_SIZE = 5;          // Bytes per sprite: x, y, char, attr, size
+    
+    xx = yy;
+    _subtract_ms_offset_from_position(xx, xPos, yPos);
+    
+    // Initialize sprite data pointer to first sprite (offset 11)
+    mem16();
+    #[mem16] {
+        aa = xx;
+        aa += SPRITE_DATA_OFFSET;
+        __sprite_data_ptr = aa;
+    }
+    mem8();
+    
+    // Loop through all sprites until terminator
+__dynamic_pattern_loop:
+        // Read sprite X offset to check for terminator
+        xx = __sprite_data_ptr;
+        a = (MsDataFormat._base as far *u8)[unaligned xx];
+        if a == SPRITE_LIST_END { return; }
+        
+        // Check if buffer has space
+        yy = bufferPos;
+        if negative { return; }
+        
+        // X position: sprite_x + xPos (16-bit math to handle 9th bit and offscreen check)
+        // Sprite X offset is signed 8-bit, xPos is 16-bit screen position
+        // First, sign-extend sprite X offset into zpTmp_word_0
+        a = (MsDataFormat._base as far *i8)[unaligned xx] as u8;
+        <:zpTmp_word_0 = a;
+        // Sign extend: if bit 7 set, high byte = 0xFF, else 0x00
+        if negative { a = 0xFF; } else { a = 0; }
+        >:zpTmp_word_0 = a;
+        
+        // Add xPos to get final screen X (16-bit)
+        mem16();
+        #[mem16] {
+            aa = zpTmp_word_0;
+            aa +#= xPos;
+            zpTmp_word_0 = aa;  // Full 16-bit X position
+        }
+        mem8();
+        
+        // Check if sprite is offscreen
+        // Offscreen if: X >= 256 AND X < 0xFFF0 (i.e., not in [-16, 255] range)
+        // X in [0, 255] is visible
+        // X in [0xFFF0, 0xFFFF] is -16 to -1, partially visible from left
+        // X in [256, 0xFFEF] is offscreen
+        a = >:zpTmp_word_0;
+        if !zero {
+            // High byte non-zero, check if it's 0xFF (negative X, coming from left)
+            cmp(a, 0xFF);
+            if !zero {
+                // High byte is not 0x00 or 0xFF, sprite is offscreen
+                goto __dynamic_pattern_hide_sprite;
+            }
+            // High byte is 0xFF - check if low byte >= 0xF0 (X >= -16)
+            a = <:zpTmp_word_0;
+            cmp(a, 0xF0);
+            if !carry {
+                // X < -16, completely offscreen left
+                goto __dynamic_pattern_hide_sprite;
+            }
+        }
+        
+        // Sprite is visible - write X position
+        a = <:zpTmp_word_0;
+        (&buffer[0].xPos)[unaligned yy] = a;
+        
+        // Y position: treat as UNSIGNED offset and add to yPos (16-bit math)
+        xx++;
+        a = (MsDataFormat._base as far *u8)[unaligned xx];
+        push16(xx);
+        mem16();
+        #[mem16] {
+            aa &= 0x00ff;  // Zero-extend (unsigned)
+            aa +#= yPos;
+            // Hide if Y is offscreen (but not wrapping from top)
+            if aa >= DISPLAY_HEIGHT && aa < 0xFF00 { aa = OFFSCREEN_YPOS as u16; }
+        }
+        mem8();
+        xx = pop16();
+        (&buffer[0].yPos)[unaligned yy] = a;
+        
+        // Char (tile ID)
+        xx++;
+        a = (MsDataFormat._base as far *u8)[unaligned xx];
+        carry = false;
+        a +#= __dyn_char_base;
+        (&buffer[0].char)[unaligned yy] = a;
+        
+        // Attr (palette, priority, flip)
+        xx++;
+        a = (MsDataFormat._base as far *u8)[unaligned xx];
+        a |= __dyn_name_table;
+        (&buffer[0].attr)[unaligned yy] = a;
+        
+        // Size and X9 hiTable update
+        // Hi table format: 2 bits per sprite - [size][x9]
+        xx++;
+        a = (MsDataFormat._base as far *u8)[unaligned xx];
+        if zero { hiTableQueue <<= 1; } else { carry = true; hiTableQueue <<<<#= 1; }
+        // X9 bit from high byte of zpTmp_word_0
+        a = >:zpTmp_word_0;
+        a >>>= 1;  // Shift bit 0 into carry
+        hiTableQueue <<<<#= 1;
+        if carry { _hiTableQueue_full(); }
+        
+        // Advance to next sprite
+        xx++;
+        goto __dynamic_pattern_next_sprite;
+
+__dynamic_pattern_hide_sprite:
+        // Sprite is offscreen - hide it by setting Y to offscreen value
+        (&buffer[0].yPos)[unaligned yy] = a = OFFSCREEN_YPOS;
+        
+        // Skip to size byte (x + 4)
+        xx++; xx++; xx++; xx++;
+        
+        // Update hi table with size bit, X9 = 0
+        a = (MsDataFormat._base as far *u8)[unaligned xx];
+        if zero { hiTableQueue <<= 1; } else { carry = true; hiTableQueue <<<<#= 1; }
+        hiTableQueue <<= 1;  // X9 = 0
+        if carry { _hiTableQueue_full(); }
+        
+        xx++;
+
+__dynamic_pattern_next_sprite:
+        __sprite_data_ptr = xx;
+        
+        // Decrement buffer position
+        push16(xx);
+        xx = yy;
+        xx = _decrement_buffer_index(xx);
+        bufferPos = xx;
+        xx = pop16();
+        
+    ^goto __dynamic_pattern_loop;
+}
+
+
+// Blank drawing function - does nothing.
+//
+#[mem8, idx16]
+func null_function(msFrame : u16 in yy, xPos : u16 in xPos, yPos : u16 in yPos) {
+}
+
+}
+
+}
+}
+
+
+
+//Moving this here prevents an
+// "encountered a reference to `var metasprites.xPos` before its type was known" error.
+import "room-transitions";
+import "../entity_api";
+import "camera";
+
+import "../resources/dma";
+import "../resources/resources";
+
+import "gen/ms-drawing-functions";

@@ -1,0 +1,169 @@
+{
+  "entities": [
+    {
+      "name": "dug",
+      "source": "dug",
+      "metasprites": "dug.Dug",
+      "is_enemy": true,
+      "is_killable": true,
+      "zpos": 0,
+      "health": 45,
+      "attack": 10,
+      "portrait": 2,
+      "move_speed_x": 1,
+      "move_speed_y": 0.5,
+      "parameter": {
+        "type": "enum",
+        "values": [
+          "left",
+          "right"
+        ]
+      },
+      "anim_roles": {
+        "idle":      { "animations": ["idle"] },
+        "walk":      { "animations": ["walk"] },
+        "hunch":     { "animations": ["hunch"] },
+        "attack":    { "animations": ["attack1", "attack2", "attack3", "attack4"] },
+        "hurt":      { "animations": ["hurt1", "hurt2"] },
+        "knockback": { "animations": ["knockback"] },
+        "recover":   { "animations": ["recover"] }
+      },
+      "ai_profile": {
+        "approach_speed": 1,
+        "orbit_radius": 48,
+        "attack_range": 28,
+        "commit_frames": 20,
+        "attack_startup": 12,
+        "attack_active": 6,
+        "attack_recovery": 26,
+        "hitstun_frames": 18,
+        "knockdown_frames": 45,
+        "getup_frames": 30,
+        "orbit_reroll_frames": 60,
+        "hunch_threshold": 64,
+        "attack_damage": 10,
+        "attack_damage_kd": 138,
+        "knockback_speed": 10,
+        "retreat_chance": 40,
+        "shuffle_distance": 35,
+        "retreat_distance": 50,
+        "grab_stun_frames": 15,
+        "death_duration": 60
+      }
+    },
+    {
+      "name": "bred",
+      "source": "bred",
+      "metasprites": "bred.Bred",
+      "is_enemy": true,
+      "is_killable": true,
+      "zpos": 0,
+      "health": 45,
+      "attack": 10,
+      "portrait": 3,
+      "move_speed_x": 1,
+      "move_speed_y": 0.5,
+      "parameter": {
+        "type": "enum",
+        "values": [
+          "left",
+          "right"
+        ]
+      },
+      "anim_roles": {
+        "idle":      { "animations": ["idle"] },
+        "walk":      { "animations": ["walk"] },
+        "hunch":     { "animations": ["hunch"] },
+        "attack":    { "animations": ["attack1", "attack2", "attack3", "attack4"] },
+        "hurt":      { "animations": ["hurt1", "hurt2"] },
+        "knockback": { "animations": ["knockback"] },
+        "recover":   { "animations": ["recover"] }
+      },
+      "ai_profile": {
+        "approach_speed": 1,
+        "orbit_radius": 48,
+        "attack_range": 28,
+        "commit_frames": 20,
+        "attack_startup": 12,
+        "attack_active": 6,
+        "attack_recovery": 26,
+        "hitstun_frames": 18,
+        "knockdown_frames": 45,
+        "getup_frames": 30,
+        "orbit_reroll_frames": 60,
+        "hunch_threshold": 64,
+        "attack_damage": 10,
+        "attack_damage_kd": 138,
+        "knockback_speed": 10,
+        "retreat_chance": 40,
+        "shuffle_distance": 35,
+        "retreat_distance": 50,
+        "grab_stun_frames": 15,
+        "death_duration": 60
+      }
+    },
+    {
+      "name": "j",
+      "source": "j",
+      "metasprites": "j.J",
+      "is_enemy": true,
+      "is_killable": true,
+      "zpos": 0,
+      "health": 40,
+      "attack": 10,
+      "portrait": 4,
+      "move_speed_x": 1.2,
+      "move_speed_y": 0.6,
+      "parameter": {
+        "type": "enum",
+        "values": [
+          "left",
+          "right"
+        ]
+      },
+      "anim_roles": {
+        "idle":      { "animations": ["idle"] },
+        "walk":      { "animations": ["walk"] },
+        "hunch":     { "animations": ["walk"] },
+        "attack":    { "animations": ["attack1", "attack2"] },
+        "hurt":      { "animations": ["hurt1", "hurt2"] },
+        "knockback": { "animations": ["knockback"] },
+        "recover":   { "animations": ["recover"] }
+      },
+      "ai_profile": {
+        "approach_speed": 1,
+        "orbit_radius": 40,
+        "attack_range": 28,
+        "commit_frames": 15,
+        "attack_startup": 10,
+        "attack_active": 6,
+        "attack_recovery": 20,
+        "hitstun_frames": 14,
+        "knockdown_frames": 40,
+        "getup_frames": 25,
+        "orbit_reroll_frames": 40,
+        "hunch_threshold": 48,
+        "attack_damage": 10,
+        "attack_damage_kd": 138,
+        "knockback_speed": 10,
+        "retreat_chance": 25,
+        "shuffle_distance": 30,
+        "retreat_distance": 45,
+        "grab_stun_frames": 12,
+        "death_duration": 60
+      }
+    },
+    {
+      "name": "hit_effect",
+      "source": "hit_effect",
+      "metasprites": "dungeon.HitEffect",
+      "is_enemy": false,
+      "is_killable": false,
+      "zpos": 0,
+      "health": 1,
+      "attack": 0,
+      "move_speed_x": 0,
+      "move_speed_y": 0
+    }
+  ]
+}

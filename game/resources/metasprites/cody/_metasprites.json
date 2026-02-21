@@ -1,0 +1,301 @@
+{
+  "name": "cody",
+  "palette": "cody",
+  "firstTile": 0,
+  "endTile": 48,
+  "dynamic": true,
+  "framesets": [
+    {
+      "name": "Cody",
+      "source": "cody.png",
+      "frameWidth": 128,
+      "frameHeight": 128,
+      "autoFlip": "h",
+      "frames": [
+        "frame0",
+        "frame1",
+        "frame2",
+        "frame3",
+        "frame4",
+        "frame5",
+        "frame6",
+        "frame7",
+        "frame8",
+        "frame9",
+        "frame10",
+        "frame11",
+        "frame12",
+        "frame13",
+        "frame14",
+        "frame15",
+        "frame16",
+        "frame17",
+        "frame18",
+        "frame19",
+        "frame20",
+        "frame21",
+        "frame22",
+        "frame23",
+        "frame24",
+        "frame25",
+        "frame26",
+        "frame27",
+        "frame28",
+        "frame29",
+        "frame30",
+        "frame31",
+        "frame32",
+        "frame33",
+        "frame34",
+        "frame35",
+        "frame36",
+        "frame37",
+        "frame38",
+        "frame39",
+        "frame40",
+        "frame41",
+        "frame42",
+        "frame43",
+        "frame44",
+        "frame45",
+        "frame46",
+        "frame47",
+        "frame48",
+        "frame49",
+        "frame50",
+        "frame51"
+      ],
+      "animations": {
+        "idle": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame0"
+          ],
+          "loop": true
+        },
+        "walk": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame1",
+            "frame2",
+            "frame3",
+            "frame4",
+            "frame5",
+            "frame6",
+            "frame7",
+            "frame8",
+            "frame9",
+            "frame10",
+            "frame11",
+            "frame12"
+          ],
+          "loop": true
+        },
+        "punch1": {
+          "delay-type": "frame",
+          "fixed-delay": 1,
+          "frames": [
+            "frame21",
+            "frame22",
+            "frame22"
+          ],
+          "loop": false
+        },
+        "punch2": {
+          "delay-type": "frame",
+          "fixed-delay": 4,
+          "frames": [
+            "frame23",
+            "frame24"
+          ],
+          "loop": false
+        },
+        "hook": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame25",
+            "frame26",
+            "frame27",
+            "frame28",
+            "frame29"
+          ],
+          "loop": false
+        },
+        "special": {
+          "delay-type": "frame",
+          "fixed-delay": 7,
+          "frames": [
+            "frame34",
+            "frame35",
+            "frame36",
+            "frame37",
+            "frame38",
+            "frame39"
+          ],
+          "loop": false
+        },
+        "air_elbow": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame45"
+          ],
+          "loop": false
+        },
+        "jump_start": {
+          "delay-type": "frame",
+          "fixed-delay": 1,
+          "frames": [
+            "frame13"
+          ],
+          "loop": false
+        },
+        "jump": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame14"
+          ],
+          "loop": true
+        },
+        "jump_kick": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame40",
+            "frame41",
+            "frame41",
+            "frame41",
+            "frame41",
+            "frame41",
+            "frame41",
+            "frame40"
+          ],
+          "loop": false
+        },
+        "leap_sequence": {
+          "delay-type": "frame",
+          "fixed-delay": 6,
+          "frames": [
+            "frame16",
+            "frame17",
+            "frame18",
+            "frame19",
+            "frame20"
+          ],
+          "loop": false
+        },
+        "leap_kick": {
+          "delay-type": "frame",
+          "fixed-delay": 4,
+          "frames": [
+            "frame42",
+            "frame43",
+            "frame44",
+            "frame44",
+            "frame44",
+            "frame44",
+            "frame44",
+            "frame43"
+          ],
+          "loop": false
+        },
+        "grab": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame30"
+          ],
+          "loop": false
+        },
+        "grab_kick": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame31"
+          ],
+          "loop": false
+        },
+        "grab_throw": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame32",
+            "frame33"
+          ],
+          "loop": false
+        },
+        "hurt": {
+          "delay-type": "frame",
+          "fixed-delay": 6,
+          "frames": [
+            "frame46"
+          ],
+          "loop": false
+        },
+        "knockdown": {
+          "delay-type": "frame",
+          "fixed-delay": 8,
+          "frames": [
+            "frame47",
+            "frame48",
+            "frame49"
+          ],
+          "loop": false
+        },
+        "recover": {
+          "delay-type": "frame",
+          "fixed-delay": 12,
+          "frames": [
+            "frame49",
+            "frame50",
+            "frame49",
+            "frame50",
+            "frame51"
+          ],
+          "loop": false
+        },
+        "pickup": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame51"
+          ],
+          "loop": false
+        }
+      },
+      "hitboxes": {
+        "frame31": "65 44 32 46",
+        "frame44": "64 99 64 29",
+        "frame22": "88 42 40 86",
+        "frame28": "74 35 37 35",
+        "frame36": "63 99 65 29",
+        "frame41": "87 32 40 96",
+        "frame38": "0 89 65 39",
+        "frame29": "63 16 48 54",
+        "frame24": "88 42 40 86"
+      },
+      "hurtboxes": {
+        "frame0-frame42": "38 42 50 86"
+      },
+      "bounds": "38 39 38 86",
+      "offsets": {
+        "frame19": "8 0",
+        "frame1": "4 0",
+        "frame2": "15 0",
+        "frame3": "13 0",
+        "frame4": "7 0",
+        "frame7": "-8 0",
+        "frame8": "13 0",
+        "frame9": "11 0",
+        "frame10": "4 0",
+        "frame11": "-5 0"
+      },
+      "order": 2,
+      "defaultLayout": "auto 0 0"
+    }
+  ]
+}

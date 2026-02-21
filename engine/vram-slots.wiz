@@ -1,0 +1,234 @@
+// VRAM Slot Allocator for Dynamic Sprites
+//
+// Manages fixed VRAM slots for entities with dynamic sprites.
+// Each slot provides a dedicated range of OAM VRAM tiles that won't conflict
+// with other dynamic entities.
+//
+// Layout (with TILES_PER_SLOT=96):
+//   Slot 0: Tiles 0-95     (player, FIRST table, name_table=0)
+//   Slot 1: Tiles 160-255  (dynamic, FIRST table, name_table=0)
+//   Slot 2: Tiles 256-351  (dynamic, SECOND table, name_table=1)
+//   Slot 3: Tiles 352-447  (dynamic, SECOND table, name_table=1)
+//   Slot 4: Tiles 448-511  (dynamic, SECOND table, name_table=1, 64 tiles only)
+//
+// Slot 1 is placed at tile 160 so it fits entirely in the first table (160-255).
+// This allows fast 8-bit math: slot 0-1 use name_table=0, slots 2+ use name_table=1.
+//
+// Note: SNES OAM has 512 tile slots (two 256-tile name tables).
+// Tiles 256-511 require name table bit (attr bit 0) to be set.
+
+import "src/memmap";
+
+
+namespace vram_slots {
+
+
+// Configuration
+let TILES_PER_SLOT = 96;              // Tiles per slot (6 rows of 16 tiles)
+let VRAM_WORDS_PER_TILE = 16;         // 32 bytes = 16 words per 8x8 4bpp tile
+let VRAM_OFFSET_PER_SLOT = TILES_PER_SLOT * VRAM_WORDS_PER_TILE;  // 0x0600 = 1536
+
+// Slot 1 starts at tile 160 (VRAM offset 0x0A00) to fit in first table (160-255)
+let SLOT1_BASE_TILE = 160;
+let SLOT1_VRAM_OFFSET = SLOT1_BASE_TILE * VRAM_WORDS_PER_TILE;  // 0x0A00
+
+// Second name table base (tile 256 = VRAM word offset 0x1000)
+let SECOND_TABLE_BASE_TILE = 256;
+let SECOND_TABLE_VRAM_OFFSET = SECOND_TABLE_BASE_TILE * VRAM_WORDS_PER_TILE;  // 0x1000
+
+// Number of slots:
+// Slot 0: player (tiles 0-95)
+// Slot 1: first dynamic (tiles 160-255, first table)
+// Slots 2-4: remaining dynamic (tiles 256-511, second table = 256 tiles / 96 = 2.67 slots)
+let N_SLOTS = 5;  // 5 slots total (slot 4 has only 64 tiles but still usable)
+
+// Reserved slots (not available for dynamic allocation)
+// Slot 0 = Player (always reserved)
+// Change N_RESERVED_SLOTS to 2 to reserve slot 1 for Player 2
+let N_RESERVED_SLOTS = 1;
+
+// Player slot is always 0
+let PLAYER_SLOT = 0;
+let PLAYER2_SLOT = 1;  // Can be reserved for 2-player mode by setting N_RESERVED_SLOTS = 2
+
+// Value indicating no slot assigned
+let NO_SLOT = 0xFF;
+
+
+in lowram {
+    // Bitmap of allocated slots (bit N = 1 means slot N is allocated)
+    // Bit 0 = slot 0 (player), bit 1 = slot 1 (player 2), etc.
+    var __allocated_slots : u8;
+}
+
+
+in code {
+
+
+// Initialize the slot allocator
+// Call once at game start
+// Automatically reserves slot 0 for player
+// DB = any
+#[mem8, idx8]
+inline func init() {
+    // Reserve slot 0 for player (always allocated)
+    // Slot 1 reserved for player 2 but not allocated yet
+    __allocated_slots = a = 1 << PLAYER_SLOT;
+}
+
+
+// Reserve additional slots (e.g., for 2-player mode)
+// slot: slot number to reserve (0-N_SLOTS-1)
+// Returns: carry = true if slot was already allocated
+// DB = any
+#[mem8, idx8]
+inline func reserve_slot(slot : u8 in a) : bool in carry {
+    x = a;
+    a = 1;
+    if x != 0 {
+        do {
+            a <<= 1;
+            x--;
+        } while !zero;
+    }
+    // a = 1 << slot
+    
+    // Check if already allocated
+    if a & __allocated_slots != 0 {
+        carry = true;
+        return true;
+    }
+    
+    // Allocate it
+    a |= __allocated_slots;
+    __allocated_slots = a;
+    carry = false;
+    return false;
+}
+
+
+// Allocate a VRAM slot for a dynamic entity
+// Returns: a = slot number (0-N_SLOTS-1), or NO_SLOT if none available
+// DB = any
+#[mem8, idx8]
+func allocate_slot() : u8 in a {
+    // Start searching from first non-reserved slot
+    x = N_RESERVED_SLOTS;
+    a = 1 << N_RESERVED_SLOTS;  // Start bit mask at first available slot
+    
+    do {
+        // Check if this slot is free
+        if a & __allocated_slots == 0 {
+            // Found free slot - allocate it
+            a |= __allocated_slots;
+            __allocated_slots = a;
+            a = x;  // Return slot number
+            return a;
+        }
+        
+        // Try next slot
+        a <<= 1;
+        x++;
+    } while x < N_SLOTS;
+    
+    // No slots available
+    a = NO_SLOT;
+    return a;
+}
+
+
+// Free a VRAM slot when entity is despawned
+// slot: slot number to free
+// Note: Slot 0 (player) cannot be freed
+// DB = any
+#[mem8, idx8]
+func free_slot(slot : u8 in a) {
+    // Don't free reserved slots
+    if a < N_RESERVED_SLOTS {
+        return;
+    }
+    
+    // Don't free invalid slot numbers
+    if a >= N_SLOTS {
+        return;
+    }
+    
+    // Create mask for this slot
+    x = a;
+    a = 1;
+    if x != 0 {
+        do {
+            a <<= 1;
+            x--;
+        } while !zero;
+    }
+    // a = 1 << slot
+    
+    // Clear the bit (free the slot)
+    a ^= 0xFF;  // Invert to create AND mask
+    a &= __allocated_slots;
+    __allocated_slots = a;
+}
+
+
+// Get VRAM word offset for a slot
+// slot: slot number (0-N_SLOTS-1)
+// Returns: aa = VRAM word offset
+// DB = any
+#[mem16]
+inline func get_vram_offset(slot : u8 in a) : u16 in aa {
+    // offset = slot * TILES_PER_SLOT * VRAM_WORDS_PER_TILE
+    // = slot * 80 * 16 = slot * 1280 = slot * 0x0500
+    aa = a as u16;
+    aa *= VRAM_OFFSET_PER_SLOT as u16;
+    return aa;
+}
+
+
+// Get first tile ID for a slot (for OAM char attribute)
+// slot: slot number (0-N_SLOTS-1)
+// Returns: a = first tile ID
+// DB = any
+#[mem8]
+inline func get_first_tile_id(slot : u8 in a) : u8 in a {
+    // first_tile = slot * TILES_PER_SLOT = slot * 80
+    x = a;
+    a = 0;
+    if x != 0 {
+        do {
+            a += TILES_PER_SLOT;
+            x--;
+        } while !zero;
+    }
+    return a;
+}
+
+
+// Check if any dynamic slots are available
+// Returns: carry = true if at least one slot is free
+// DB = any
+#[mem8]
+inline func has_free_slot() : bool in carry {
+    // Check if any non-reserved slot bits are clear
+    a = __allocated_slots;
+    
+    // Mask to check only non-reserved slots
+    // For N_SLOTS=3, N_RESERVED=2: only check bit 2
+    // Mask = (1 << N_SLOTS) - 1 - ((1 << N_RESERVED) - 1)
+    //      = 0b111 - 0b011 = 0b100
+    let AVAILABLE_SLOTS_MASK = ((1 << N_SLOTS) - 1) - ((1 << N_RESERVED_SLOTS) - 1);
+    
+    a &= AVAILABLE_SLOTS_MASK;
+    if a != AVAILABLE_SLOTS_MASK {
+        // At least one slot is free
+        carry = true;
+    } else {
+        // All slots allocated
+        carry = false;
+    }
+}
+
+
+}
+
+}

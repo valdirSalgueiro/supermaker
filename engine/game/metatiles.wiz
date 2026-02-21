@@ -1,0 +1,141 @@
+// 16x16 Native Tile System
+// =========================
+// Uses SNES hardware 16x16 BG character mode for efficient tile handling.
+// Provides tileset loading and tile property lookups.
+//
+// Map drawing is handled by map_system.wiz for unified single-screen and scrolling support.
+//
+// In 16x16 mode, each tilemap entry references a 2x2 group of 8x8 tiles:
+//   - Tile ID N displays tiles N, N+1, N+16, N+17
+//   - Tiles must be arranged in VRAM with 16-tile-wide rows
+//
+// Copyright (c) 2024
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+import "../registers";
+
+import "room";
+import "../vram-map";
+import "../wait-frame";
+import "../resources/dma";
+import "../resources/resources";
+
+import "../entity_api";
+
+
+namespace metatiles {
+
+let TILE_SIZE = 16;
+
+// Screen dimensions (16x14 tiles = 256x224 pixels)
+let SCREEN_WIDTH_TILES = 16;
+let SCREEN_HEIGHT_TILES = 14;
+
+let MAP_WIDTH_PIXELS = SCREEN_WIDTH_TILES * TILE_SIZE;
+let MAP_HEIGHT_PIXELS = SCREEN_HEIGHT_TILES * TILE_SIZE;
+
+
+// Tile property bits
+let TILE_PROPERTY_SOLID_BIT              = 7;
+let TILE_PROPERTY_HOLE_BIT               = 6;
+let TILE_PROPERTY_LOCKED_DOOR_BIT        = 5;
+let TILE_PROPERTY_ROTATE_CLOCKWISE_BIT   = 4;
+let TILE_PROPERTY_BREAKABLE_BIT          = 3;
+let TILE_PROPERTY_INTERACTIVE_TILES_MASK = 0b00000111;
+
+
+// Tileset16 resource RAM data format.
+//
+// Simpler than metatiles - each tile ID maps directly to one tilemap entry.
+// The PPU handles the 2x2 tile grouping in hardware.
+//
+// PPU data format: 4bpp tiles arranged in 16-tile-wide rows
+struct _Tileset16 {
+    // Tilemap entry for each tile (low byte of tile ID + attributes)
+    // In 16x16 mode, tile IDs are spaced by 2 (every other column)
+    tilemap_low  : [u8 ; 256],
+    tilemap_high : [u8 ; 256],
+
+    // Tile properties for each tile
+    // (`TILE_PROPERTY_*_BIT` bitfield for each tile)
+    properties : [u8 ; 256],
+    
+    // Unlocked door tile ID lookup (0xFF = no unlocked tile configured)
+    unlockedDoorTileId : [u8 ; 256],
+};
+
+
+// Collision direction
+enum CollisionDirection : u8 {
+    DOWN    = 0,
+    UP      = 2,
+    RIGHT   = 4,
+    LEFT    = 6,
+};
+let CollisionDirection_MASK = 0b110;
+let CollisionDirection_LEFT_RIGHT_BIT_TEST = 4;
+
+
+in wram7e {
+    // Tileset data
+    #[align(256)]
+    var __far_tileset16_data : _Tileset16;
+        var tileset @ &__far_tileset16_data : _Tileset16;
+}
+
+
+in code {
+
+
+// Load a 16x16 tileset into memory and the PPU
+//
+// REQUIRES: Force-Blank
+// Uses DMA channel 0
+//
+// NOTE: BGMODE must be set with BGMODE_SIZE_BG1 for 16x16 tile mode
+//
+// DB = 0x80
+#[mem8, idx16]
+func load_tileset__forceblank(tileset_id : u8 in a) {
+var _ppuData : resources.PpuData_Dma0 in resources.ppuData;
+
+    // Use uncompressed loader - tile data can be >32KB and shouldn't use compression flag
+    _ppuData = resources.load_resource__fixed_ram_and_uncompressed_ppu__forceblank_inline(
+        resources.ResourceType.mt_tileset,  // Reuse same resource type slot
+        a,
+        &tileset as *u8,
+        sizeof(typeof(tileset))
+    );
+
+    // Transfer tiles to VRAM
+    VMADD = xx = VRAM_MTSL_TILES_WADDR;
+    ^return resources.dma_remaining_to_vram__forceblank(_ppuData);
+}
+
+
+// Get tile property from tileset by tile ID
+//
+// Use map_system.get_tile_property() for position-based lookups
+//
+// DB = 0x7e
+#[mem8, idx8]
+func get_property_for_tile(tileId : u8 in y) : u8 in a {
+    a = tileset.properties[y];
+    return a;
+}
+
+
+// Stub: draw tile buffer is no longer used (map_system handles all drawing)
+// This is called by wait-frame.wiz so we keep an empty version
+//
+// DB = 0x80
+#[mem16, idx8]
+inline func process_draw_tile_buffer__vblank() {
+    // No-op: map_system handles tile drawing now
+}
+
+
+}
+}
+

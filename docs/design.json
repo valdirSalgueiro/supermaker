@@ -1,0 +1,138 @@
+{
+  "_comment": "SuperMaker 16 — Brand & Design Tokens",
+
+  "colors": {
+    "background": {
+      "base":    "#0f0f10",
+      "surface": "#1a1a1e",
+      "raised":  "#252528",
+      "overlay": "#2d2d32"
+    },
+    "border":    "#3a3a42",
+    "text": {
+      "primary": "#dcdcdc",
+      "muted":   "#888896"
+    },
+    "accent": {
+      "gold":       "#f0c040",
+      "goldDark":   "#c8962a",
+      "blue":       "#569cd6",
+      "blueDark":   "#264f78",
+      "blueLight":  "#7ec8e3",
+      "green":      "#4ec94e",
+      "red":        "#e05555"
+    },
+    "icon": {
+      "bandDark":   "#1e3a5c",
+      "bandLight":  "#264f78"
+    }
+  },
+
+  "typography": {
+    "display": {
+      "family":   "'Press Start 2P', monospace",
+      "weight":   900,
+      "usage":    "Headlines, logo, badges, nav"
+    },
+    "body": {
+      "family":   "'Inter', system-ui, sans-serif",
+      "weights":  [400, 500, 600],
+      "usage":    "Body copy, descriptions, UI labels"
+    },
+    "mono": {
+      "family":   "'Courier New', Courier, monospace",
+      "weight":   900,
+      "usage":    "Icon mark, pixel-art wordmark, code snippets"
+    },
+    "scale": {
+      "xs":   "8px",
+      "sm":   "11px",
+      "base": "13px",
+      "md":   "15px",
+      "lg":   "18px",
+      "xl":   "24px",
+      "2xl":  "32px",
+      "3xl":  "52px"
+    }
+  },
+
+  "spacing": {
+    "xs":  "4px",
+    "sm":  "8px",
+    "md":  "16px",
+    "lg":  "24px",
+    "xl":  "40px",
+    "2xl": "64px",
+    "3xl": "96px"
+  },
+
+  "borderRadius": {
+    "sm":   "2px",
+    "md":   "4px",
+    "lg":   "8px",
+    "icon": "20px"
+  },
+
+  "shadows": {
+    "pixel":   "4px 4px 0 <goldDark>",
+    "card":    "0 2px 12px rgba(0,0,0,0.4)",
+    "glow":    "0 0 12px rgba(240,192,64,0.3)"
+  },
+
+  "logo": {
+    "iconFile":   "docs/icon.svg",
+    "logoFile":   "docs/logo.svg",
+    "iconPng":    "editor/src/SuperMaker.App/Assets/icon.png",
+    "iconIco":    "editor/src/SuperMaker.App/Assets/icon.ico",
+    "iconGrid":   "12px cells on 256×256 canvas",
+    "palette": {
+      "bg":        "#1a1a1e",
+      "border":    "#f0c040",
+      "band":      "#1e3a5c / #264f78",
+      "smText":    "#7ec8e3",
+      "digits":    "#f0c040",
+      "pins":      "#3a3a42"
+    },
+    "pixelArt": {
+      "digitFont": "hand-crafted 4×5 pixel grid",
+      "cellSize":  { "icon256": 12, "logo": 4 },
+      "glowFilter": "feGaussianBlur stdDeviation=3.5 with feMerge"
+    }
+  },
+
+  "components": {
+    "button": {
+      "primary":   { "bg": "#f0c040", "fg": "#000000", "shadow": "4px 4px 0 #c8962a", "font": "display" },
+      "secondary": { "bg": "transparent", "fg": "#569cd6", "border": "2px solid #569cd6", "font": "display" }
+    },
+    "card": {
+      "bg":      "#252528",
+      "border":  "1px solid #3a3a42",
+      "hover":   "border-color: #569cd6; translateY(-2px)"
+    },
+    "tag": {
+      "bg":     "#2d2d32",
+      "border": "1px solid #3a3a42",
+      "fg":     "#888896",
+      "font":   "display 8px"
+    },
+    "nav": {
+      "bg":         "rgba(15,15,16,0.92)",
+      "blur":       "backdrop-filter: blur(8px)",
+      "height":     "56px",
+      "borderBottom": "1px solid #3a3a42"
+    },
+    "featureCard": {
+      "accentLine": "linear-gradient(90deg, transparent, #f0c040, transparent) on hover"
+    }
+  },
+
+  "effects": {
+    "scanlines": "repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,0,0,0.08) 2px 4px)",
+    "heroGradient": [
+      "radial-gradient(ellipse 80% 60% at 60% 40%, rgba(86,156,214,0.07), transparent)",
+      "radial-gradient(ellipse 60% 50% at 20% 70%, rgba(240,192,64,0.05), transparent)"
+    ],
+    "scrollReveal": "opacity 0→1, translateY 24px→0, duration 0.5s ease"
+  }
+}

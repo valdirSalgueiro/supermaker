@@ -1,0 +1,168 @@
+{
+  "name": "Cody",
+  "palette": "Cody",
+  "firstTile": 0,
+  "endTile": 256,
+  "dynamic": true,
+  "framesets": [
+    {
+      "name": "Cody",
+      "source": "Cody.png",
+      "frameWidth": 128,
+      "frameHeight": 128,
+      "autoFlip": "h",
+      "frames": [
+        "frame0",
+        "frame1",
+        "frame2",
+        "frame3",
+        "frame4",
+        "frame5",
+        "frame6",
+        "frame7",
+        "frame8",
+        "frame9",
+        "frame10",
+        "frame11",
+        "frame12",
+        "frame13",
+        "frame14",
+        "frame15",
+        "frame16",
+        "frame17",
+        "frame18",
+        "frame19",
+        "frame20",
+        "frame21",
+        "frame22",
+        "frame23",
+        "frame24",
+        "frame25",
+        "frame26",
+        "frame27",
+        "frame28",
+        "frame29",
+        "frame30",
+        "frame31",
+        "frame32",
+        "frame33",
+        "frame34",
+        "frame35",
+        "frame36",
+        "frame37",
+        "frame38",
+        "frame39",
+        "frame40",
+        "frame41",
+        "frame42",
+        "frame43",
+        "frame44",
+        "frame45",
+        "frame46",
+        "frame47",
+        "frame48",
+        "frame49",
+        "frame50",
+        "frame51"
+      ],
+      "animations": {
+        "animation0": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame0",
+            "frame1",
+            "frame2",
+            "frame3",
+            "frame4",
+            "frame5",
+            "frame6",
+            "frame7",
+            "frame8",
+            "frame9",
+            "frame10",
+            "frame11",
+            "frame12"
+          ],
+          "loop": true
+        },
+        "animation1": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame13",
+            "frame14",
+            "frame15",
+            "frame16",
+            "frame17",
+            "frame18",
+            "frame19",
+            "frame20"
+          ],
+          "loop": true
+        },
+        "animation2": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame21",
+            "frame22",
+            "frame23",
+            "frame24",
+            "frame25",
+            "frame26",
+            "frame27",
+            "frame28",
+            "frame29"
+          ],
+          "loop": true
+        },
+        "animation3": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame30",
+            "frame31",
+            "frame32",
+            "frame33",
+            "frame34",
+            "frame35",
+            "frame36",
+            "frame37",
+            "frame38",
+            "frame39"
+          ],
+          "loop": true
+        },
+        "animation4": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame40",
+            "frame41",
+            "frame42",
+            "frame43",
+            "frame44",
+            "frame45"
+          ],
+          "loop": true
+        },
+        "animation5": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame46",
+            "frame47",
+            "frame48",
+            "frame49",
+            "frame50",
+            "frame51"
+          ],
+          "loop": true
+        }
+      },
+      "defaultLayout": "auto 0 0",
+      "order": 2
+    }
+  ]
+}

@@ -1,0 +1,2369 @@
+// Grunt AI - Shared AI Logic for Basic Enemies
+// =============================================
+// Arcade-style beat 'em up enemy behavior.
+// State machine driven by distance checks and timers.
+//
+// States:
+//   SPAWN_IN  → Initial spawn, walk onto screen
+//   APPROACH  → Move toward player
+//   ORBIT     → Circle around player at attack range
+//   COMMIT    → Preparing to attack (on deck)
+//   ATTACK    → Attack animation (startup → active → recovery)
+//   HITSTUN   → Hit by player, brief stagger
+//   KNOCKDOWN → Knocked to ground
+//   GETUP     → Rising from knockdown
+//
+// Uses entity SoA.var_* for state:
+//   var_0_l = aiState (GruntState enum)
+//   var_0_h = aiTimer (frames until state change) OR flank_direction (0=from_below, 1=from_above)
+//   var_1_l = facing direction (0=right, 1=left)
+//   var_1_h = y-lane offset (signed, for orbit wobble) OR flank_target_x_hi
+//   var_2_l = attack phase (0=startup, 1=active, 2=recovery) OR knockback magnitude OR flank_start_x_lo
+//   var_2_h = orbit reroll timer OR flank_start_x_hi
+//   var_3_l = animation variant index (ALWAYS - never overwrite!)
+//   var_3_h = death timer OR retreat hit threshold OR flank_target_x_lo
+//
+// DB = 0x7e (all functions)
+
+import "../memmap";
+
+import "engine/entity_api";
+import "engine/audio";
+import "engine/game/group-ai";
+import "engine/game/metasprites";
+import "engine/common/math";
+
+import "../player";
+import "../player-hitbox";
+import "../rng";
+import "engine/game/map-system";
+import "engine/entity_utils";
+
+import "grunt_anim";
+
+import "gen/entities";
+import "gen/enums";
+
+import "../hud";
+
+
+namespace grunt_ai {
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AI STATE MACHINE
+// ═══════════════════════════════════════════════════════════════════════════
+
+enum GruntState : u8 {
+    SPAWN_IN   = 0,  // Walking onto screen
+    APPROACH   = 1,  // Moving toward player
+    ORBIT      = 2,  // Circling at range
+    COMMIT     = 3,  // Committed to attack, waiting for slot
+    ATTACK     = 4,  // Executing attack
+    HITSTUN    = 5,  // Staggered from hit
+    KNOCKDOWN  = 6,  // On the ground
+    GETUP      = 7,  // Rising from ground
+    GRABBED    = 8,  // Being grabbed by player
+    RETREAT    = 9,  // Keeping distance, avoiding player
+    SHUFFLE    = 10, // Random movement at medium range
+    FLANK      = 11, // Circling around player to opposite side
+}
+
+// Attack phases (var_2_l)
+namespace AttackPhase {
+    let STARTUP  = 0;
+    let ACTIVE   = 1;
+    let RECOVERY = 2;
+}
+
+// Facing (var_1_l)
+namespace Facing {
+    let RIGHT = 0;
+    let LEFT  = 1;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AI PROFILE CONSTANTS (hardcoded for now, will be ROM tables later)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Movement speeds (whole pixels per frame, like player)
+// These are added directly to worldX/worldY each frame
+let APPROACH_SPEED_X  = 1 as u16;  // 1 px/frame horizontal
+let APPROACH_SPEED_Y  = 1 as u16;  // 1 px/frame vertical
+let ORBIT_SPEED       = 1 as u16;  // 1 px/frame orbit movement
+
+// Distance thresholds (pixels)
+let ORBIT_RADIUS      = 48;   // Distance to maintain from player
+let ATTACK_RANGE      = 28;   // Distance to initiate attack
+let RETREAT_DISTANCE  = 50;   // Keep at least this far from player in retreat mode
+let SHUFFLE_DISTANCE  = 35;   // Comfortable distance for shuffle state (between attack and retreat)
+let Y_LANE_TOLERANCE  = 4;    // How close Y must be to player Y
+let GRAB_AVOID_DIST   = 30;   // Back away if closer than this (avoid player grab)
+
+// Flank state distances
+let FLANK_SAFE_Y      = 24;   // Vertical distance from player (out of hit range) 
+let FLANK_PASS_X      = 48;   // How far past player X to go before completing flank
+let FLANK_COMPLETE_X  = 20;   // Horizontal spacing from player when flank completes
+
+// Timing (frames)
+let COMMIT_FRAMES     = 20;   // How long to wind up before attack
+let ATTACK_STARTUP    = 8;    // Frames before hitbox active
+let ATTACK_ACTIVE     = 6;    // Frames hitbox is active
+let ATTACK_RECOVERY   = 30;   // Punishable recovery frames
+let HITSTUN_FRAMES    = 20;   // Stagger duration
+let GRAB_STUN_FRAMES  = 15;   // Stun duration when kicked while grabbed
+let KNOCKDOWN_FRAMES  = 45;   // Time on ground
+let GETUP_FRAMES      = 60;   // Rising animation
+let ORBIT_REROLL      = 60;   // Frames between orbit offset changes
+let KNOCKBACK_SPEED   = 10;    // Initial death knockback speed (pixels/frame, decays by 1 each frame)
+let DEATH_DURATION    = 60;    // Frames to show death animation before removal
+let APPROACH_TIMEOUT  = 240;   // Max frames to chase player before giving up (4 seconds)
+let SHUFFLE_DURATION_MIN = 60;  // Min frames to shuffle (1 second)
+let SHUFFLE_DURATION_MAX = 180; // Max frames to shuffle (3 seconds)
+let SHUFFLE_CHANGE_DIR = 30;   // Frames between shuffle direction changes
+
+// Retreat behavior parameters
+let RETREAT_DURATION_MIN = 180;   // Minimum frames to stay in retreat (3 seconds)
+let RETREAT_DURATION_MAX = 600;   // Maximum frames to stay in retreat (10 seconds)
+let RETREAT_CHANCE       = 40;    // Percentage chance (0-100) to retreat after hit
+
+// Attack damage dealt to player (bit 7 = knockdown flag)
+let GRUNT_ATTACK_DAMAGE = 10;           // Normal punch damage
+let GRUNT_ATTACK_DAMAGE_KD = 0x8A;      // Heavy attack with knockdown (10 + 0x80)
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TEMPORARY VARIABLES (zeropage)
+// ═══════════════════════════════════════════════════════════════════════════
+
+in zeropage {
+    var _tempDx : u8;  // Signed distance to player X (clamped to -127..+127, stored as u8)
+    var _tempDy : u8;  // Signed distance to player Y (clamped to -127..+127, stored as u8)
+    var _tempAbsDx : u8;  // Absolute distance X (clamped to 255 max)
+    var _tempAbsDy : u8;  // Absolute distance Y
+    var _tempBoundsOffset : u16;  // Temporary for bounds center offset (16-bit for zero extend)
+    var _tempEntityCenterX : u16;  // Entity center X (16-bit for accuracy)
+    var _tempPlayerCenterX : u16;  // Player center X (16-bit for accuracy)
+    var _tempDx16 : u16;  // Full 16-bit signed distance X (stored as u16, interpreted as i16)
+
+    // Per-entity AI profile value cached per-frame
+    var _hunchThreshold : u8;  // Distance threshold for hunch posture (from AI profile)
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN PROCESS FUNCTION
+// ═══════════════════════════════════════════════════════════════════════════
+
+in code {
+
+// Load per-entity AI profile values into zero-page cache.
+// Currently only loads hunch_threshold; Phase 2 will load all profile values.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func _load_ai_profile_values(entityId : u8 in y) {
+    // Get EntityTypes index from entityTypeIndex (mask off is_enemy bit 7)
+    a = entities.SoA.entityTypeIndex[unaligned y];
+    a &= 0x7F;
+    x = a;
+
+    // Load bank byte for AI profile
+    a = entity_data.ai_profile_banks[x];
+    zpTmp_byte_0 = a;  // Save bank byte
+
+    // Load pointer for AI profile from separate lo/hi byte tables
+    a = entities.SoA.entityTypeIndex[unaligned y];
+    a &= 0x7F;
+    x = a;
+
+    push8(y);
+    // Build 16-bit pointer by writing lo/hi bytes directly
+    a = entity_data.ai_profile_ptrs_lo[x];
+    (&<:zpTmp_word_0 as *u8)[0] = a;
+    a = entity_data.ai_profile_ptrs_hi[x];
+    (&>:zpTmp_word_0 as *u8)[0] = a;
+    y = pop8();
+
+    // Set up far pointer to AI profile
+    (&<:zpTmp_farPtr as *u8)[0] = a = <:zpTmp_word_0;
+    (&<:zpTmp_farPtr as *u8)[1] = a = >:zpTmp_word_0;
+    (&<:zpTmp_farPtr as *u8)[2] = a = zpTmp_byte_0;  // Bank from earlier
+
+    // Read hunch_threshold using far pointer
+    push8(y);
+    // Store offset in zpTmp_word_1 (zero-extended)
+    x = entity_data.AiField.HUNCH_THRESHOLD;
+    a = x & 0xFF;
+    (&<:zpTmp_word_1 as *u8)[0] = a;
+    (&>:zpTmp_word_1 as *u8)[0] = a = 0;
+    {
+    var _profilePtr : far *u8 in zpTmp_farPtr;
+        mem16();
+        idx16();
+        #[mem16, idx16] {
+            yy = zpTmp_word_1;
+            mem8();
+            #[mem8, idx16] {
+                a = _profilePtr[yy];
+            }
+            mem16();
+        }
+        mem8();
+        idx8();
+    }
+    _hunchThreshold = a;
+    y = pop8();
+}
+
+// Process grunt AI for one frame
+// Called from entity's process() function
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process(entityId : u8 in y) {
+    // Dead entities: apply knockback slide if active, decrement death timer, then skip AI
+    a = entities.SoA.health[unaligned y];
+    if zero {
+        // Decrement death timer (var_3_h) - entityloop removes entity when this reaches 0
+        a = entities.SoA.var_3_h[unaligned y];
+        if !zero {
+            a--;
+            entities.SoA.var_3_h[unaligned y] = a;
+        }
+
+        a = entities.SoA.var_2_l[unaligned y];  // knockback magnitude
+        if !zero {
+            // Zero-extend magnitude to 16-bit temp for worldX update
+            <:_tempBoundsOffset = a;
+            >:_tempBoundsOffset = 0;
+
+            // Slide away from player: LEFT facing → +X, RIGHT facing → -X
+            a = entities.SoA.var_1_l[unaligned y];
+            if a == Facing.LEFT {
+                mem16();
+                #[mem16] {
+                    aa = entities.SoA.worldX[unaligned y];
+                    carry = false;
+                    aa +#= _tempBoundsOffset;
+                    entities.SoA.worldX[unaligned y] = aa;
+                }
+                mem8();
+            } else {
+                mem16();
+                #[mem16] {
+                    aa = entities.SoA.worldX[unaligned y];
+                    carry = true;
+                    aa -#= _tempBoundsOffset;
+                    entities.SoA.worldX[unaligned y] = aa;
+                }
+                mem8();
+            }
+
+            // Decay knockback by 1 pixel/frame
+            a = entities.SoA.var_2_l[unaligned y];
+            a--;
+            entities.SoA.var_2_l[unaligned y] = a;
+        }
+        return;
+    }
+
+    // Compute distance to player once per frame
+    _compute_distance_to_player(y);
+
+    // Load per-entity AI profile values needed this frame
+    _load_ai_profile_values(y);
+    
+    // Dispatch to current state handler
+    // State is 0-7, multiply by 2 for function pointer table index
+    a = entities.SoA.var_0_l[unaligned y];  // aiState
+    a <<= 1;  // * 2 for function pointer size
+    x = a;
+    return state_handlers[unaligned x](y);
+}
+
+const state_handlers : [func(entityId : u8 in y) ; 12] = [
+    state_spawn_in,     // 0 = SPAWN_IN
+    state_approach,     // 1 = APPROACH
+    state_orbit,        // 2 = ORBIT
+    state_commit,       // 3 = COMMIT
+    state_attack,       // 4 = ATTACK
+    state_hitstun,      // 5 = HITSTUN
+    state_knockdown,    // 6 = KNOCKDOWN
+    state_getup,        // 7 = GETUP
+    state_grabbed,      // 8 = GRABBED
+    state_retreat,      // 9 = RETREAT
+    state_shuffle,      // 10 = SHUFFLE
+    state_flank,        // 11 = FLANK
+];
+
+
+// Compute signed and absolute distance to player (center to center)
+// Uses world position + bounds offset to get entity center
+// Uses 16-bit math to handle world positions > 256
+// Stores results in _tempDx, _tempAbsDx, _tempDy, _tempAbsDy
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _compute_distance_to_player(entityId : u8 in y) {
+    // Calculate entity center X = worldX + bounds_left + bounds_width/2 (16-bit)
+    // First, get bounds_left and bounds_width/2 and add them
+    a = entities.SoA.bounds_left[unaligned y];
+    _tempDx = a;  // Temp storage for bounds_left
+    a = entities.SoA.bounds_width[unaligned y];
+    a >>>= 1;  // width / 2
+    carry = false;
+    a +#= _tempDx;  // bounds_left + width/2 (bounds center offset)
+    // Zero-extend to 16-bit
+    <:_tempBoundsOffset = a;
+    >:_tempBoundsOffset = 0;
+    
+    // Now add to worldX (16-bit)
+    mem16();
+    #[mem16] {
+        aa = entities.SoA.worldX[unaligned y];
+        carry = false;
+        aa +#= _tempBoundsOffset;
+        _tempEntityCenterX = aa;
+    }
+    mem8();
+    
+    // Calculate player center X similarly
+    a = entities.SoA.bounds_left[0];
+    _tempDx = a;
+    a = entities.SoA.bounds_width[0];
+    a >>>= 1;
+    carry = false;
+    a +#= _tempDx;
+    <:_tempBoundsOffset = a;
+    >:_tempBoundsOffset = 0;
+    
+    mem16();
+    #[mem16] {
+        aa = entities.SoA.worldX[0];
+        carry = false;
+        aa +#= _tempBoundsOffset;
+        _tempPlayerCenterX = aa;
+        
+        // dx = playerCenterX - entityCenterX (16-bit signed, stored in u16)
+        carry = true;
+        aa -#= _tempEntityCenterX;
+        _tempDx16 = aa;  // Store full 16-bit difference
+    }
+    mem8();
+    
+    // Compute absolute value from 16-bit, clamp to 255 max
+    // Check sign bit (high byte bit 7)
+    a = >:_tempDx16;
+    if negative {
+        // Negative: negate 16-bit value to get absolute value
+        mem16();
+        #[mem16] {
+            aa = 0;
+            carry = true;
+            aa -#= _tempDx16;
+            // Now aa = abs(dx16) (positive)
+            // Check if high byte is non-zero (value > 255)
+            push16(aa);
+        }
+        mem8();
+        // Check high byte from stack
+        a = pop8();  // High byte
+        if !zero {
+            // High byte is non-zero, clamp absDx to 255, dx to -127
+            a = pop8();  // Discard low byte
+            _tempAbsDx = a = 255;
+            _tempDx = a = 0x81;  // -127 as signed
+        } else {
+            // Absolute value fits in 8 bits
+            a = pop8();  // Low byte is the abs value
+            _tempAbsDx = a;
+            // For signed dx: if abs >= 128, clamp to -127
+            if negative {
+                // Abs value is 128-255, clamp dx to -127
+                _tempDx = a = 0x81;  // -127
+            } else {
+                // Abs value is 0-127, negate for direction
+                a = negate8(a);
+                _tempDx = a;
+            }
+        }
+    } else {
+        // Positive or zero: high byte is 0x00..0x7F
+        a = >:_tempDx16;
+        if !zero {
+            // High byte is non-zero (1-127), clamp absDx to 255, dx to +127
+            _tempAbsDx = a = 255;
+            _tempDx = a = 127;
+        } else {
+            // High byte is zero - check if low byte fits in signed range
+            a = <:_tempDx16;
+            _tempAbsDx = a;  // Absolute value is the low byte
+            // For signed dx: if low byte >= 128, clamp to +127 (avoid negative interpretation)
+            if negative {
+                // Low byte has bit 7 set (128-255), would be negative as i8
+                _tempDx = a = 127;
+            } else {
+                // Low byte is 0-127, safe to store directly
+                _tempDx = a;
+            }
+        }
+    }
+    
+    // For Y, use simpler 8-bit math (Y range is smaller on beat-em-up walk plane)
+    // Calculate entity center Y = worldY_lo + bounds_top + bounds_height/2
+    a = entities.SoA.worldY_lo[unaligned y];
+    carry = false;
+    a +#= entities.SoA.bounds_top[unaligned y];
+    _tempDy = a;  // Temp storage
+    a = entities.SoA.bounds_height[unaligned y];
+    a >>>= 1;
+    carry = false;
+    a +#= _tempDy;
+    _tempDy = a;  // Entity center Y
+    
+    // Calculate player center Y
+    a = entities.SoA.worldY_lo[0];
+    carry = false;
+    a +#= entities.SoA.bounds_top[0];
+    _tempAbsDy = a;  // Temp storage
+    a = entities.SoA.bounds_height[0];
+    a >>>= 1;
+    carry = false;
+    a +#= _tempAbsDy;
+    // Now a = player center Y, _tempDy = entity center Y
+    
+    // dy = playerCenterY - entityCenterY
+    carry = true;
+    a -#= _tempDy;
+    _tempDy = a;
+    
+    // abs(dy) using negate8 if negative
+    if negative {
+        a = negate8(a);
+    }
+    _tempAbsDy = a;
+    
+    // NOTE: Facing update moved to _update_facing_toward_player()
+    // Only call it from states that should track the player (not during attack/hitstun/knockdown/getup)
+}
+
+
+// Update facing direction toward player based on _tempDx (computed by _compute_distance_to_player).
+// Only call this from states that should track the player.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _update_facing_toward_player(entityId : u8 in y) {
+    a = _tempDx;
+    if negative {
+        entities.SoA.var_1_l[unaligned y] = a = Facing.LEFT;
+    } else {
+        entities.SoA.var_1_l[unaligned y] = a = Facing.RIGHT;
+    }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STATE HANDLERS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// SPAWN_IN: Walk onto screen, then transition to APPROACH
+//
+// DB = 0x7e
+#[mem8, idx8]
+func state_spawn_in(entityId : u8 in y) {
+    a = entities.SoA.var_0_h[unaligned y];  // aiTimer
+    if !zero {
+        a--;
+        entities.SoA.var_0_h[unaligned y] = a;
+        
+        // Keep moving in initial direction
+        apply_spawn_movement(y);
+        return;
+    }
+    
+    // Timer expired - transition to APPROACH
+    set_state_approach(y);
+}
+
+
+// APPROACH: Move toward player until within orbit radius
+//
+// DB = 0x7e
+#[mem8, idx8]
+func state_approach(entityId : u8 in y) {
+    // Check if we're still in APPROACH (could have been hit before this runs)
+    a = entities.SoA.var_0_l[unaligned y];
+    if a != GruntState.APPROACH as u8 {
+        return;  // State changed, don't execute approach logic
+    }
+    
+    // Decrement timeout timer
+    a = entities.SoA.var_0_h[unaligned y];
+    if !zero {
+        a--;
+        entities.SoA.var_0_h[unaligned y] = a;
+    }
+    
+    // Check timeout - if timer expired, give up and shuffle
+    if zero {
+        set_state_shuffle(y);
+        return;
+    }
+    
+    // Track player (updates facing)
+    _update_facing_toward_player(y);
+    
+    // Calculate bounds edge gap between enemy and player
+    // Player bounds: player.x + bounds.left to player.x + bounds.left + bounds.width
+    // Enemy bounds: enemy.x + bounds.left to enemy.x + bounds.left + bounds.width
+    
+    mem16();
+    #[mem16] {
+        // Player center X
+        aa = entities.SoA.worldX[0];
+        zpTmp_word_0 = aa;
+        
+        // Enemy center X
+        aa = entities.SoA.worldX[unaligned y];
+        zpTmp_word_1 = aa;
+        
+        // Calculate distance: abs(enemy - player)
+        if aa >= zpTmp_word_0 {
+            // Enemy is to the right of player
+            aa -#= zpTmp_word_0;  // enemy - player
+            zpTmp_word_2 = aa;
+        } else {
+            // Enemy is to the left of player
+            aa = zpTmp_word_0;
+            aa -#= zpTmp_word_1;  // player - enemy
+            zpTmp_word_2 = aa;
+        }
+    }
+    mem8();
+    
+    // Now subtract bounds to get edge-to-edge gap
+    // Gap = center_distance - (player_bounds_width/2 + enemy_bounds_width/2)
+    // Simplified: center_distance - ((player_width + enemy_width) / 2)
+    
+    a = entities.SoA.bounds_width[0];  // Player width
+    a >>>= 1;  // Divide by 2
+    <:zpTmp_word_3 = a;
+    >:zpTmp_word_3 = 0;
+    
+    a = entities.SoA.bounds_width[unaligned y];  // Enemy width
+    a >>>= 1;  // Divide by 2
+    carry = false;
+    a +#= <:zpTmp_word_3;  // Add player half-width
+    <:zpTmp_word_3 = a;
+    
+    mem16();
+    #[mem16] {
+        aa = zpTmp_word_2;  // Center-to-center distance
+        carry = true;
+        aa -#= zpTmp_word_3;  // Subtract combined half-widths = edge gap
+        zpTmp_word_2 = aa;
+    }
+    mem8();
+    
+    // Check if gap is negative (high byte has sign bit set)
+    // If negative, they're overlapping - treat as within range
+    a = >:zpTmp_word_2;
+    if negative {
+        // Overlapping - treat as within attack range
+        // Fall through to Y alignment check
+    } else {
+        // Positive gap - check if within attack range
+        mem16();
+        #[mem16] {
+            aa = zpTmp_word_2;
+            if aa < ATTACK_RANGE as u16 {
+                // Within range - fall through to Y alignment check
+            } else {
+                // Too far - keep approaching
+                mem8();
+                move_toward_player_approach(y);
+                return;
+            }
+        }
+        mem8();
+    }
+    
+    // Good positioning - now check Y alignment
+    a = _tempAbsDy;
+    if a < Y_LANE_TOLERANCE {
+        // Y aligned - ready to attack
+        set_state_commit(y);
+        return;
+    } else {
+        // Not Y aligned - just align Y without moving forward
+        align_y_only(y);
+        return;
+    }
+}
+
+
+// ORBIT: Circle around player, looking for attack opportunity
+//
+// DB = 0x7e
+#[mem8, idx8]
+func state_orbit(entityId : u8 in y) {
+    // Check if we're still in ORBIT (could have been hit before this runs)
+    a = entities.SoA.var_0_l[unaligned y];
+    if a != GruntState.ORBIT as u8 {
+        return;  // State changed, don't execute orbit logic
+    }
+    
+    // Track player
+    _update_facing_toward_player(y);
+    
+    // Decrement orbit reroll timer
+    a = entities.SoA.var_2_h[unaligned y];
+    if !zero {
+        a--;
+        entities.SoA.var_2_h[unaligned y] = a;
+    } else {
+        // Reroll y-lane offset (simple pseudo-random)
+        a = entities.SoA.xPos_px[unaligned y];
+        a ^= entities.SoA.yPos_px[unaligned y];
+        a &= 0x1F;  // 0-31 range
+        carry = true;
+        a -#= 0x10; // -16 to +15 range
+        entities.SoA.var_1_h[unaligned y] = a;  // yLaneOffset
+        
+        entities.SoA.var_2_h[unaligned y] = a = ORBIT_REROLL;
+    }
+    
+    // Check if player moved away
+    a = _tempAbsDx;
+    if a >= ORBIT_RADIUS + 16 {
+        set_state_approach(y);
+        return;
+    }
+    
+    // Check Y alignment for attack
+    a = _tempAbsDy;
+    if a < Y_LANE_TOLERANCE {
+        // Check X distance for attack range
+        a = _tempAbsDx;
+        if a < ATTACK_RANGE + 8 {
+            // In range and aligned - try to commit
+            set_state_commit(y);
+            return;
+        }
+    }
+    
+    // Orbit movement - move to maintain distance and align Y
+    orbit_movement(y);
+}
+
+
+// COMMIT: Preparing to attack, waiting for attack slot
+//
+// DB = 0x7e
+#[mem8, idx8]
+func state_commit(entityId : u8 in y) {
+    // Check if we're still in COMMIT (could have been hit before this runs)
+    a = entities.SoA.var_0_l[unaligned y];
+    if a != GruntState.COMMIT as u8 {
+        return;  // State changed, don't execute commit logic
+    }
+    
+    // Track player while waiting for attack slot
+    _update_facing_toward_player(y);
+
+    // // Check if too close (in grab danger zone) - back away instead of committing
+    // a = _tempAbsDx;
+    // if a < GRAB_AVOID_DIST {
+    //     // Too close! Back away to orbit
+    //     set_state_orbit(y);
+    //     return;
+    // }
+
+    // Try to get attack slot
+    carry = group_ai.request_attack(y);
+    if carry {
+        // Got slot - start attack
+        set_state_attack(y);
+        return;
+    }
+
+    // No slot - decrement timer
+    a = entities.SoA.var_0_h[unaligned y];
+    if !zero {
+        a--;
+        entities.SoA.var_0_h[unaligned y] = a;
+
+        // Stand still while committed (telegraphed intent)
+        stop_movement(y);
+        return;
+    }
+
+    // Check if we got hit while waiting (state changed to HITSTUN/KNOCKDOWN)
+    a = entities.SoA.var_0_l[unaligned y];
+    if a != GruntState.COMMIT as u8 {
+        // State changed (hit by player) - don't override it
+        return;
+    }
+
+    // Timer expired without getting slot - back to orbit
+    set_state_orbit(y);
+}
+
+
+// ATTACK: Execute attack animation
+//
+// DB = 0x7e
+#[mem8, idx8]
+func state_attack(entityId : u8 in y) {
+    // Check if we're still in ATTACK (could have been hit before this runs)
+    a = entities.SoA.var_0_l[unaligned y];
+    if a != GruntState.ATTACK as u8 {
+        return;  // State changed, don't execute attack logic
+    }
+    
+    // Stop movement during attack
+    stop_movement(y);
+    
+    // Decrement timer
+    a = entities.SoA.var_0_h[unaligned y];
+    if !zero {
+        a--;
+        entities.SoA.var_0_h[unaligned y] = a;
+        return;
+    }
+    
+    // Timer expired - advance attack phase
+    x = entities.SoA.var_2_l[unaligned y];  // attackPhase
+    
+    if x == AttackPhase.STARTUP {
+        // Startup done - activate hitbox
+        entities.SoA.var_2_l[unaligned y] = a = AttackPhase.ACTIVE;
+        entities.SoA.var_0_h[unaligned y] = a = ATTACK_ACTIVE;
+        // TODO: Enable hitbox
+        return;
+    }
+    
+    if x == AttackPhase.ACTIVE {
+        // Active done - recovery (punishable)
+        entities.SoA.var_2_l[unaligned y] = a = AttackPhase.RECOVERY;
+        entities.SoA.var_0_h[unaligned y] = a = ATTACK_RECOVERY;
+        // TODO: Disable hitbox
+        return;
+    }
+    
+    // Recovery done - release slot and choose next action randomly
+    group_ai.release_attack(y);
+    
+    // Check if we got hit during recovery (state changed to HITSTUN/KNOCKDOWN)
+    a = entities.SoA.var_0_l[unaligned y];
+    if a != GruntState.ATTACK as u8 {
+        // State changed (hit by player) - don't override it
+        return;
+    }
+    
+    
+    // Roll random action: 30% RETREAT, 25% SHUFFLE, 25% FLANK, 20% APPROACH
+    
+    push8(y);
+    a = rng.random();
+    y = pop8();
+    
+    // 0-76 (30%) = RETREAT
+    if a < 77 {
+        set_state_retreat(y);
+        return;
+    }
+    
+    // 77-140 (25%) = SHUFFLE
+    carry = true;
+    a -#= 77;
+    if a < 64 {
+        set_state_shuffle(y);
+        return;
+    }
+    
+    // 141-204 (25%) = FLANK
+    carry = true;
+    a -#= 64;
+    if a < 64 {
+        set_state_flank(y);
+        return;
+    }
+    
+    // 205-255 (20%) = APPROACH (aggressive)
+    set_state_approach(y);
+}
+
+
+// HITSTUN: Staggered from player hit
+//
+// DB = 0x7e
+#[mem8, idx8]
+func state_hitstun(entityId : u8 in y) {
+    // Check if we're still in HITSTUN (could have been overridden before this runs)
+    a = entities.SoA.var_0_l[unaligned y];
+    if a != GruntState.HITSTUN as u8 {
+        return;  // State changed, don't execute hitstun logic
+    }
+    
+    // Stop movement
+    stop_movement(y);
+    
+    // Decrement timer
+    a = entities.SoA.var_0_h[unaligned y];
+    if !zero {
+        a--;
+        entities.SoA.var_0_h[unaligned y] = a;
+        return;
+    }
+    
+    // Timer expired - back to approach
+    set_state_approach(y);
+}
+
+
+// KNOCKDOWN: On the ground
+// Applies knockback slide if var_2_l (knockback magnitude) > 0
+//
+// DB = 0x7e
+#[mem8, idx8]
+func state_knockdown(entityId : u8 in y) {
+    // Apply knockback slide if active (var_2_l = magnitude)
+    a = entities.SoA.var_2_l[unaligned y];
+    if !zero {
+        // Zero-extend magnitude to 16-bit temp for worldX update
+        <:_tempBoundsOffset = a;
+        >:_tempBoundsOffset = 0;
+
+        // Slide away from attacker: LEFT facing → +X, RIGHT facing → -X
+        a = entities.SoA.var_1_l[unaligned y];
+        if a == Facing.LEFT {
+            mem16();
+            #[mem16] {
+                aa = entities.SoA.worldX[unaligned y];
+                carry = false;
+                aa +#= _tempBoundsOffset;
+                entities.SoA.worldX[unaligned y] = aa;
+            }
+            mem8();
+        } else {
+            mem16();
+            #[mem16] {
+                aa = entities.SoA.worldX[unaligned y];
+                carry = true;
+                aa -#= _tempBoundsOffset;
+                entities.SoA.worldX[unaligned y] = aa;
+            }
+            mem8();
+        }
+
+        // Decay knockback by 1 pixel/frame
+        a = entities.SoA.var_2_l[unaligned y];
+        a--;
+        entities.SoA.var_2_l[unaligned y] = a;
+    }
+
+    // No movement intent during knockdown
+    stop_movement(y);
+
+    // Decrement timer
+    a = entities.SoA.var_0_h[unaligned y];
+    if !zero {
+        a--;
+        entities.SoA.var_0_h[unaligned y] = a;
+        return;
+    }
+
+    // Timer expired - start getting up (only if alive)
+    a = entities.SoA.health[unaligned y];
+    if zero { return; }  // Dead - stay in knockdown until removed
+
+    entities.SoA.var_0_l[unaligned y] = a = GruntState.GETUP as u8;
+    entities.SoA.var_0_h[unaligned y] = a = GETUP_FRAMES;
+}
+
+
+// GETUP: Rising from ground
+//
+// DB = 0x7e
+#[mem8, idx8]
+func state_getup(entityId : u8 in y) {
+    // Stop movement
+    stop_movement(y);
+
+    // Decrement timer
+    a = entities.SoA.var_0_h[unaligned y];
+    if !zero {
+        a--;
+        entities.SoA.var_0_h[unaligned y] = a;
+        return;
+    }
+
+    // Timer expired - back to approach
+    set_state_approach(y);
+}
+
+
+// GRABBED: Being grabbed by player
+// Enemy is locked in place until released by player.
+// No AI processing, just wait for release.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func state_grabbed(entityId : u8 in y) {
+    // Stop all movement - enemy is locked in grab
+    stop_movement(y);
+
+    // Decrement stun timer if active (used for hurt animation after kick)
+    a = entities.SoA.var_0_h[unaligned y];
+    if !zero {
+        a--;
+        entities.SoA.var_0_h[unaligned y] = a;
+        if zero {
+            // Stun finished - clear variant so IDLE animation plays correctly
+            grunt_anim.clear_variant(y);
+        }
+    }
+
+    // Player controls when grab ends - no other processing
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STATE TRANSITION HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_state_approach(entityId : u8 in y) {
+    entities.SoA.var_0_l[unaligned y] = a = GruntState.APPROACH as u8;
+    entities.SoA.var_0_h[unaligned y] = a = APPROACH_TIMEOUT;  // Set timeout timer
+
+    // Clear variant index (approach uses walk/hunch with no variants)
+    grunt_anim.clear_variant(y);
+}
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_state_orbit(entityId : u8 in y) {
+    entities.SoA.var_0_l[unaligned y] = a = GruntState.ORBIT as u8;
+    entities.SoA.var_0_h[unaligned y] = a = 0;
+    entities.SoA.var_2_h[unaligned y] = a = ORBIT_REROLL;  // Reset reroll timer
+
+    // Clear variant index (orbit uses hunch with no variants)
+    grunt_anim.clear_variant(y);
+}
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_state_commit(entityId : u8 in y) {
+    entities.SoA.var_0_l[unaligned y] = a = GruntState.COMMIT as u8;
+    entities.SoA.var_0_h[unaligned y] = a = COMMIT_FRAMES;
+
+    // Clear variant index (commit uses hunch with no variants)
+    grunt_anim.clear_variant(y);
+}
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_state_attack(entityId : u8 in y) {
+    entities.SoA.var_0_l[unaligned y] = a = GruntState.ATTACK as u8;
+    entities.SoA.var_0_h[unaligned y] = a = ATTACK_STARTUP;
+    entities.SoA.var_2_l[unaligned y] = a = AttackPhase.STARTUP;
+
+    // Lock random attack variant
+    a = grunt_anim.AnimRole.ATTACK;
+    grunt_anim.select_random_variant(y, a);
+}
+
+
+// Called externally when enemy is hit
+//
+// DB = 0x7e
+#[mem8, idx8]
+func on_hit(entityId : u8 in y, damage : u8 in a) {
+    // Notify HUD of combat interaction
+    push8(a);
+    hud.show_enemy_hud(y);
+    a = pop8();
+
+    // Save raw damage BEFORE release_attack clobbers A.
+    // Bit 7 = knockdown flag (set by caller), bits 0-6 = actual damage.
+    _tempDx = a;
+
+    // Release attack slot if we had it
+    group_ai.release_attack(y);
+
+    // Check knockdown flag BEFORE masking it off
+    a = _tempDx;
+    _tempDy = a;  // Save full damage byte for knockdown check later
+
+    // Mask off KD flag to get actual damage
+    a &= 0x7F;
+    _tempDx = a;                              // _tempDx = actual damage only
+
+    // Subtract damage from health
+    a = entities.SoA.health[unaligned y];
+    carry = true;
+    a -#= _tempDx;
+    if !carry || zero {
+        // Dead — set state to KNOCKDOWN so death animation plays via update_animation
+        entities.SoA.health[unaligned y] = a = 0;
+        entities.SoA.var_0_l[unaligned y] = a = GruntState.KNOCKDOWN as u8;
+        entities.SoA.var_0_h[unaligned y] = a = KNOCKDOWN_FRAMES;
+        entities.SoA.var_2_l[unaligned y] = a = KNOCKBACK_SPEED;  // Start knockback slide
+        entities.SoA.var_3_h[unaligned y] = a = DEATH_DURATION;   // Death timer for removal
+        grunt_anim.clear_variant(y);
+        
+        // Clear movement intent and velocity
+        mem16();
+        #[mem16] {
+            group_ai.intent.desiredVelX[unaligned y] = aa = 0;
+            group_ai.intent.desiredVelY[unaligned y] = aa = 0;
+            entities.SoA.xVelocity[unaligned y] = aa = 0;
+            entities.SoA.yVelocity[unaligned y] = aa = 0;
+        }
+        mem8();
+        group_ai.intent.priority[unaligned y] = a = 0;
+        
+        // Play death sound effect
+        audio.queue_sound_effect(sound_effects.enemy_poof);
+        return;
+    }
+    entities.SoA.health[unaligned y] = a;
+
+    // Check knockdown flag - if set, force knockdown state even though still alive
+    a = _tempDy;
+    if a & 0x80 != 0 {
+        // Knockdown flag set - force knockdown (enemy will recover after)
+        entities.SoA.var_0_l[unaligned y] = a = GruntState.KNOCKDOWN as u8;
+        entities.SoA.var_0_h[unaligned y] = a = KNOCKDOWN_FRAMES;
+        entities.SoA.var_2_l[unaligned y] = a = KNOCKBACK_SPEED;
+        grunt_anim.clear_variant(y);
+        
+        // Clear movement intent and velocity
+        mem16();
+        #[mem16] {
+            group_ai.intent.desiredVelX[unaligned y] = aa = 0;
+            group_ai.intent.desiredVelY[unaligned y] = aa = 0;
+            entities.SoA.xVelocity[unaligned y] = aa = 0;
+            entities.SoA.yVelocity[unaligned y] = aa = 0;
+        }
+        mem8();
+        group_ai.intent.priority[unaligned y] = a = 0;
+        return;
+    }
+
+    // Lock random hurt variant
+    a = grunt_anim.AnimRole.HURT;
+    grunt_anim.select_random_variant(y, a);
+
+    entities.SoA.var_0_l[unaligned y] = a = GruntState.HITSTUN as u8;
+    entities.SoA.var_0_h[unaligned y] = a = HITSTUN_FRAMES;
+    
+    mem16();
+    #[mem16] {
+        group_ai.intent.desiredVelX[unaligned y] = aa = 0;
+        group_ai.intent.desiredVelY[unaligned y] = aa = 0;
+        entities.SoA.xVelocity[unaligned y] = aa = 0;
+        entities.SoA.yVelocity[unaligned y] = aa = 0;
+    }
+    mem8();
+    group_ai.intent.priority[unaligned y] = a = 0;
+}
+
+
+// Called when enemy takes damage while grabbed (grab kick)
+// Deals damage but keeps enemy in GRABBED state (unless fatal)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func on_grab_hit(entityId : u8 in y, damage : u8 in a) {
+    // Notify HUD of combat interaction
+    push8(a);
+    hud.show_enemy_hud(y);
+    a = pop8();
+
+    // Subtract damage from health (no knockdown flag handling)
+    _tempDx = a;
+    a = entities.SoA.health[unaligned y];
+    carry = true;
+    a -#= _tempDx;
+    if !carry || zero {
+        // Dead - transition to KNOCKDOWN state so death animation plays
+        // Player will detect the state change and release grab
+        entities.SoA.health[unaligned y] = a = 0;
+        entities.SoA.var_0_l[unaligned y] = a = GruntState.KNOCKDOWN as u8;
+        entities.SoA.var_0_h[unaligned y] = a = KNOCKDOWN_FRAMES;
+        entities.SoA.var_2_l[unaligned y] = a = KNOCKBACK_SPEED;  // Start knockback slide
+        entities.SoA.var_3_h[unaligned y] = a = DEATH_DURATION;   // Death timer for removal
+        grunt_anim.clear_variant(y);
+        // Play death sound effect
+        audio.queue_sound_effect(sound_effects.enemy_poof);
+        return;
+    }
+    entities.SoA.health[unaligned y] = a;
+
+    // Set stun timer for hurt animation (will be decremented in state_grabbed)
+    entities.SoA.var_0_h[unaligned y] = a = GRAB_STUN_FRAMES;
+
+    // Lock random hurt variant
+    a = grunt_anim.AnimRole.HURT;
+    grunt_anim.select_random_variant(y, a);
+}
+
+
+// Called externally when enemy is knocked down
+//
+// DB = 0x7e
+#[mem8, idx8]
+func on_knockdown(entityId : u8 in y) {
+    // Release attack slot if we had it
+    group_ai.release_attack(y);
+
+    // Clear variant index (knockdown/recover have single animations)
+    grunt_anim.clear_variant(y);
+
+    entities.SoA.var_0_l[unaligned y] = a = GruntState.KNOCKDOWN as u8;
+    entities.SoA.var_0_h[unaligned y] = a = KNOCKDOWN_FRAMES;
+}
+
+
+// Called externally when enemy is grabbed by player
+//
+// DB = 0x7e
+#[mem8, idx8]
+func on_grabbed(entityId : u8 in y) {
+    // Release attack slot if we had it
+    group_ai.release_attack(y);
+
+    // Clear variant index
+    grunt_anim.clear_variant(y);
+
+    entities.SoA.var_0_l[unaligned y] = a = GruntState.GRABBED as u8;
+    entities.SoA.var_0_h[unaligned y] = a = 0;  // No timer - player controls duration
+}
+
+
+// Called externally when player releases grab (without knockdown)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func on_grab_released(entityId : u8 in y) {
+    // Return to approach state
+    set_state_approach(y);
+}
+
+
+// Set enemy to retreat mode - keeps distance from player
+// Public interface for external systems
+//
+// DB = 0x7e
+#[mem8, idx8]
+func set_state_retreat(entityId : u8 in y) {
+    entities.SoA.var_0_l[unaligned y] = a = GruntState.RETREAT as u8;
+    entities.SoA.var_0_h[unaligned y] = a = 0;  // No timer - stays in retreat until changed
+    grunt_anim.clear_variant(y);
+}
+
+
+// Check if enemy is in a state that can be grabbed
+// Returns carry SET if grabbable, CLEAR if not
+//
+// DB = 0x7e
+#[mem8, idx8]
+func is_grabbable(entityId : u8 in y) : bool in carry {
+    // Cannot grab dead enemies
+    a = entities.SoA.health[unaligned y];
+    if zero {
+        carry = false;
+        return carry;
+    }
+
+    // Can only grab enemies in certain states (not during knockdown/getup/grabbed/hitstun)
+    a = entities.SoA.var_0_l[unaligned y];
+    if a == GruntState.KNOCKDOWN as u8 {
+        carry = false;
+        return carry;
+    }
+    if a == GruntState.GETUP as u8 {
+        carry = false;
+        return carry;
+    }
+    if a == GruntState.GRABBED as u8 {
+        carry = false;
+        return carry;
+    }
+    if a == GruntState.HITSTUN as u8 {
+        carry = false;
+        return carry;
+    }
+
+    carry = true;
+    return carry;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MOVEMENT HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Move toward player using APPROACH speed
+//
+// DB = 0x7e
+#[mem8, idx8]
+func move_toward_player_approach(entityId : u8 in y) {
+    // Set X velocity based on dx sign
+    // Check sign in mem8, then switch to mem16 to write velocity
+    a = _tempDx;
+    if negative {
+        // Player is to the left - negative velocity
+        mem16();
+        #[mem16] {
+            aa = 0;
+            carry = true;
+            aa -#= APPROACH_SPEED_X;
+            group_ai.intent.desiredVelX[unaligned y] = aa;
+        }
+        mem8();
+    } else if !zero {
+        // Player is to the right - positive velocity
+        mem16();
+        #[mem16] {
+            aa = APPROACH_SPEED_X as u16;
+            group_ai.intent.desiredVelX[unaligned y] = aa;
+        }
+        mem8();
+    } else {
+        mem16();
+        #[mem16] {
+            group_ai.intent.desiredVelX[unaligned y] = aa = 0;
+        }
+        mem8();
+    }
+    
+    // Set Y velocity based on dy sign
+    a = _tempDy;
+    if negative {
+        // Player is above - negative velocity
+        mem16();
+        #[mem16] {
+            aa = 0;
+            carry = true;
+            aa -#= APPROACH_SPEED_Y;
+            group_ai.intent.desiredVelY[unaligned y] = aa;
+        }
+        mem8();
+    } else if !zero {
+        // Player is below - positive velocity
+        mem16();
+        #[mem16] {
+            aa = APPROACH_SPEED_Y as u16;
+            group_ai.intent.desiredVelY[unaligned y] = aa;
+        }
+        mem8();
+    } else {
+        mem16();
+        #[mem16] {
+            group_ai.intent.desiredVelY[unaligned y] = aa = 0;
+        }
+        mem8();
+    }
+    
+    // Set priority
+    group_ai.intent.priority[unaligned y] = a = group_ai.Priority.APPROACHING;
+}
+
+
+// Align Y only - stop X movement, just adjust Y to match player
+// Used when enemy is close enough in X but needs Y alignment
+//
+// DB = 0x7e
+#[mem8, idx8]
+func align_y_only(entityId : u8 in y) {
+    // Stop X movement
+    mem16();
+    #[mem16] {
+        group_ai.intent.desiredVelX[unaligned y] = aa = 0;
+    }
+    mem8();
+    
+    // Move Y toward player
+    a = _tempDy;
+    if negative {
+        // Player is above - move up (negative)
+        mem16();
+        #[mem16] {
+            aa = 0;
+            carry = true;
+            aa -#= APPROACH_SPEED_Y;
+            group_ai.intent.desiredVelY[unaligned y] = aa;
+        }
+        mem8();
+    } else if !zero {
+        // Player is below - move down (positive)
+        mem16();
+        #[mem16] {
+            aa = APPROACH_SPEED_Y as u16;
+            group_ai.intent.desiredVelY[unaligned y] = aa;
+        }
+        mem8();
+    } else {
+        // Already aligned
+        mem16();
+        #[mem16] {
+            group_ai.intent.desiredVelY[unaligned y] = aa = 0;
+        }
+        mem8();
+    }
+    
+    group_ai.intent.priority[unaligned y] = a = group_ai.Priority.APPROACHING;
+}
+
+
+// RETREAT: Keep distance from player, move away if too close
+// Maintains minimum safe distance (RETREAT_DISTANCE) from player
+// Timer in var_0_h counts down - returns to APPROACH when it reaches 0
+//
+// DB = 0x7e
+#[mem8, idx8]
+func state_retreat(entityId : u8 in y) {
+    // Check if we're still in RETREAT (could have been hit before this runs)
+    a = entities.SoA.var_0_l[unaligned y];
+    if a != GruntState.RETREAT as u8 {
+        return;  // State changed, don't execute retreat logic
+    }
+    
+    // Track player (updates facing)
+    _update_facing_toward_player(y);
+    
+    // Check timer - return to approach when time expires
+    a = entities.SoA.var_0_h[unaligned y];
+    if zero {
+        // Timer expired - return to approach
+        set_state_approach(y);
+        return;
+    }
+    // Decrement timer
+    a--;
+    entities.SoA.var_0_h[unaligned y] = a;
+    
+    // Calculate edge-to-edge gap (same as approach logic)
+    mem16();
+    #[mem16] {
+        // Player center X
+        aa = entities.SoA.worldX[0];
+        zpTmp_word_0 = aa;
+        
+        // Enemy center X
+        aa = entities.SoA.worldX[unaligned y];
+        zpTmp_word_1 = aa;
+        
+        // Calculate distance: abs(enemy - player)
+        if aa >= zpTmp_word_0 {
+            aa -#= zpTmp_word_0;  // enemy - player
+            zpTmp_word_2 = aa;
+        } else {
+            aa = zpTmp_word_0;
+            aa -#= zpTmp_word_1;  // player - enemy
+            zpTmp_word_2 = aa;
+        }
+    }
+    mem8();
+    
+    // Convert center distance to edge gap
+    a = entities.SoA.bounds_width[0];  // Player width
+    a >>>= 1;
+    <:zpTmp_word_3 = a;
+    >:zpTmp_word_3 = 0;
+    
+    a = entities.SoA.bounds_width[unaligned y];  // Enemy width
+    a >>>= 1;
+    carry = false;
+    a +#= <:zpTmp_word_3;
+    <:zpTmp_word_3 = a;
+    
+    mem16();
+    #[mem16] {
+        aa = zpTmp_word_2;  // Center distance
+        carry = true;
+        aa -#= zpTmp_word_3;  // Subtract combined half-widths = edge gap
+        zpTmp_word_2 = aa;
+        
+        // Check if player is too close
+        if aa < RETREAT_DISTANCE as u16 {
+            // Too close - move away from player
+            mem8();
+            move_away_from_player(y);
+            entity_utils.clamp_to_walk_plane(y);
+            return;
+        }
+    }
+    mem8();
+    
+    // Safe distance - just stand and track player
+    mem16();
+    #[mem16] {
+        group_ai.intent.desiredVelX[unaligned y] = aa = 0;
+        group_ai.intent.desiredVelY[unaligned y] = aa = 0;
+    }
+    mem8();
+    group_ai.intent.priority[unaligned y] = a = group_ai.Priority.APPROACHING;
+    entity_utils.clamp_to_walk_plane(y);
+}
+
+
+// Move away from player (opposite of move_toward_player)
+// Sets velocity to move in opposite direction
+//
+// DB = 0x7e
+#[mem8, idx8]
+func move_away_from_player(entityId : u8 in y) {
+    // Set X velocity - opposite of player direction
+    a = _tempDx;
+    if negative {
+        // Player is to the left - move right (positive velocity)
+        mem16();
+        #[mem16] {
+            aa = APPROACH_SPEED_X as u16;
+            group_ai.intent.desiredVelX[unaligned y] = aa;
+        }
+        mem8();
+    } else if !zero {
+        // Player is to the right - move left (negative velocity)
+        mem16();
+        #[mem16] {
+            aa = 0;
+            carry = true;
+            aa -#= APPROACH_SPEED_X;
+            group_ai.intent.desiredVelX[unaligned y] = aa;
+        }
+        mem8();
+    } else {
+        mem16();
+        #[mem16] {
+            group_ai.intent.desiredVelX[unaligned y] = aa = 0;
+        }
+        mem8();
+    }
+    
+    // Set Y velocity - opposite of player direction
+    a = _tempDy;
+    if negative {
+        // Player is above - move down (positive velocity)
+        mem16();
+        #[mem16] {
+            aa = APPROACH_SPEED_Y as u16;
+            group_ai.intent.desiredVelY[unaligned y] = aa;
+        }
+        mem8();
+    } else if !zero {
+        // Player is below - move up (negative velocity)
+        mem16();
+        #[mem16] {
+            aa = 0;
+            carry = true;
+            aa -#= APPROACH_SPEED_Y;
+            group_ai.intent.desiredVelY[unaligned y] = aa;
+        }
+        mem8();
+    } else {
+        mem16();
+        #[mem16] {
+            group_ai.intent.desiredVelY[unaligned y] = aa = 0;
+        }
+        mem8();
+    }
+    
+    group_ai.intent.priority[unaligned y] = a = group_ai.Priority.APPROACHING;
+}
+
+
+// Orbit around player (maintain distance, align Y, close in for attack)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func orbit_movement(entityId : u8 in y) {
+    // Determine X velocity based on distance
+    // Goal: Stay close but not too close, and gradually close in if Y is aligned
+
+    a = _tempAbsDx;
+
+    // Too close (within grab danger zone)? Back away to avoid player grab
+    if a < ATTACK_RANGE - 4 {
+        // Back away - opposite of dx direction
+        a = _tempDx;
+        if negative {
+            // dx negative (player left), move right (positive)
+            mem16();
+            #[mem16] {
+                aa = ORBIT_SPEED as u16;
+                group_ai.intent.desiredVelX[unaligned y] = aa;
+            }
+            mem8();
+        } else {
+            // dx positive (player right), move left (negative)
+            mem16();
+            #[mem16] {
+                aa = 0;
+                carry = true;
+                aa -#= ORBIT_SPEED;
+                group_ai.intent.desiredVelX[unaligned y] = aa;
+            }
+            mem8();
+        }
+    } else {
+        // Check if too far (absDx >= ATTACK_RANGE + 8 = 36)
+        // If so, move closer to get within attack range
+        a = _tempAbsDx;
+        if a >= ATTACK_RANGE + 8 {
+            // Move closer - same as dx direction
+            a = _tempDx;
+            if negative {
+                // Player is left - move left
+                mem16();
+                #[mem16] {
+                    aa = 0;
+                    carry = true;
+                    aa -#= ORBIT_SPEED;
+                    group_ai.intent.desiredVelX[unaligned y] = aa;
+                }
+                mem8();
+            } else {
+                // Player is right - move right
+                mem16();
+                #[mem16] {
+                    aa = ORBIT_SPEED as u16;
+                    group_ai.intent.desiredVelX[unaligned y] = aa;
+                }
+                mem8();
+            }
+        } else {
+            // In attack range (24-36 pixels) - hold position, wait for Y alignment
+            mem16();
+            #[mem16] {
+                group_ai.intent.desiredVelX[unaligned y] = aa = 0;
+            }
+            mem8();
+        }
+    }
+    
+    // Y: Align with player
+    a = _tempDy;
+    if negative {
+        mem16();
+        #[mem16] {
+            aa = 0;
+            carry = true;
+            aa -#= ORBIT_SPEED;
+            group_ai.intent.desiredVelY[unaligned y] = aa;
+        }
+        mem8();
+    } else if !zero {
+        mem16();
+        #[mem16] {
+            aa = ORBIT_SPEED as u16;
+            group_ai.intent.desiredVelY[unaligned y] = aa;
+        }
+        mem8();
+    } else {
+        mem16();
+        #[mem16] {
+            group_ai.intent.desiredVelY[unaligned y] = aa = 0;
+        }
+        mem8();
+    }
+    
+    group_ai.intent.priority[unaligned y] = a = group_ai.Priority.IDLE;
+}
+
+
+// Stop all movement
+//
+// DB = 0x7e
+#[mem8, idx8]
+func stop_movement(entityId : u8 in y) {
+    mem16();
+    #[mem16] {
+        group_ai.intent.desiredVelX[unaligned y] = aa = 0;
+        group_ai.intent.desiredVelY[unaligned y] = aa = 0;
+    }
+    mem8();
+    
+    group_ai.intent.priority[unaligned y] = a = group_ai.Priority.IDLE;
+}
+
+
+// Apply spawn-in movement (just walk in initial direction briefly)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func apply_spawn_movement(entityId : u8 in y) {
+    a = entities.SoA.var_1_l[unaligned y];  // facing
+    if a == Facing.LEFT {
+        mem16();
+        #[mem16] {
+            aa = 0;
+            carry = true;
+            aa -#= APPROACH_SPEED_X;
+            group_ai.intent.desiredVelX[unaligned y] = aa;
+            group_ai.intent.desiredVelY[unaligned y] = aa = 0;
+        }
+        mem8();
+    } else {
+        mem16();
+        #[mem16] {
+            aa = APPROACH_SPEED_X as u16;
+            group_ai.intent.desiredVelX[unaligned y] = aa;
+            group_ai.intent.desiredVelY[unaligned y] = aa = 0;
+        }
+        mem8();
+    }
+    
+    group_ai.intent.priority[unaligned y] = a = group_ai.Priority.APPROACHING;
+}
+
+
+// Helper: Clamp Y velocity to zero if entity is at ceiling or floor boundary
+// Prevents stuttering when trying to move vertically into boundaries
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _clamp_y_velocity_at_boundary(entityId : u8 in y) {
+    // Get ceiling and floor boundaries
+    a = map_system.mapCeilingY;
+    <:zpTmp_word_0 = a;
+    >:zpTmp_word_0 = 0;
+    
+    a = map_system.mapFloorY;
+    <:zpTmp_word_1 = a;
+    >:zpTmp_word_1 = 0;
+    
+    // Get entity bounds_top
+    a = entities.SoA.bounds_top[unaligned y];
+    <:zpTmp_word_2 = a;
+    >:zpTmp_word_2 = 0;
+    
+    // Get bounds_top + bounds_height for floor check
+    a = entities.SoA.bounds_top[unaligned y];
+    carry = false;
+    a +#= entities.SoA.bounds_height[unaligned y];
+    <:zpTmp_word_3 = a;
+    >:zpTmp_word_3 = 0;
+    
+    mem16();
+    #[mem16] {
+        // Check ceiling: aabbTop = worldY + bounds_top
+        aa = entities.SoA.worldY[unaligned y];
+        carry = false;
+        aa +#= zpTmp_word_2;
+        
+        carry = true;
+        aa -#= zpTmp_word_0;  // aabbTop - ceiling
+        if negative {
+            // At ceiling! Zero Y velocity to prevent downward movement
+            group_ai.intent.desiredVelY[unaligned y] = aa = 0;
+            mem8();
+            return;
+        }
+        
+        // Check floor: aabbBottom = worldY + bounds_top + bounds_height
+        aa = entities.SoA.worldY[unaligned y];
+        carry = false;
+        aa +#= zpTmp_word_3;
+        
+        if aa >= zpTmp_word_1 {
+            // At floor! Zero Y velocity to prevent upward movement
+            group_ai.intent.desiredVelY[unaligned y] = aa = 0;
+        }
+    }
+    mem8();
+}
+
+
+// SHUFFLE: Random movement at medium range
+// Moves in random directions for brief periods, maintaining roughly SHUFFLE_DISTANCE from player
+//
+// Uses var_2_h as direction change timer
+//
+// DB = 0x7e
+#[mem8, idx8]
+func state_shuffle(entityId : u8 in y) {
+    // Check if we're still in SHUFFLE
+    a = entities.SoA.var_0_l[unaligned y];
+    if a != GruntState.SHUFFLE as u8 {
+        return;
+    }
+    
+    // Track player (updates facing)
+    _update_facing_toward_player(y);
+    
+    // Decrement timer
+    a = entities.SoA.var_0_h[unaligned y];
+    if !zero {
+        a--;
+        entities.SoA.var_0_h[unaligned y] = a;
+    }
+    
+    // Check if timer expired - transition back to APPROACH
+    if zero {
+        set_state_approach(y);
+        return;
+    }
+    
+    // Check distance to player
+    mem16();
+    #[mem16] {
+        aa = entities.SoA.worldX[0];
+        zpTmp_word_0 = aa;
+        aa = entities.SoA.worldX[unaligned y];
+        zpTmp_word_1 = aa;
+        
+        if aa >= zpTmp_word_0 {
+            aa -#= zpTmp_word_0;
+            zpTmp_word_2 = aa;
+        } else {
+            aa = zpTmp_word_0;
+            aa -#= zpTmp_word_1;
+            zpTmp_word_2 = aa;
+        }
+    }
+    mem8();
+    
+    // Calculate edge gap
+    a = entities.SoA.bounds_width[0];
+    a >>>= 1;
+    <:zpTmp_word_3 = a;
+    >:zpTmp_word_3 = 0;
+    
+    a = entities.SoA.bounds_width[unaligned y];
+    a >>>= 1;
+    carry = false;
+    a +#= <:zpTmp_word_3;
+    <:zpTmp_word_3 = a;
+    
+    mem16();
+    #[mem16] {
+        aa = zpTmp_word_2;
+        carry = true;
+        aa -#= zpTmp_word_3;
+        zpTmp_word_2 = aa;
+    }
+    mem8();
+    
+    // Don't actively back away in shuffle - just do random movement
+    // The random directions will naturally create spacing over time
+    
+    // Check if we're at boundary FIRST - this takes priority over random direction changes
+    a = map_system.mapCeilingY;
+    <:zpTmp_word_0 = a;
+    >:zpTmp_word_0 = 0;
+    
+    a = map_system.mapFloorY;
+    <:zpTmp_word_1 = a;
+    >:zpTmp_word_1 = 0;
+    
+    a = entities.SoA.bounds_top[unaligned y];
+    <:zpTmp_word_2 = a;
+    >:zpTmp_word_2 = 0;
+    
+    a = entities.SoA.bounds_top[unaligned y];
+    carry = false;
+    a +#= entities.SoA.bounds_height[unaligned y];
+    <:zpTmp_word_3 = a;
+    >:zpTmp_word_3 = 0;
+    
+    mem16();
+    #[mem16] {
+        // Check ceiling: aabbTop = worldY + bounds_top
+        aa = entities.SoA.worldY[unaligned y];
+        carry = false;
+        aa +#= zpTmp_word_2;
+        
+        carry = true;
+        aa -#= zpTmp_word_0;  // aabbTop - ceiling
+        if negative {
+            // At ceiling! Force movement AWAY (DOWN)
+            mem8();
+            #[mem8] {
+                // Set dirBits to move DOWN only: bit 1=1 (DOWN), bit 3=1 (Y-move), bits 0,2=0 (no X)
+                entities.SoA.var_2_l[unaligned y] = a = 0x0A;  // 0b00001010 = DOWN-only
+                // Lock this for 15 frames to escape boundary - prevents random override
+                entities.SoA.var_2_h[unaligned y] = a = 15;
+            }
+            
+            // Skip to applying movement - don't do timer check or random pick
+            goto apply_direction;
+        }
+        
+        // Check floor: aabbBottom = worldY + bounds_top + bounds_height
+        aa = entities.SoA.worldY[unaligned y];
+        carry = false;
+        aa +#= zpTmp_word_3;
+        
+        if aa >= zpTmp_word_1 {
+            // At floor! Force movement AWAY (UP)
+            mem8();
+            #[mem8] {
+                // Set dirBits to move UP only: bit 1=0 (UP), bit 3=1 (Y-move), bits 0,2=0 (no X)
+                entities.SoA.var_2_l[unaligned y] = a = 0x08;  // 0b00001000 = UP-only
+                // Lock this for 15 frames to escape boundary - prevents random override
+                entities.SoA.var_2_h[unaligned y] = a = 15;
+            }
+            
+            // Skip to applying movement - don't do timer check or random pick
+            goto apply_direction;
+        }
+    }
+    mem8();
+    
+    // Not at boundary - do normal random movement logic
+    // Check direction change timer (var_2_h)
+    a = entities.SoA.var_2_h[unaligned y];
+    if !zero {
+        a--;
+        entities.SoA.var_2_h[unaligned y] = a;
+    } else {
+        // Timer expired - pick new random direction
+        // Reset timer
+        entities.SoA.var_2_h[unaligned y] = a = SHUFFLE_CHANGE_DIR;
+        
+        // Pick random direction bits: bit 0 = X direction, bit 1 = Y direction, bit 2 = X move, bit 3 = Y move
+        push8(y);
+        a = rng.random();
+        y = pop8();
+        entities.SoA.var_2_l[unaligned y] = a;  // Store random bits in var_2_l
+    }
+    
+    apply_direction:
+    
+    // Apply current direction from var_2_l
+    a = entities.SoA.var_2_l[unaligned y];
+    x = a;
+    
+    // Bit 2 = should move in X?
+    a = x;
+    a &= 0x04;
+    if !zero {
+        // Move in X
+        a = x;
+        a &= 0x01;  // Bit 0 = direction (0=left, 1=right)
+        if zero {
+            // Move left
+            mem16();
+            #[mem16] {
+                aa = 0;
+                carry = true;
+                aa -#= APPROACH_SPEED_X;
+                group_ai.intent.desiredVelX[unaligned y] = aa;
+            }
+            mem8();
+        } else {
+            // Move right
+            mem16();
+            #[mem16] {
+                aa = APPROACH_SPEED_X as u16;
+                group_ai.intent.desiredVelX[unaligned y] = aa;
+            }
+            mem8();
+        }
+    } else {
+        // Don't move in X
+        mem16();
+        #[mem16] {
+            group_ai.intent.desiredVelX[unaligned y] = aa = 0;
+        }
+        mem8();
+    }
+    
+    // Bit 3 = should move in Y?
+    a = x;
+    a &= 0x08;
+    if !zero {
+        // Move in Y
+        a = x;
+        a &= 0x02;  // Bit 1 = direction (0=up, 1=down)
+        if zero {
+            // Move up
+            mem16();
+            #[mem16] {
+                aa = 0;
+                carry = true;
+                aa -#= APPROACH_SPEED_Y;
+                group_ai.intent.desiredVelY[unaligned y] = aa;
+            }
+            mem8();
+        } else {
+            // Move down
+            mem16();
+            #[mem16] {
+                aa = APPROACH_SPEED_Y as u16;
+                group_ai.intent.desiredVelY[unaligned y] = aa;
+            }
+            mem8();
+        }
+    } else {
+        // Don't move in Y
+        mem16();
+        #[mem16] {
+            group_ai.intent.desiredVelY[unaligned y] = aa = 0;
+        }
+        mem8();
+    }
+    
+    group_ai.intent.priority[unaligned y] = a = group_ai.Priority.APPROACHING;
+    entity_utils.clamp_to_walk_plane(y);
+}
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_state_shuffle(entityId : u8 in y) {
+    entities.SoA.var_0_l[unaligned y] = a = GruntState.SHUFFLE as u8;
+    
+    // Random duration between SHUFFLE_DURATION_MIN and SHUFFLE_DURATION_MAX
+    push8(y);
+    a = rng.random();
+    y = pop8();
+    
+    // Map to range: min + (random % (max - min))
+    // For 60-180: range = 120, so mask to 0-127 and clamp to 120
+    a &= 0x7F;
+    carry = true;
+    a -#= 121;
+    if !carry {
+        a = 120;
+    } else {
+        a +#= 121;
+    }
+    carry = false;
+    a +#= SHUFFLE_DURATION_MIN;
+    entities.SoA.var_0_h[unaligned y] = a;
+    
+    // Initialize direction change timer to trigger immediate direction pick
+    entities.SoA.var_2_h[unaligned y] = a = 0;
+    
+    grunt_anim.clear_variant(y);
+}
+
+
+// FLANK: Circle around player to opposite side
+// Moves horizontally to pass player, while maintaining safe vertical distance
+// Determines flank direction based on player position relative to vertical midpoint
+//
+// DB = 0x7e
+#[mem8, idx8]
+// Flank State
+// Moves diagonally then horizontally to circle around player
+// Progressive movement: diagonal → horizontal → stop
+//
+// var_2 (lo/hi) = flank start X
+// var_3_l + var_1_h = flank target X  
+// var_3_h = flank direction (0=from below, 1=from above)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func state_flank(entityId : u8 in y) {
+    // Check if we're still in FLANK
+    a = entities.SoA.var_0_l[unaligned y];
+    if a != GruntState.FLANK as u8 {
+        return;
+    }
+    
+    // Track player (updates facing)
+    _update_facing_toward_player(y);
+    
+    // Load flank parameters
+    <:zpTmp_word_0 = a = entities.SoA.var_2_l[unaligned y];  // start X low
+    >:zpTmp_word_0 = a = entities.SoA.var_2_h[unaligned y];  // start X high
+    
+    <:zpTmp_word_1 = a = entities.SoA.var_3_h[unaligned y];  // target X low (NOT var_3_l - that's variant!)
+    >:zpTmp_word_1 = a = entities.SoA.var_1_h[unaligned y];  // target X high
+    
+    a = entities.SoA.var_0_h[unaligned y];  // flank direction (NOW USING var_0_h!)
+    push8(a);  // flank direction (0=below, 1=above) - keep this one on stack
+    
+    // Get player center Y for target calculation
+    a = entities.SoA.bounds_top[0];
+    <:zpTmp_word_3 = a;
+    >:zpTmp_word_3 = 0;
+    
+    a = entities.SoA.bounds_height[0];
+    <:zpTmp_word_4 = a;
+    >:zpTmp_word_4 = 0;
+    
+    // Get enemy bounds for center Y calculation later
+    a = entities.SoA.bounds_top[unaligned y];
+    <:zpTmp_word_6 = a;
+    >:zpTmp_word_6 = 0;
+    
+    a = entities.SoA.bounds_height[unaligned y];
+    <:zpTmp_word_7 = a;
+    >:zpTmp_word_7 = 0;
+    
+    mem16();
+    #[mem16] {
+        // Player center Y
+        aa = zpTmp_word_4;
+        aa >>>= 1;
+        carry = false;
+        aa +#= zpTmp_word_3;
+        zpTmp_word_3 = aa;
+        
+        aa = entities.SoA.worldY[0];
+        carry = false;
+        aa +#= zpTmp_word_3;
+        zpTmp_word_3 = aa;  // player center Y stored in zpTmp_word_3
+        
+        // Get enemy current X
+        aa = entities.SoA.worldX[unaligned y];
+        zpTmp_word_2 = aa;  // enemy X
+        
+        // Calculate total distance to travel
+        aa = zpTmp_word_1;  // target X
+        carry = true;
+        aa -#= zpTmp_word_0;  // target - start
+        zpTmp_word_4 = aa;  // total X distance (signed)
+        
+        // Check if reached target X
+        aa = zpTmp_word_2;  // enemy X
+        carry = true;
+        aa -#= zpTmp_word_1;  // enemy - target
+        
+        // Check if close enough (within 4 pixels)
+        if !negative {
+            // enemy >= target
+            if aa < 4 as u16 {
+                // Reached target
+                mem8();
+                #[mem8] {
+                    a = pop8();  // Clean stack
+                    set_state_approach(y);
+                }
+                return;
+            }
+        } else {
+            // enemy < target - get absolute distance
+            aa = zpTmp_word_1;
+            carry = true;
+            aa -#= zpTmp_word_2;
+            if aa < 4 as u16 {
+                // Reached target
+                mem8();
+                #[mem8] {
+                    a = pop8();  // Clean stack
+                    set_state_approach(y);
+                }
+                return;
+            }
+        }
+        
+        // Calculate horizontal progress: (current - start) / (target - start)
+        // If progress < 50%, move diagonally
+        // If progress >= 50%, move horizontally only
+        
+        aa = zpTmp_word_2;  // current X
+        carry = true;
+        aa -#= zpTmp_word_0;  // current - start
+        zpTmp_word_5 = aa;  // distance traveled
+        
+        // Check if we've traveled more than half the distance
+        // Multiply by 2 and compare to total distance
+        aa = zpTmp_word_5;
+        aa <<= 1;  // traveled * 2
+        
+        // Get absolute value of total distance for comparison
+        aa = zpTmp_word_4;
+        if negative {
+            aa = 0;
+            carry = true;
+            aa -#= zpTmp_word_4;
+        }
+        zpTmp_word_4 = aa;  // abs(total distance)
+        
+        aa = zpTmp_word_5;
+        aa <<= 1;
+        
+        // If traveled*2 >= total, we're past midpoint
+        if aa >= zpTmp_word_4 {
+            // Past midpoint - horizontal movement only
+            zpTmp_word_5 = aa = 1;  // Flag: horizontal only
+        } else {
+            // First half - diagonal movement
+            zpTmp_word_5 = aa = 0;  // Flag: diagonal
+        }
+    }
+    mem8();
+    
+    a = pop8();  // flank direction
+    push8(a);
+    
+    // Set velocities based on movement phase
+    <:zpTmp_word_0 = a = entities.SoA.var_2_l[unaligned y];  // start X low
+    >:zpTmp_word_0 = a = entities.SoA.var_2_h[unaligned y];  // start X high
+    
+    <:zpTmp_word_1 = a = entities.SoA.var_3_h[unaligned y];  // target X low (NOT var_3_l!)
+    >:zpTmp_word_1 = a = entities.SoA.var_1_h[unaligned y];  // target X high
+    
+    mem16();
+    #[mem16] {
+        // Set X velocity (always move toward target)
+        aa = entities.SoA.worldX[unaligned y];
+        if aa < zpTmp_word_1 {
+            // Move right
+            group_ai.intent.desiredVelX[unaligned y] = aa = APPROACH_SPEED_X;
+        } else {
+            // Move left
+            aa = 0;
+            carry = true;
+            aa -#= APPROACH_SPEED_X;
+            group_ai.intent.desiredVelX[unaligned y] = aa;
+        }
+        
+        // Set Y velocity based on phase
+        aa = zpTmp_word_5;  // movement phase flag
+        if zero {
+            // Diagonal phase - set Y velocity
+            aa = zpTmp_word_3;  // player center Y
+        }
+    }
+    mem8();
+    
+    a = pop8();  // flank direction
+    if zero {
+        // Flank from below (player above midpoint - pass below player)
+        
+        mem16();
+        #[mem16] {
+            // Calculate enemy center Y offset: bounds_top + bounds_height/2
+            aa = zpTmp_word_7;  // enemy bounds_height
+            aa >>>= 1;
+            carry = false;
+            aa +#= zpTmp_word_6;  // + enemy bounds_top
+            zpTmp_word_5 = aa;  // enemy center Y offset
+            
+            // Get enemy center Y
+            aa = entities.SoA.worldY[unaligned y];
+            carry = false;
+            aa +#= zpTmp_word_5;
+            zpTmp_word_4 = aa;  // enemy center Y
+            
+            // Target: player center Y + offset (go below player)
+            aa = zpTmp_word_3;  // player center Y
+            carry = false;
+            aa +#= 20 as u16;  // Pass 20 pixels below player
+            zpTmp_word_5 = aa;  // target Y
+            
+            // Compare enemy center Y to target
+            aa = zpTmp_word_4;  // enemy center Y
+            if aa < zpTmp_word_5 {  // target Y
+                // Enemy above target - move down
+                group_ai.intent.desiredVelY[unaligned y] = aa = APPROACH_SPEED_Y;
+            } else {
+                // Enemy at or below target - stop
+                group_ai.intent.desiredVelY[unaligned y] = aa = 0;
+            }
+        }
+        mem8();
+    } else {
+        // Flank from above (player below midpoint - pass above player)
+        
+        mem16();
+        #[mem16] {
+            // Calculate enemy center Y offset: bounds_top + bounds_height/2
+            aa = zpTmp_word_7;  // enemy bounds_height
+            aa >>>= 1;
+            carry = false;
+            aa +#= zpTmp_word_6;  // + enemy bounds_top
+            zpTmp_word_5 = aa;  // enemy center Y offset
+            
+            // Get enemy center Y
+            aa = entities.SoA.worldY[unaligned y];
+            carry = false;
+            aa +#= zpTmp_word_5;
+            zpTmp_word_4 = aa;  // enemy center Y
+            
+            // Target: player center Y - offset (go above player)
+            aa = zpTmp_word_3;  // player center Y
+            carry = true;
+            aa -#= 20 as u16;  // Pass 20 pixels above player
+            zpTmp_word_5 = aa;  // target Y
+            
+            // Compare enemy center Y to target
+            aa = zpTmp_word_4;  // enemy center Y
+            if aa >= zpTmp_word_5 {  // target Y
+                // Enemy below target - move up
+                aa = 0;
+                carry = true;
+                aa -#= APPROACH_SPEED_Y;
+                group_ai.intent.desiredVelY[unaligned y] = aa;
+            } else {
+                // Enemy at or above target - stop
+                group_ai.intent.desiredVelY[unaligned y] = aa = 0;
+            }
+        }
+        mem8();
+    }
+    
+    group_ai.intent.priority[unaligned y] = a = group_ai.Priority.APPROACHING;
+    entity_utils.clamp_to_walk_plane(y);
+}
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func set_state_flank(entityId : u8 in y) {
+    entities.SoA.var_0_l[unaligned y] = a = GruntState.FLANK as u8;
+    
+    // No timer - flank until reaching target position
+    entities.SoA.var_0_h[unaligned y] = a = 0;
+    
+    grunt_anim.clear_variant(y);
+    
+    // Store flank start position and calculate target
+    // Get player bounds_width
+    a = entities.SoA.bounds_width[0];
+    <:zpTmp_word_0 = a;
+    >:zpTmp_word_0 = 0;
+    
+    // Get enemy bounds_width
+    a = entities.SoA.bounds_width[unaligned y];
+    <:zpTmp_word_3 = a;
+    >:zpTmp_word_3 = 0;
+    
+    mem16();
+    #[mem16] {
+        // Player center X = worldX + bounds_width/2
+        aa = zpTmp_word_0;
+        aa >>>= 1;
+        zpTmp_word_1 = aa;
+        aa = entities.SoA.worldX[0];
+        carry = false;
+        aa +#= zpTmp_word_1;
+        zpTmp_word_2 = aa;  // player center X
+        
+        // Enemy start X = worldX + bounds_width/2
+        aa = zpTmp_word_3;
+        aa >>>= 1;
+        zpTmp_word_1 = aa;
+        aa = entities.SoA.worldX[unaligned y];
+        carry = false;
+        aa +#= zpTmp_word_1;
+        zpTmp_word_0 = aa;  // enemy start center X
+    }
+    mem8();
+    
+    // Store start X in var_2 (lo/hi)
+    a = <:zpTmp_word_0;
+    entities.SoA.var_2_l[unaligned y] = a;
+    a = >:zpTmp_word_0;
+    entities.SoA.var_2_h[unaligned y] = a;
+    
+    // Calculate target X (opposite side of player)
+    // First load enemy start X from var_2 (need mem8 for byte access)
+    <:zpTmp_word_3 = a = entities.SoA.var_2_l[unaligned y];
+    >:zpTmp_word_3 = a = entities.SoA.var_2_h[unaligned y];
+
+    // Load player bounds_width again (zpTmp_word_0 was overwritten by enemy start X)
+    a = entities.SoA.bounds_width[0];
+    <:zpTmp_word_4 = a;                                                                                                                                                                            
+    >:zpTmp_word_4 = 0;
+    
+    mem16();
+    #[mem16] {
+        // Calculate player half-width                                                                                                                                                             
+        aa = zpTmp_word_4;  // player bounds_width
+        aa >>>= 1;
+        zpTmp_word_1 = aa;  // player half-width
+        
+        // Load enemy start X
+        aa = zpTmp_word_3;  // enemy start X
+        
+        if aa < zpTmp_word_2 {  // if enemy X < player center X
+            // Enemy left of player - target = player RIGHT edge + FLANK_PASS_X
+            aa = zpTmp_word_2;  // player center X
+            carry = false;
+            aa +#= zpTmp_word_1;  // + player half-width = player right edge
+            carry = false;
+            aa +#= FLANK_PASS_X as u16;  // + overshoot distance
+        } else {
+            // Enemy right of player - target = player LEFT edge - FLANK_PASS_X
+            aa = zpTmp_word_2;  // player center X
+            carry = true;
+            aa -#= zpTmp_word_1;  // - player half-width = player left edge
+            carry = true;
+            aa -#= FLANK_PASS_X as u16;  // - overshoot distance
+        }
+        zpTmp_word_1 = aa;  // target X
+    }
+    mem8();
+    
+    // Store target X in var_3_h (low byte) and var_1_h (high byte)
+    // IMPORTANT: DO NOT use var_3_l - that's the animation variant!
+    a = <:zpTmp_word_1;
+    entities.SoA.var_3_h[unaligned y] = a;  // target X low byte
+    a = >:zpTmp_word_1;
+    entities.SoA.var_1_h[unaligned y] = a;  // target X high byte
+    
+    // Determine flank direction (above or below)
+    // Calculate midpoint
+    a = map_system.mapCeilingY;
+    <:zpTmp_word_0 = a;
+    >:zpTmp_word_0 = 0;
+    
+    a = map_system.mapFloorY;
+    <:zpTmp_word_2 = a;
+    >:zpTmp_word_2 = 0;
+    
+    a = entities.SoA.bounds_top[0];
+    <:zpTmp_word_3 = a;
+    >:zpTmp_word_3 = 0;
+    
+    a = entities.SoA.bounds_height[0];
+    <:zpTmp_word_4 = a;
+    >:zpTmp_word_4 = 0;
+    
+    mem16();
+    #[mem16] {
+        // midpoint = ceiling + (floor - ceiling) / 2
+        aa = zpTmp_word_2;
+        carry = true;
+        aa -#= zpTmp_word_0;
+        aa >>>= 1;
+        carry = false;
+        aa +#= zpTmp_word_0;
+        zpTmp_word_0 = aa;  // midpoint
+        
+        // player center Y
+        aa = zpTmp_word_4;
+        aa >>>= 1;
+        carry = false;
+        aa +#= zpTmp_word_3;
+        zpTmp_word_3 = aa;
+        
+        aa = entities.SoA.worldY[0];
+        carry = false;
+        aa +#= zpTmp_word_3;
+        zpTmp_word_3 = aa;  // player center Y
+        
+        // Compare to midpoint
+        aa = zpTmp_word_3;
+        if aa < zpTmp_word_0 {
+            // Player above midpoint - flank from below
+            aa = 0;
+        } else {
+            // Player below midpoint - flank from above
+            aa = 1;
+        }
+    }
+    mem8();
+    
+    // Store flank direction in var_1_l (NOT var_3_h - that's target X low byte!)
+    entities.SoA.var_0_h[unaligned y] = a;
+}
+
+
+}  // in code
+}  // namespace grunt_ai

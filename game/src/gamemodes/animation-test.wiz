@@ -1,0 +1,284 @@
+// Animation Test Gamemode
+// ========================
+//
+// A dedicated test screen for cycling through entity animations.
+// Black background, minimal setup, supports testing any entity.
+//
+// Controls:
+//   UP/DOWN = cycle animation ID
+//   B = toggle facing direction
+//   A = replay current animation
+//   START = exit to game loop
+//
+// To test different entities, change the entity configuration in setup().
+
+import "../memmap";
+
+import "engine/entity_api";
+import "engine/gamemodes";
+import "engine/wait-frame";
+import "engine/dma-queue";
+import "engine/registers";
+import "engine/vram-map";
+import "engine/resources/resources";
+
+import "engine/game/metasprites";
+import "engine/game/entityloop";
+
+import "../player";
+import "../joypad";
+
+import "gen/enums";
+import "gen/ms-drawing-functions";
+
+
+namespace gamemodes {
+namespace animation_test {
+
+
+// ═══════════════════════════════════════════════════════════════
+// TEST CONFIGURATION
+// ═══════════════════════════════════════════════════════════════
+
+// Current animation being tested
+in wram7e {
+    var currentAnimId : u8;
+    var prevButtonsH : u8;
+    var facingLeft : u8;
+}
+
+// Number of animations for the current entity (set in setup)
+// For player: 21 animations (0-20)
+let PLAYER_ANIM_COUNT = 21;
+let PLAYER_HFLIP_OFFSET = 22;
+
+
+in code {
+
+
+// ═══════════════════════════════════════════════════════════════
+// GAMEMODE ENTRY POINT
+// ═══════════════════════════════════════════════════════════════
+
+// Initialize and run the animation test screen
+//
+// DB = 0x7e
+#[mem8, idx8]
+func exec() {
+    setup();
+    
+    // Main loop
+    ^do {
+        // Reset DMA queue
+        idx16();
+        #[idx16] {
+            dma_queue.reset();
+        }
+        idx8();
+        
+        // Process input and update animation
+        process_input();
+        
+        // Process animation system for entity 0 (test entity)
+        metasprites.process_entity_animation(0);
+        
+        // Draw the single test entity
+        entityloop.draw_entities();
+        
+        wait_frame();
+        
+        negative = is_next_game_mode_unchanged();
+    } while negative;
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// SETUP - BLACK SCREEN + ENTITY
+// ═══════════════════════════════════════════════════════════════
+
+// Initialize the test screen with black background
+//
+// DB = 0x7e
+#[mem8, idx8]
+func setup() {
+    // Force blank during setup
+    *(far &INIDISP) = a = INIDISP_FORCE_BLANK;
+    
+    // Clear test state
+    currentAnimId = a = 0;
+    prevButtonsH = a = 0;
+    facingLeft = a = 0;
+    
+    // Clear CGRAM (all black palette)
+    idx16();
+    #[idx16] {
+        push16(0x7e80);
+        data_bank = pop8();
+    // DB = 0x80
+    
+        // Set CGRAM address to 0
+        CGADD = a = 0;
+        
+        // Write 512 bytes of 0 (256 colors * 2 bytes)
+        xx = 512;
+        do {
+            CGDATA = a = 0;
+            xx--;
+        } while !zero;
+        
+        // Clear VRAM (black tiles)
+        VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
+        VMADD = xx = 0;
+        
+        xx = 0x8000;  // 32KB words
+        do {
+            VMDATAL = a = 0;
+            VMDATAH = a = 0;
+            xx--;
+        } while !zero;
+        
+        data_bank = pop8();
+    // DB = 0x7e
+    }
+    mem8_idx8();
+    
+    // Setup PPU for sprites only
+    idx16();
+    #[idx16] {
+        push16(0x7e80);
+        data_bank = pop8();
+    // DB = 0x80
+    
+        // Setup metasprite system and load dungeon spritesheet
+        // (includes dynamic sprite palette slot for player)
+        metasprites.setup__forceblank();
+        metasprites.load_ms_spritesheet_ppu_data__forceblank(resources.ms_spritesheets.dungeon as u8);
+        
+        // Enable only sprites (no backgrounds)
+        TM = a = TM_OBJ;
+        
+        // Mode 1, but we only show sprites
+        BGMODE = a = BGMODE_MODE_1_BG3_PRIORITY;
+        
+        data_bank = pop8();
+    // DB = 0x7e
+    }
+    mem8_idx8();
+    
+    // Initialize entity system with just the test entity
+    entityloop.init__inline();
+    
+    // Setup player entity at center of screen
+    // Position: center screen (128, 160) - offset for sprite anchor
+    entities.SoA.xPos_px[0] = a = 128;
+    entities.SoA.xPos_sx[0] = a = 0;
+    entities.SoA.yPos_px[0] = a = 160;
+    entities.SoA.yPos_sx[0] = a = 0;
+    entities.SoA.zPos[0] = a = 0;
+    
+    // Initialize player metasprites
+    player.init_metasprites();
+    
+    // Set initial animation (IDLE)
+    a = 0;
+    metasprites.set_player_animation(a);
+    
+    // Entity 0 (player) is always active after init__inline
+    // numberOfActiveEntities is already set to 1
+    
+    // Enable screen (full brightness)
+    *(far &INIDISP) = a = 0x0f;
+    
+    // Stay in this gamemode
+    set_next_game_mode(GameModes.ANIMATION_TEST);
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// INPUT PROCESSING
+// ═══════════════════════════════════════════════════════════════
+
+// Process controller input for animation cycling
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process_input() {
+var _justPressed : u8 in zpTmp_byte_0;
+var _currentButtons : u8 in zpTmp_byte_1;
+
+    // Edge detection for high byte (D-pad, B, START)
+    _currentButtons = a = joypad.pressed_h;
+    a ^= prevButtonsH;           // Changed bits
+    a &= _currentButtons;        // Only newly pressed
+    _justPressed = a;
+    prevButtonsH = a = _currentButtons;
+    
+    // START = exit to game loop
+    a = _justPressed;
+    if a & joypad.JOYH.START != 0 {
+        // Trigger room transition to reload game properly
+        set_next_game_mode(GameModes.GAME_LOOP);
+        return;
+    }
+    
+    // UP = next animation
+    a = _justPressed;
+    if a & joypad.JOYH.UP != 0 {
+        a = currentAnimId;
+        a++;
+        if a >= PLAYER_ANIM_COUNT {
+            a = 0;
+        }
+        currentAnimId = a;
+        goto __play_animation;
+    }
+    
+    // DOWN = previous animation
+    a = _justPressed;
+    if a & joypad.JOYH.DOWN != 0 {
+        a = currentAnimId;
+        if zero {
+            a = PLAYER_ANIM_COUNT - 1;
+        } else {
+            a--;
+        }
+        currentAnimId = a;
+        goto __play_animation;
+    }
+    
+    // B = toggle facing
+    a = _justPressed;
+    if a & joypad.JOYH.B != 0 {
+        a = facingLeft;
+        a ^= 1;
+        facingLeft = a;
+        goto __play_animation;
+    }
+    
+    // A = replay animation (low byte)
+    a = joypad.pressed_l;
+    if a & joypad.JOYL.A != 0 {
+        // Only on fresh press
+        a = _justPressed;  // Reuse detection logic
+        if !zero {
+            goto __play_animation;
+        }
+    }
+    
+    return;
+    
+__play_animation:
+    // Calculate animation ID with facing offset
+    a = currentAnimId;
+    x = facingLeft;
+    if !zero {
+        a +#= PLAYER_HFLIP_OFFSET;
+    }
+    metasprites.set_player_animation(a);
+}
+
+
+}  // in code
+
+}  // namespace animation_test
+}  // namespace gamemodes

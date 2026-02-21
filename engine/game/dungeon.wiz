@@ -1,0 +1,593 @@
+// Copyright (c) 2024, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+import "../registers";
+import "../registers_math.wiz";
+
+import "../vram-map";
+import "../flags";
+
+import "room";
+import "camera";
+import "bg3-ui";
+import "spawn-regions";
+import "group-ai";
+
+import "gen/game-config";
+
+
+import "ms_palettes";
+import "metasprites";
+import "metatiles";
+import "entityloop";
+
+import "../resources/resources";
+import "../resources/palette";
+
+import "../entity_api";
+
+import "../textbox";
+import "../wait-frame";
+
+import "../common/reset";
+import "../gamemodes";
+
+import "src/engine-hooks";
+import "gen/enums";
+import "map-system";
+
+
+namespace dungeon {
+
+// Room to load data structure
+struct RoomToLoad {
+    dungeon: u8,
+    room_x: u8,
+    room_y: u8,
+
+    player_x_lo: u8,
+    player_x_hi: u8,
+    player_y_lo: u8,
+    player_y_hi: u8,
+    player_z: u8,
+
+    player_state: u8,
+    player_direction: u8,
+}
+
+in wram7e {
+    var __far_roomToLoad : RoomToLoad;
+        var roomToLoad @ &__far_roomToLoad : RoomToLoad;
+}
+
+
+namespace DungeonFlags {
+    let INFINITE_BIT = 7;
+}
+
+
+// Dungeon data stored in RAM
+struct _RamDataFormat {
+    flags: u8,
+
+    width: u8,
+    height: u8,
+
+    defaultRoom_x: u8,
+    defaultRoom_y: u8,
+
+    startingTile_x: u8,
+    startingTile_y: u8,
+
+    palette: resources.palettes,
+    tileset: u8,
+    secondLayer: u8,
+    msPalette: u8,
+    msSpritesheet: u8,
+
+    song: u8,
+}
+
+
+// The type of room to load when loading a dungeon.
+enum LoadDungeonRoomType : u8 {
+    ROOM_TO_LOAD,
+    DEFAULT_ROOM,
+    DUNGEON_ZERO_DEFAULT_ROOM,
+}
+
+let MAX_N_LOAD_ROOMS = 3;
+
+
+in lowram {
+    var _dungeonLoaded : u8 in __dungeonLoadedFlag__;
+    
+    // Flag indicating if a room is loaded
+    var _roomLoaded : u8;
+}
+
+
+in lowram_roomstate {
+    var __dungeonData : _RamDataFormat;
+        const dungeonData @ &__dungeonData : _RamDataFormat;
+
+    var _dungeonId : u8;
+}
+
+
+in lowram {
+    // The far-address of the room table in ROM.
+    var roomTable: far *u16;
+}
+
+in wram7e {
+    var __load_dungeon__roomTypeToLoad : LoadDungeonRoomType;
+
+    // Counter to detect infinite warp loops
+    var __load_room_counter : u8;
+}
+
+
+
+in code {
+
+// Marks the dungeon as unloaded
+//
+#[mem8]
+inline func mark_dungeon_unloaded() {
+    _dungeonLoaded = 0;
+}
+
+
+// Initialize a new game by setting starting position
+//
+// DB = 0x7e
+#[mem8, idx8]
+func new_game() {
+    // Reset all flags
+    flags.reset_all_flags();
+
+    // Force a dungeon load on the next room transition
+    mark_dungeon_unloaded();
+
+    // Load the starting dungeon/room from game_config.json
+    roomToLoad.dungeon = a = game_config.STARTING_DUNGEON_ID;
+    roomToLoad.room_x = a = game_config.STARTING_ROOM_X;
+    roomToLoad.room_y = a = game_config.STARTING_ROOM_Y;
+    roomToLoad.player_x_lo = a = game_config.STARTING_PIXEL_X;
+    roomToLoad.player_x_hi = a = 0;
+    roomToLoad.player_y_lo = a = game_config.STARTING_PIXEL_Y;
+    roomToLoad.player_y_hi = a = 0;
+    roomToLoad.player_z = 0;
+    roomToLoad.player_state = 0;
+    roomToLoad.player_direction = 0;
+
+    engine_hooks.gamestate__new_game__inline();
+}
+
+
+// Load a dungeon and a room into memory (with fadein/fadeout transition)
+//
+// CAUTION: Switches the game-mode to GAME_LOOP and drops the stack.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func load_dungeon_and_room(_roomToLoad : RoomToLoad in roomToLoad) {
+    return __load_dungeon__reset_loadroom_counter(__roomToLoad.dungeon, LoadDungeonRoomType.ROOM_TO_LOAD);
+}
+
+
+
+// Load a dungeon the dungeon's default room into memory (with fadein/fadeout transition)
+//
+// CAUTION: Switches the game-mode to GAME_LOOP and drops the stack.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func load_dungeon_and_default_room(dungeonId : u8 in a) {
+    return __load_dungeon__reset_loadroom_counter(a, LoadDungeonRoomType.DEFAULT_ROOM);
+}
+
+
+
+// Load a room into memory.
+//
+// CAUTION: Does not draw entities
+// CAUTION: May load a dungeon and switch the game-mode to GAME_LOOP
+//          (which drops the stack).
+//
+// USES Multiplication registers
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func load_room__inline(_roomToLoad : RoomToLoad in roomToLoad) {
+    __load_room_counter = a = MAX_N_LOAD_ROOMS;
+
+    __load_room();
+    __finish_loading_room();
+}
+
+
+// Private Functions
+// =================
+
+
+in wram7e {
+    // Alias for the roomToLoad variable.
+    var __roomToLoad : RoomToLoad in roomToLoad;
+}
+
+
+// DB = 0x7e
+#[fallthrough, mem8, idx8]
+func __load_dungeon__reset_loadroom_counter(dungeon : u8 in a, roomType : LoadDungeonRoomType in y) {
+    __load_room_counter = x = MAX_N_LOAD_ROOMS;
+}
+
+
+
+// Load dungeon into memory and initialise game subsystems
+//
+// DB = 0x7e
+#[mem8, idx8]
+func __load_dungeon(dungeon : u8 in a, roomType : LoadDungeonRoomType in y) {
+var _dmaFarAddr : far *u8 in resources.DMA0_A_BUS_FARADDR;
+
+var _roomTypeToLoad : u8 in __load_dungeon__roomTypeToLoad;
+
+    carry = resources.items_id_out_of_bounds(a, resources.ResourceType.dungeons);
+    if carry || y >= LoadDungeonRoomType.DUNGEON_ZERO_DEFAULT_ROOM as u8 {
+        a = 0;
+        y = LoadDungeonRoomType.DUNGEON_ZERO_DEFAULT_ROOM as u8;
+    }
+
+    _dungeonId = a;
+    _roomTypeToLoad = y;
+
+    // Fadeout if not in force-blank
+    wait_multiple_frames_and_fadeout();
+
+    // Calling reset_registers here as it clears the _dungeonLoaded flag.
+    reset_registers();
+
+    idx16();
+    #[idx16] {
+        push16(0x7e80);
+        data_bank = pop8();
+    // DB = 0x80
+
+        _dmaFarAddr = resources.load_resource__fixed_ram__forceblank_inline(
+                        resources.ResourceType.dungeons, _dungeonId,
+                        &dungeonData as *u8, sizeof(typeof(dungeonData)));
+
+        *(&roomTable as *u16) = xx = *(&_dmaFarAddr as *u16);
+        *(&#:roomTable as *u8) = a = #:_dmaFarAddr;
+
+        // Clear room loaded flag
+        _roomLoaded = 0;
+
+        data_bank = pop8();
+    // DB = 0x7e
+    }
+    mem8_idx8();
+
+    _dungeonLoaded = a = 1;
+
+
+    a = _roomTypeToLoad;
+    if a != LoadDungeonRoomType.ROOM_TO_LOAD as u8 {
+        // Loading default room
+        __load_room_counter = a = 1;
+
+        __roomToLoad.dungeon = a = _dungeonId;
+        __roomToLoad.room_x = a = dungeonData.defaultRoom_x;
+        __roomToLoad.room_y = a = dungeonData.defaultRoom_y;
+
+        // Use starting position from dungeon data (tile coordinates * 16)
+        a = dungeonData.startingTile_x << 4;
+        __roomToLoad.player_x_lo = a;
+        __roomToLoad.player_x_hi = a = 0;
+        a = dungeonData.startingTile_y << 4;
+        __roomToLoad.player_y_lo = a;
+        __roomToLoad.player_y_hi = a = 0;
+        __roomToLoad.player_z = 0;
+
+        __roomToLoad.player_state = 0;
+        __roomToLoad.player_direction = 0;
+    }
+    __load_room();
+
+
+    // Check if room loaded successfully
+    a = _roomLoaded;
+    if zero {
+        // Cannot load the room. Load the dungeon's default room instead.
+        y = LoadDungeonRoomType.DEFAULT_ROOM as u8;
+        if y == _roomTypeToLoad {
+            y++;
+        }
+        ^return __load_dungeon(_dungeonId, y as LoadDungeonRoomType);
+    }
+
+
+    idx16();
+    #[idx16] {
+        push16(0x7e80);
+        data_bank = pop8();
+    // DB = 0x80
+
+        // Load game subsystems
+        ms_palettes.load_ms_palette__forceblank(dungeonData.msPalette);
+
+        metasprites.setup__forceblank();
+        metasprites.load_ms_spritesheet_ppu_data__forceblank(dungeonData.msSpritesheet);
+        
+        // Load BG3 UI overlay (replaces textbox setup for now)
+        bg3_ui.load__forceblank();
+
+        engine_hooks.load_dungeon__setup_ppu__forceblank();
+
+        palette.load_palette__forceblank(dungeonData.palette);
+
+        metatiles.load_tileset__forceblank(dungeonData.tileset);
+
+        // Enable BG1 (metatiles), BG2 (second layer), BG3 (textbox), and sprites
+        a = TM_BG1 | TM_BG2 | TM_BG3 | TM_OBJ;
+        TM = a;
+
+        // Setup VRAM MAP - 16x16 tiles for BG1 and BG2
+        BGMODE = a = BGMODE_MODE_1_BG3_PRIORITY | BGMODE_SIZE_BG1 | BGMODE_SIZE_BG2;
+
+        let MT_SC = ((VRAM_METATILE_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_32x32;
+        BG1SC = a = MT_SC as u8;
+        
+        // BG2 uses the second layer map address
+        let SL_SC = ((VRAM_SECOND_LAYER_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_32x32;
+        BG2SC = a = SL_SC as u8;
+
+        BG3SC = a = ((VRAM_BG3_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_32x32;
+
+        // BG1 and BG2 share the same tileset
+        BG12NBA = a = ((VRAM_MTSL_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG1_SHIFT) | ((VRAM_MTSL_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG2_SHIFT);
+        BG34NBA = a = ((VRAM_BG3_TILES_WADDR / BG34NBA_WALIGN) << BG34NBA_BG3_SHIFT);
+
+        data_bank = pop8();
+    // DB = 0x7e
+    }
+    mem8_idx8();
+
+
+    engine_hooks.load_dungeon__init();
+
+    // Use starting position from loaded room data (already in pixels)
+    __roomToLoad.player_x_lo = a = currentRoom_playerStartX_lo;
+    __roomToLoad.player_x_hi = a = currentRoom_playerStartX_hi;
+    __roomToLoad.player_y_lo = a = currentRoom_playerStartY_lo;
+    __roomToLoad.player_y_hi = a = currentRoom_playerStartY_hi;
+
+    _set_player_pos();
+
+    engine_hooks.dungeon_loaded__restore_player_state_and_direction__inline(__roomToLoad.player_state, __roomToLoad.player_direction);
+
+    __finish_loading_room();
+
+    engine_hooks.init_player_metasprites__inline();
+
+    // Initialize map system from room data
+    map_system.init();
+    map_system.setup_from_room();
+    
+    // Draw initial map
+    map_system.draw_initial_map__forceblank();
+
+    entityloop.draw_entities();
+
+    wait_multiple_frames_and_fadein();
+
+    // All rooms use the same game loop now
+    ^return switch_game_mode(GameModes.GAME_LOOP);
+}
+
+
+
+// Load a room into memory.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func __load_room() {
+    // Clear room state
+    clear_room_state();
+    _roomLoaded = 0;
+
+    a = _dungeonId;
+    x = _dungeonLoaded;
+    if zero || a != __roomToLoad.dungeon {
+        ^goto LoadDungeon;
+    }
+
+    __load_room_counter--;
+    if negative {
+        ^return __load_dungeon(a, LoadDungeonRoomType.DUNGEON_ZERO_DEFAULT_ROOM);
+    }
+
+    __load_room_from_rom__inline();
+
+    // Check if room loaded successfully (width > 0)
+    a = currentRoom_width;
+    if !zero {
+        _roomLoaded = a = 1;
+    }
+
+    return;
+
+
+LoadDungeon:
+    ^return __load_dungeon(__roomToLoad.dungeon, LoadDungeonRoomType.ROOM_TO_LOAD);
+}
+
+
+
+// Finish loading a room.
+//
+// REQUIRES: __load_room() called, subsystems loaded into memory.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func __finish_loading_room() {
+    // Reset entity subsystem
+    entityloop.init__inline();
+
+    // Check if room is valid (width > 0)
+    a = currentRoom_width;
+    if !zero {
+        // Spawn entities from room data
+        __spawn_room_entities();
+    }
+    
+    // Initialize spawn region system
+    a = numSpawnRegions;
+    if !zero {
+        y = a;  // count
+        a = spawnRegionPtr_bank;  // bank
+        idx16();
+        #[idx16] {
+            xx = *(&spawnRegionPtr_lo as *u16);  // address
+            spawn_regions.init(xx, a, y);
+        }
+        idx8();
+    } else {
+        spawn_regions.init_empty__inline();
+    }
+    
+    // Initialize group AI coordination
+    group_ai.reset();
+
+    _set_player_pos();
+    
+    // Initialize camera with player's correct position
+    camera.init();
+
+    entityloop.sort_active_entities();
+}
+
+
+// Spawn entities defined in the room data.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func __spawn_room_entities() {
+    x = 0;
+    do {
+        a = RoomEntities.entityType[x];
+        if a != 0xff {
+            // Entity exists at this slot
+            // Load 16-bit position directly from room data
+            <:zpTmp_word_0 = a = RoomEntities.xPos_lo[x];
+            >:zpTmp_word_0 = a = RoomEntities.xPos_hi[x];
+            <:zpTmp_word_1 = a = RoomEntities.yPos_lo[x];
+            >:zpTmp_word_1 = a = RoomEntities.yPos_hi[x];
+            y = RoomEntities.parameter[x];
+            a = RoomEntities.entityType[x];
+
+            push8(x);
+            entityloop.spawn_entity(zpTmp_word_0, zpTmp_word_1, a, y);
+            x = pop8();
+        }
+
+        x++;
+    } while x < N_ENTITIES_IN_ROOM_DATA;
+}
+
+
+// DB = 0x7e
+#[mem8, idx8]
+func _set_player_pos() {
+    // Set player world position directly in entity SoA (player = entity 0)
+    // __roomToLoad.player_x/y are now 16-bit pixel coordinates
+    entities.SoA.worldX_lo[0] = a = __roomToLoad.player_x_lo;
+    entities.SoA.worldX_hi[0] = a = __roomToLoad.player_x_hi;
+    
+    entities.SoA.worldY_lo[0] = a = __roomToLoad.player_y_lo;
+    entities.SoA.worldY_hi[0] = a = __roomToLoad.player_y_hi;
+    
+    player.zPos = a = __roomToLoad.player_z;
+}
+
+
+
+// Load a room from ROM into the room state variables.
+//
+// ASSUMES: Dungeon loaded
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func __load_room_from_rom__inline() {
+var _farPtr : far *u16 in zpTmp_farPtr;
+
+    x = __roomToLoad.room_x;
+    y = __roomToLoad.room_y;
+
+    if x >= dungeonData.width || y >= dungeonData.height {
+        if !(dungeonData.flags $ DungeonFlags.INFINITE_BIT) {
+            return;
+        }
+
+        a = x;
+        if negative {
+            x = dungeonData.width;
+            x--;
+        }
+        else if x >= dungeonData.width {
+            x = 0;
+        }
+
+        a = y;
+        if negative {
+            y = dungeonData.height;
+            y--;
+        }
+        else if y >= dungeonData.height {
+            y = 0;
+        }
+
+        __roomToLoad.room_x = x;
+        __roomToLoad.room_y = y;
+    }
+
+    // Calculate room offset in room table
+    *(far &WRMPYA) = a = y;
+    *(far &WRMPYB) = a = dungeonData.width;
+
+    // Set bank byte of far pointer
+    (&<:_farPtr as *u8)[2] = a = *(&#:roomTable as *u8);
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        *(&_farPtr as *u16) = aa = *(&roomTable as *u16);
+
+        // calculate room offset: (y * width + x) * 2
+        yy = aa = (xx + *(far &RDMPY)) << 1;
+
+        aa = _farPtr[unaligned yy];
+        if !zero {
+            // Found valid room - add offset to get room data pointer
+            *(&_farPtr as *u16) = aa = aa + *(&_farPtr as *u16);
+        }
+        else {
+            // No room at this position
+            mem8_idx8();
+            return;
+        }
+    }
+    mem8_idx8();
+
+    // Load room data from ROM using the new room.wiz function
+    load_room_from_rom();
+}
+
+
+
+}
+}
+

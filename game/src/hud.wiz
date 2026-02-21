@@ -1,0 +1,1063 @@
+// HUD System
+// ==========
+// Fighting-game style HUD on BG3 layer.
+// Displays player/enemy health bars, names, portraits, and countdown timer.
+//
+// BG3 is 2bpp, 8x8 tile mode, 32x32 tilemap, high priority (Mode 1 BG3 priority).
+// The HUD occupies the top 4 tile rows (32 pixels) of the screen.
+//
+// Tileset: bg3-1.png (128x256, 469 unique 2bpp tiles after optimization).
+// Tile IDs are assigned by superfamiconv and referenced via the tilemap.
+
+import "memmap";
+import "engine/registers";
+import "engine/registers_math";
+import "engine/vram-map";
+import "engine/entity_api";
+import "engine/game/entityloop";
+import "engine/wait-frame";
+import "engine/dma-queue";
+
+import "player";
+import "gen/game-config";
+import "gen/player-characters";
+import "gen/entities";
+
+
+namespace hud {
+
+
+// ============================================================
+// Tile ID constants (from superfamiconv bg3.map output)
+// ============================================================
+
+namespace Tiles {
+    let EMPTY = 32;
+
+    // Small 8x8 font: digits '0'-'9'
+    let SMALL_DIGIT_BASE = 0;  // tile 0 = '0', tile 9 = '9'
+
+    // Small 8x8 font: lowercase 'a'-'z'
+    let SMALL_LOWER_BASE = 0x61;  // TODO: replace with actual tile ID
+
+    // Small 8x8 font: uppercase 'A'-'Z'
+    let SMALL_UPPER_BASE = 0x41;  // TODO: replace with actual tile ID
+
+    // Health bar tiles (8x8, pixel-accurate)
+    // Left cap: 9 stages (index = pixels empty: 0=full, 8=empty)
+    // Also used for middle tiles (no right edge)
+    let HEALTH_LEFT_0 = 0x60 * 2;  // full (0 empty)
+
+    // Right cap: 7 stages (index = pixels empty: 0=full, 6=empty)
+    // Has 2 rounding pixels at border always visible
+    let HEALTH_RIGHT_0 = 0xC9;  // full (0 empty, 6 filled)
+}
+
+// BG3 tilemap entry attributes
+// Bit 13 = priority, Bits 10-12 = palette
+let HUD_PRIORITY = 0x2000;
+let HUD_PAL_0 = 0x0000;
+let HUD_PAL_1 = 0x0400;
+let HUD_PAL_2 = 0x0800;
+let HUD_PAL_3 = 0x0C00;
+
+// Default attribute: priority + palette 0
+let HUD_PAL0_ATTR = HUD_PRIORITY | HUD_PAL_0;
+
+// Health bar attribute: priority + palette 1
+let HUD_PAL1_ATTR = HUD_PRIORITY | HUD_PAL_1;
+
+// Palette 2 attribute
+let HUD_PAL2_ATTR = HUD_PRIORITY | HUD_PAL_2;
+
+// Palette 3 attribute
+let HUD_PAL3_ATTR = HUD_PRIORITY | HUD_PAL_3;
+
+// Buffer dimensions
+let HUD_ROWS = 4;
+let BUFFER_WIDTH = 32;
+let BUFFER_SIZE = BUFFER_WIDTH * HUD_ROWS;  // 128 entries
+
+// Health bar width in tiles
+let BAR_WIDTH = 12;
+
+// Portrait constants (2x2 tiles = 16x16 pixels)
+// Tileset is 16 tiles wide, portraits arranged 8 per row
+// Base tile 0x5c (92), portrait N: base + (N/8)*32 + (N%8)*2
+let PORTRAIT_BASE_TILE = 0xC0 * 2;
+
+// Layout positions (tile X coordinates)
+let PLAYER_PORTRAIT_X = 0;
+let PLAYER_NAME_X = 2;
+let PLAYER_BAR_X = 2;
+
+let ENEMY_PORTRAIT_X = 18;
+let ENEMY_NAME_X = 20;
+let ENEMY_BAR_X = 20;
+
+let TIMER_LABEL_X = 14;
+let TIMER_DIGIT_X = 14;
+
+
+// ============================================================
+// RAM
+// ============================================================
+
+in wram7e {
+    var buffer : [u16 ; BUFFER_SIZE];
+    var dirty : u8;
+    var timerFrames : u16;
+
+    // Dirty tracking — previous frame values (0xff = force redraw)
+    var prevPlayerHp : u8;
+    var prevEnemyHp : u8;
+    var prevEnemyType : u8;
+    var prevTimerSeconds : u8;
+
+    // Enemy HUD interaction timer
+    var enemyHudTimer : u16;      // frames remaining (0 = hidden)
+    var enemyHudEntityId : u8;    // entity ID of displayed enemy (0xff = none)
+}
+
+// Temporaries used by HUD drawing (shared zpTmp slots)
+in zeropage {
+    var _hud_x : u8 in zpTmp_byte_4;
+    var _hud_y : u8 in zpTmp_byte_5;
+    var _hud_tmp0 : u8 in zpTmp_byte_6;
+    var _hud_tmp1 : u8 in zpTmp_byte_7;
+    var _hud_tmp2 : u8 in zpTmp_byte_8;
+    var _hud_tmp3 : u8 in zpTmp_byte_9;
+    var _hud_tmp4 : u8 in zpTmp_byte_10;
+
+    // 16-bit temp for buffer offset calculation (overlaps zpTmp_word_3)
+    var _hud_offset : u16 in zpTmp_word_3;
+}
+
+
+// ============================================================
+// ROM data
+// ============================================================
+
+in rodata0 {
+    // Big digit lookup: top-left tile for digits 0-9
+    const BigDigitTL : [u8 ; 10] = [(0x40*2) + 0, (0x42*2) + 0, (0x44*2) + 0, (0x46*2) + 0, (0x48*2) + 0, (0x4A*2) + 0, (0x4C*2) + 0, (0x4E*2) + 0, (0x50*2) + 0, (0x52*2) + 0];
+    const BigDigitTR : [u8 ; 10] = [(0x40*2) + 1, (0x42*2) + 1, (0x44*2) + 1, (0x46*2) + 1, (0x48*2) + 1, (0x4A*2) + 1, (0x4C*2) + 1, (0x4E*2) + 1, (0x50*2) + 1, (0x52*2) + 1];
+    const BigDigitBL : [u8 ; 10] = [(0x41*2) + 0, (0x43*2) + 0, (0x45*2) + 0, (0x47*2) + 0, (0x49*2) + 0, (0x4B*2) + 0, (0x4D*2) + 0, (0x4F*2) + 0, (0x51*2) + 0, (0x53*2) + 0];
+    const BigDigitBR : [u8 ; 10] = [(0x41*2) + 1, (0x43*2) + 1, (0x45*2) + 1, (0x47*2) + 1, (0x49*2) + 1, (0x4B*2) + 1, (0x4D*2) + 1, (0x4F*2) + 1, (0x51*2) + 1, (0x53*2) + 1];
+
+    const TimeName : [u8] = "time\0";
+}
+
+
+in code {
+
+
+// ============================================================
+// Compute buffer byte offset from (_hud_x, _hud_y) into _hud_offset
+// ============================================================
+// offset = (_hud_y * 32 + _hud_x) * 2
+// Must be called in mem8 mode. Switches to mem16 internally.
+// Clobbers aa.
+//
+// DB = 0x7e
+#[mem8]
+inline func _calc_offset() {
+    // Load _hud_y into aa with zero-extension
+    a = _hud_y;
+    mem16();
+    #[mem16] {
+        aa &= 0xff;
+        swap_bytes(aa);    // << 8
+        aa >>>= 3;         // >> 3 → net << 5 = * 32
+
+        // Save partial result
+        _hud_offset = aa;
+    }
+    mem8();
+    a = _hud_x;
+    mem16();
+    #[mem16] {
+        aa &= 0xff;
+        aa = aa + _hud_offset;
+        aa <<= 1;          // * 2 for byte offset
+        _hud_offset = aa;
+    }
+    mem8();
+}
+
+
+// ============================================================
+// Write a tile entry at (_hud_x, _hud_y) in the HUD buffer
+// ============================================================
+// tile_id in A register (8-bit tile index).
+// _hud_x and _hud_y must be set before calling.
+// Clobbers xx.
+//
+// DB = 0x7e
+#[mem8, idx16]
+func _buf_write_tile(tile_id : u8 in a, pal_attr : u16 in yy) {
+    _hud_tmp0 = a;   // save tile_id
+    
+    // Save pal_attr to zpTmp_word_4 (not _hud_offset which is zpTmp_word_3)
+    mem16();
+    #[mem16] {
+        zpTmp_word_4 = yy;
+    }
+    mem8();
+
+    _calc_offset();
+
+    a = _hud_tmp0;
+    mem16();
+    #[mem16] {
+        xx = _hud_offset;
+
+        // Write tile entry: tile_id | pal_attr
+        aa &= 0xff;
+        aa = aa | zpTmp_word_4;
+        buffer[unaligned xx] = aa;
+    }
+    mem8();
+}
+
+
+// ============================================================
+// Initialize HUD
+// ============================================================
+// DB = 0x7e
+#[mem8, idx8]
+func init() {
+    idx16();
+    #[idx16] {
+        // Clear buffer to empty tile + priority
+        mem16();
+        #[mem16] {
+            xx = 0;
+            do {
+                (&buffer as *u16)[unaligned xx] = aa = Tiles.EMPTY | HUD_PAL0_ATTR;
+                xx++;
+                xx++;
+            } while xx < BUFFER_SIZE * 2;
+
+            // Initialize timer to 60 seconds
+            timerFrames = aa = 60 * 60;
+
+            // Initialize enemy HUD timer
+            enemyHudTimer = aa = 0;
+        }
+        mem8();
+    }
+    idx8();
+
+    // Force first-frame redraw of all regions
+    prevPlayerHp = a = 0xff;
+    prevEnemyHp = a = 0xff;
+    prevEnemyType = a = 0xff;
+    prevTimerSeconds = a = 0xff;
+    enemyHudEntityId = a = 0xff;
+
+    // --- Draw static elements ---
+
+    // "time" label
+    idx16();
+    #[idx16] {
+        *(&zpTmp_farPtr as *u16) = xx = &TimeName as u16;
+    }
+    idx8();
+    *(&#:zpTmp_farPtr as *u8) = a = #:far &TimeName;
+    a = TIMER_LABEL_X;
+    y = 0;
+    put_text_upper(a, y, zpTmp_farPtr);
+
+    // Player name (from player_chars ROM table)
+    x = player.selectedCharacter;
+    <:zpTmp_farPtr = a = player_chars.name_ptrs_lo[x];
+    >:zpTmp_farPtr = a = player_chars.name_ptrs_hi[x];
+    *(&#:zpTmp_farPtr as *u8) = a = player_chars.name_ptrs_bank;
+    a = PLAYER_NAME_X;
+    y = 0;
+    put_text_upper(a, y, zpTmp_farPtr);
+
+    // Player portrait (from player_chars ROM table)
+    x = player.selectedCharacter;
+    a = player_chars.portraits[x];
+    push8(a);  // save portrait index
+    idx16();
+    #[idx16] {
+        a = pop8();
+        mem16();
+        #[mem16] { aa &= 0xff; xx = aa; }
+        mem8();
+        a = PLAYER_PORTRAIT_X;
+        yy = 0;
+        _draw_portrait(a, yy, xx);
+    }
+    idx8();
+
+    dirty = a = 1;
+}
+
+
+// ============================================================
+// Write text string (lowercase a-z)
+// ============================================================
+// Writes a null-terminated ASCII string as lowercase 8x8 tiles.
+// Only 'a'-'z' characters are supported; others become empty tiles.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func put_text_lower(x_pos : u8 in a, y_row : u8 in y, textPtr : far *const u8 in zpTmp_farPtr) {
+    _hud_x = a;
+    _hud_y = y;
+
+    y = 0;
+    while true {
+        a = textPtr[y];
+        break if zero;
+
+        // Convert ASCII 'a'-'z' to tile ID
+        // Subtract 'a', check if result < 26
+        a -= 'a';
+        if a < 26 {
+            a += Tiles.SMALL_LOWER_BASE;
+        } else {
+            a = Tiles.EMPTY;
+        }
+
+        push8(y);
+        idx16();
+        #[idx16] {
+            yy = HUD_PAL0_ATTR;
+            _buf_write_tile(a, yy);
+        }
+        idx8();
+        y = pop8();
+
+        _hud_x++;
+        y++;
+    }
+}
+
+
+// ============================================================
+// Write text string (uppercase A-Z)
+// ============================================================
+// Writes a null-terminated ASCII string as uppercase 8x8 tiles.
+// Only 'A'-'Z' (or 'a'-'z') characters are supported; others become empty tiles.
+// Lowercase input is automatically converted to uppercase.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func put_text_upper(x_pos : u8 in a, y_row : u8 in y, textPtr : far *const u8 in zpTmp_farPtr) {
+    _hud_x = a;
+    _hud_y = y;
+
+    y = 0;
+    while true {
+        a = textPtr[y];
+        break if zero;
+
+        // Try lowercase first: 'a'-'z'
+        a -= 'a';
+        if a < 26 {
+            a += Tiles.SMALL_UPPER_BASE;
+        } else {
+            // Try uppercase: 'A'-'Z'
+            // Restore and subtract 'A'
+            a = textPtr[y];
+            a -= 'A';
+            if a < 26 {
+                a += Tiles.SMALL_UPPER_BASE;
+            } else {
+                a = Tiles.EMPTY;
+            }
+        }
+
+        push8(y);
+        idx16();
+        #[idx16] {
+            yy = HUD_PAL1_ATTR;
+            _buf_write_tile(a, yy);
+        }
+        idx8();
+        y = pop8();
+
+        _hud_x++;
+        y++;
+    }
+}
+
+
+// ============================================================
+// Draw big 16x16 digit (2x2 tiles)
+// ============================================================
+// DB = 0x7e
+#[mem8, idx8]
+func _put_big_digit(x_pos : u8 in a, y_pos : u8 in y, digit : u8 in x) {
+    _hud_x = a;
+    _hud_y = y;
+    _hud_tmp1 = x;  // save digit
+
+    // _hud_tmp1 = digit index, reload xx from it before each far read
+    // (xx gets clobbered by _buf_write_tile)
+    idx16();
+    #[idx16] {
+        // Top-left
+        a = _hud_tmp1; mem16(); #[mem16] { aa &= 0xff; xx = aa; } mem8();
+        a = (far &BigDigitTL as far *u8)[unaligned xx];
+        yy = HUD_PAL1_ATTR;
+        _buf_write_tile(a, yy);
+
+        // Top-right
+        _hud_x++;
+        a = _hud_tmp1; mem16(); #[mem16] { aa &= 0xff; xx = aa; } mem8();
+        a = (far &BigDigitTR as far *u8)[unaligned xx];
+        yy = HUD_PAL1_ATTR;
+        _buf_write_tile(a, yy);
+
+        // Bottom-left
+        _hud_x--;
+        _hud_y++;
+        a = _hud_tmp1; mem16(); #[mem16] { aa &= 0xff; xx = aa; } mem8();
+        a = (far &BigDigitBL as far *u8)[unaligned xx];
+        yy = HUD_PAL1_ATTR;
+        _buf_write_tile(a, yy);
+
+        // Bottom-right
+        _hud_x++;
+        a = _hud_tmp1; mem16(); #[mem16] { aa &= 0xff; xx = aa; } mem8();
+        a = (far &BigDigitBR as far *u8)[unaligned xx];
+        yy = HUD_PAL1_ATTR;
+        _buf_write_tile(a, yy);
+    }
+    idx8();
+}
+
+
+// ============================================================
+// Draw health bar (pixel-accurate)
+// ============================================================
+// Draw a health bar with pixel-level granularity.
+//
+// Total pixels = 8 * (width - 1) + 6 = 8*width - 2
+// (Left/middle caps: 8px each, right cap: 6px due to 2px rounding border)
+//
+// Computes filled pixels via hardware multiply/divide:
+//   filled_pixels = (current * total_pixels) / max
+//
+// Tile selection:
+//   - Tiles 0 to width-2: left cap (9 stages, 0-8 pixels empty)
+//   - Tile width-1: right cap (7 stages, 0-6 pixels empty)
+//
+// Does NOT call mark_dirty – caller is responsible.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func draw_health_bar(x : u8 in zpTmp_byte_0, y : u8 in zpTmp_byte_1,
+                     width : u8 in zpTmp_byte_2, current : u8 in zpTmp_byte_3,
+                     max : u8 in zpTmp_byte_4) {
+
+var _x : u8 in zpTmp_byte_0;
+var _y : u8 in zpTmp_byte_1;
+var _width : u8 in zpTmp_byte_2;
+var _current : u8 in zpTmp_byte_3;
+var _max : u8 in zpTmp_byte_4;
+var _i : u8 in zpTmp_byte_5;
+var _tile : u8 in zpTmp_byte_6;
+var _widthM1 : u8 in zpTmp_byte_7;
+
+    // Pre-compute width - 1 for comparisons
+    a = _width;
+    a--;
+    _widthM1 = a;
+
+    // Compute initial buffer byte offset: y * 64 + x * 2
+    <:zpTmp_word_0 = a = _y;
+    >:zpTmp_word_0 = 0;
+    <:zpTmp_word_1 = a = _x;
+    >:zpTmp_word_1 = 0;
+
+    mem16();
+    #[mem16] {
+        aa = zpTmp_word_0;
+        aa <<= 6;
+        aa = aa + zpTmp_word_1;
+        aa = aa + zpTmp_word_1;
+        zpTmp_word_0 = aa;  // buffer byte offset
+    }
+    mem8();
+
+    // Compute total pixels: 8 * width - 2
+    a = _width;
+    a <<= 3;  // * 8
+    a -= 2;
+    <:zpTmp_word_2 = a;
+    >:zpTmp_word_2 = 0;
+
+    // Compute filled pixels: (current * total_pixels) / max
+    *(far &WRMPYA) = a = _current;
+    *(far &WRMPYB) = a = <:zpTmp_word_2;
+    nop(); nop(); nop(); nop();
+
+    mem16();
+    #[mem16] {
+        aa = *(far &RDMPY as far *u16);
+        *(far &WRDIV) = aa;
+    }
+    mem8();
+    *(far &WRDIVB) = a = _max;
+    nop(); nop(); nop(); nop();
+    nop(); nop(); nop(); nop();
+
+    // filled_pixels in zpTmp_word_3
+    <:zpTmp_word_3 = a = *(far &RDDIVL);
+    >:zpTmp_word_3 = a = *(far &RDDIVH);
+
+    // Draw the bar tile by tile
+    _i = 0;
+    do {
+        // Calculate pixels_before = i * 8
+        a = _i;
+        a <<= 3;
+        <:zpTmp_word_1 = a;
+        >:zpTmp_word_1 = 0;
+
+        // pixels_in_tile = filled_pixels - pixels_before
+        mem16();
+        #[mem16] {
+            aa = zpTmp_word_3;
+            aa = aa - zpTmp_word_1;
+            if negative { aa = 0; }
+            zpTmp_word_1 = aa;
+        }
+        mem8();
+
+        a = _i;
+        if a == _widthM1 {
+            // Right cap: clamp to 0-6, tile = HEALTH_RIGHT_0 + (6 - pixels)
+            a = <:zpTmp_word_1;
+            if a >= 6 { a = 6; }
+            // empty = 6 - a
+            a ^= 0xff;
+            a++;
+            a = a + 6;
+            a = a + Tiles.HEALTH_RIGHT_0;
+        } else {
+            // Left cap: clamp to 0-8, tile = HEALTH_LEFT_0 + (8 - pixels)
+            a = <:zpTmp_word_1;
+            if a >= 8 { a = 8; }
+            // empty = 8 - a
+            a ^= 0xff;
+            a++;
+            a = a + 8;
+            a = a + Tiles.HEALTH_LEFT_0;
+        }
+        _tile = a;
+
+        // Write tile to buffer
+        <:zpTmp_word_2 = a = _tile;
+        >:zpTmp_word_2 = 0;
+
+        mem16();
+        idx16();
+        #[mem16, idx16] {
+            aa = zpTmp_word_2;
+            aa |= HUD_PAL1_ATTR;
+            xx = zpTmp_word_0;
+            buffer[unaligned xx] = aa;
+
+            // Advance buffer offset by 2
+            aa = zpTmp_word_0;
+            aa++;
+            aa++;
+            zpTmp_word_0 = aa;
+        }
+        mem8_idx8();
+
+        _i++;
+        a = _i;
+    } while a < _width;
+}
+
+
+// ============================================================
+// Draw portrait (2x2 tiles) at position
+// ============================================================
+// portrait_num: 0-31 (8 per row, 4 rows total)
+// Calculates tile IDs from PORTRAIT_BASE_TILE:
+//   base = PORTRAIT_BASE_TILE + (portrait_num/8)*32 + (portrait_num%8)*2
+//   TL=base, TR=base+1, BL=base+16, BR=base+17
+//
+// DB = 0x7e
+#[mem8, idx16]
+func _draw_portrait(x_pos : u8 in a, y_pos : u16 in yy, portrait_num : u16 in xx) {
+    _hud_x = a;
+    _hud_tmp0 = a;  // save base x
+    // In idx16 mode, use y (low byte of yy)
+    a = y;
+    _hud_y = a;
+    _hud_tmp1 = a;  // save base y
+
+    // Calculate base tile from portrait_num
+    // row = portrait_num / 8, col = portrait_num % 8
+    // base = PORTRAIT_BASE_TILE + row*32 + col*2
+    a = x;  // low byte of xx
+    _hud_tmp2 = a;  // save portrait_num
+
+    // row = portrait_num / 8 (shift right 3)
+    a >>>= 3;
+    _hud_tmp3 = a;  // row
+
+    // col = portrait_num & 7
+    a = _hud_tmp2;
+    a &= 0x07;
+    _hud_tmp4 = a;  // col
+
+    // base_tile = PORTRAIT_BASE_TILE + row*32 + col*2
+    // Use 16-bit math
+    mem16();
+    #[mem16] {
+        // row * 32
+        aa = *(&_hud_tmp3 as *u16);
+        aa &= 0xff;
+        aa <<= 5;  // * 32
+        zpTmp_word_0 = aa;
+
+        // col * 2
+        aa = *(&_hud_tmp4 as *u16);
+        aa &= 0xff;
+        aa <<= 1;  // * 2
+        aa = aa + zpTmp_word_0;
+        aa = aa + PORTRAIT_BASE_TILE;
+        zpTmp_word_0 = aa;  // base_tile
+    }
+    mem8();
+
+    // Draw 2x2 tiles
+    // Top-left (base)
+    _hud_x = a = _hud_tmp0;
+    _hud_y = a = _hud_tmp1;
+    _calc_offset();
+    mem16();
+    #[mem16] {
+        xx = _hud_offset;
+        aa = zpTmp_word_0 | HUD_PAL0_ATTR;
+        buffer[unaligned xx] = aa;
+    }
+    mem8();
+
+    // Top-right (base+1)
+    _hud_x++;
+    _calc_offset();
+    mem16();
+    #[mem16] {
+        xx = _hud_offset;
+        aa = zpTmp_word_0;
+        aa++;
+        aa |= HUD_PAL0_ATTR;
+        buffer[unaligned xx] = aa;
+    }
+    mem8();
+
+    // Bottom-left (base+16)
+    _hud_x = a = _hud_tmp0;
+    _hud_y++;
+    _calc_offset();
+    mem16();
+    #[mem16] {
+        xx = _hud_offset;
+        aa = zpTmp_word_0;
+        aa = aa + 16;
+        aa |= HUD_PAL0_ATTR;
+        buffer[unaligned xx] = aa;
+    }
+    mem8();
+
+    // Bottom-right (base+17)
+    _hud_x++;
+    _calc_offset();
+    mem16();
+    #[mem16] {
+        xx = _hud_offset;
+        aa = zpTmp_word_0;
+        aa = aa + 17;
+        aa |= HUD_PAL0_ATTR;
+        buffer[unaligned xx] = aa;
+    }
+    mem8();
+}
+
+
+// ============================================================
+// Clear a horizontal run of tiles to empty
+// ============================================================
+// DB = 0x7e
+#[mem8, idx8]
+func _clear_tiles(x_pos : u8 in a, y_row : u8 in y, count : u8 in x) {
+    _hud_x = a;
+    _hud_y = y;
+    _hud_tmp1 = x;  // count
+
+    idx16();
+    #[idx16] {
+        // Use _hud_tmp3 for counter (_hud_tmp0 is clobbered by _buf_write_tile)
+        _hud_tmp3 = 0;
+        do {
+            a = Tiles.EMPTY;
+            yy = HUD_PAL0_ATTR;
+            _buf_write_tile(a, yy);
+            _hud_x++;
+            _hud_tmp3++;
+            a = _hud_tmp3;
+        } while a < _hud_tmp1;
+    }
+    idx8();
+}
+
+
+// ============================================================
+// Show enemy HUD (called from collision/damage code)
+// ============================================================
+// Sets the enemy to display on the HUD and resets the display timer.
+// entityId: the entity SoA index of the enemy involved in combat.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func show_enemy_hud(entityId : u8 in y) {
+    // Store entity ID
+    enemyHudEntityId = y;
+
+    // Reset timer to ~4 seconds (240 frames)
+    mem16();
+    #[mem16] {
+        enemyHudTimer = aa = 240;
+    }
+    mem8();
+
+    // Force redraw of enemy section by invalidating prev state
+    prevEnemyType = a = 0xff;
+    prevEnemyHp = a = 0xff;
+}
+
+
+// ============================================================
+// Refresh player section (called on character switch)
+// ============================================================
+// Redraws player name, portrait, and forces HP bar redraw.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func refresh_player_section() {
+    // Clear old player name (BAR_WIDTH tiles)
+    a = PLAYER_NAME_X;
+    y = 0;
+    x = BAR_WIDTH;
+    _clear_tiles(a, y, x);
+
+    // Draw new player name
+    x = player.selectedCharacter;
+    <:zpTmp_farPtr = a = player_chars.name_ptrs_lo[x];
+    >:zpTmp_farPtr = a = player_chars.name_ptrs_hi[x];
+    *(&#:zpTmp_farPtr as *u8) = a = player_chars.name_ptrs_bank;
+    a = PLAYER_NAME_X;
+    y = 0;
+    put_text_upper(a, y, zpTmp_farPtr);
+
+    // Draw new player portrait
+    x = player.selectedCharacter;
+    a = player_chars.portraits[x];
+    push8(a);
+    idx16();
+    #[idx16] {
+        a = pop8();
+        mem16();
+        #[mem16] { aa &= 0xff; xx = aa; }
+        mem8();
+        a = PLAYER_PORTRAIT_X;
+        yy = 0;
+        _draw_portrait(a, yy, xx);
+    }
+    idx8();
+
+    // Force HP bar redraw on next update()
+    prevPlayerHp = a = 0xff;
+
+    dirty = a = 1;
+}
+
+
+// ============================================================
+// Draw enemy name + portrait (called when enemy type changes)
+// ============================================================
+// entityType in _hud_tmp2 (already masked to 0-6 bits)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _draw_enemy_section(entityType : u8 in a) {
+    _hud_tmp2 = a;  // save entity type
+
+    // Clear old enemy name area (12 tiles wide)
+    a = ENEMY_NAME_X;
+    y = 0;
+    x = BAR_WIDTH;
+    _clear_tiles(a, y, x);
+
+    // Draw new enemy name from entity_hud ROM tables
+    x = _hud_tmp2;
+    <:zpTmp_farPtr = a = entity_hud.name_ptrs_lo[x];
+    >:zpTmp_farPtr = a = entity_hud.name_ptrs_hi[x];
+    *(&#:zpTmp_farPtr as *u8) = a = entity_hud.name_ptrs_bank;
+    a = ENEMY_NAME_X;
+    y = 0;
+    put_text_upper(a, y, zpTmp_farPtr);
+
+    // Draw enemy portrait from entity_hud ROM tables
+    x = _hud_tmp2;
+    a = entity_hud.portraits[x];
+    push8(a);  // save portrait index
+    idx16();
+    #[idx16] {
+        a = pop8();
+        mem16();
+        #[mem16] { aa &= 0xff; xx = aa; }
+        mem8();
+        a = ENEMY_PORTRAIT_X;
+        yy = 0;
+        _draw_portrait(a, yy, xx);
+    }
+    idx8();
+}
+
+
+// ============================================================
+// Clear the enemy section of the HUD
+// ============================================================
+// DB = 0x7e
+#[mem8, idx8]
+func _clear_enemy_section() {
+    // Clear enemy name area (12 tiles)
+    a = ENEMY_NAME_X;
+    y = 0;
+    x = BAR_WIDTH;
+    _clear_tiles(a, y, x);
+
+    // Clear enemy HP bar area (12 tiles)
+    a = ENEMY_BAR_X;
+    y = 1;
+    x = BAR_WIDTH;
+    _clear_tiles(a, y, x);
+
+    // Clear enemy portrait (2x2 tiles)
+    a = ENEMY_PORTRAIT_X;
+    y = 0;
+    x = 2;
+    _clear_tiles(a, y, x);
+    a = ENEMY_PORTRAIT_X;
+    y = 1;
+    x = 2;
+    _clear_tiles(a, y, x);
+}
+
+
+// ============================================================
+// Update HUD - main per-frame function
+// ============================================================
+// Only redraws regions that have changed. Sets dirty flag only when
+// the buffer was actually modified, avoiding unnecessary DMA transfers.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func update() {
+
+    // === Player HP ===
+    a = player.health;
+    if a != prevPlayerHp {
+        prevPlayerHp = a;
+
+        zpTmp_byte_0 = a = PLAYER_BAR_X;
+        zpTmp_byte_1 = a = 1;
+        zpTmp_byte_2 = a = BAR_WIDTH;
+        zpTmp_byte_3 = a = player.health;
+        x = player.selectedCharacter;
+        zpTmp_byte_4 = a = player_chars.health[x];
+        draw_health_bar(zpTmp_byte_0, zpTmp_byte_1, zpTmp_byte_2, zpTmp_byte_3, zpTmp_byte_4);
+
+        dirty = a = 1;
+    }
+
+    // === Timer ===
+    // Compute seconds = timerFrames / 60
+    mem16();
+    #[mem16] {
+        aa = timerFrames;
+        *(far &WRDIV) = aa;
+    }
+    mem8();
+    *(far &WRDIVB) = a = 60;
+    nop(); nop(); nop(); nop();
+    nop(); nop(); nop(); nop();
+
+    a = *(far &RDDIV as far *u8);
+    if a >= 60 { a = 59; }
+
+    if a != prevTimerSeconds {
+        prevTimerSeconds = a;
+
+        // Split into tens and ones
+        _hud_tmp1 = 0;
+        while a >= 10 {
+            a = a - 10;
+            _hud_tmp1++;
+        }
+        x = a;
+        push8(x);
+
+        y = 1;
+        x = _hud_tmp1;
+        a = TIMER_DIGIT_X;
+        _put_big_digit(a, y, x);
+
+        x = pop8();
+        a = TIMER_DIGIT_X + 2;
+        y = 1;
+        _put_big_digit(a, y, x);
+
+        dirty = a = 1;
+    }
+
+    // Decrement timer (once every 8 frames)
+    a = *(far &frameCounter_lobyte as far *u8);
+    a &= 7;
+    if zero {
+        mem16();
+        #[mem16] {
+            aa = timerFrames;
+            if !zero {
+                aa--;
+                timerFrames = aa;
+            }
+        }
+        mem8();
+    }
+
+    // === Enemy HUD (interaction-based timer) ===
+    // Load u16 timer — Z flag set if zero, preserved across mem8()
+    mem16();
+    #[mem16] {
+        aa = enemyHudTimer;
+    }
+    mem8();
+    if !zero {
+        _update_enemy_hud();
+    }
+}
+
+
+// ============================================================
+// Update enemy HUD section (called when enemyHudTimer > 0)
+// ============================================================
+// DB = 0x7e
+#[mem8, idx8]
+func _update_enemy_hud() {
+    y = enemyHudEntityId;
+
+    // Get entity type (bits 0-6, mask off is_enemy bit 7)
+    a = entities.SoA.entityTypeIndex[unaligned y];
+    a &= 0x7f;
+
+    if a != prevEnemyType {
+        // New enemy type — redraw name + portrait + HP bar
+        prevEnemyType = a;
+        _draw_enemy_section(a);
+
+        // Draw enemy HP bar
+        y = enemyHudEntityId;
+        a = entities.SoA.health[unaligned y];
+        prevEnemyHp = a;
+
+        zpTmp_byte_0 = a = ENEMY_BAR_X;
+        zpTmp_byte_1 = a = 1;
+        zpTmp_byte_2 = a = BAR_WIDTH;
+        y = enemyHudEntityId;
+        zpTmp_byte_3 = a = entities.SoA.health[unaligned y];
+        x = prevEnemyType;
+        zpTmp_byte_4 = a = entity_hud.max_health[x];
+        draw_health_bar(zpTmp_byte_0, zpTmp_byte_1, zpTmp_byte_2, zpTmp_byte_3, zpTmp_byte_4);
+
+        dirty = a = 1;
+    } else {
+        // Same enemy type — check if HP changed
+        y = enemyHudEntityId;
+        a = entities.SoA.health[unaligned y];
+        if a != prevEnemyHp {
+            prevEnemyHp = a;
+
+            zpTmp_byte_0 = a = ENEMY_BAR_X;
+            zpTmp_byte_1 = a = 1;
+            zpTmp_byte_2 = a = BAR_WIDTH;
+            y = enemyHudEntityId;
+            zpTmp_byte_3 = a = entities.SoA.health[unaligned y];
+            x = prevEnemyType;
+            zpTmp_byte_4 = a = entity_hud.max_health[x];
+            draw_health_bar(zpTmp_byte_0, zpTmp_byte_1, zpTmp_byte_2, zpTmp_byte_3, zpTmp_byte_4);
+
+            dirty = a = 1;
+        }
+    }
+
+    // Decrement enemy HUD timer
+    mem16();
+    #[mem16] {
+        aa = enemyHudTimer;
+        aa--;
+        enemyHudTimer = aa;
+    }
+    mem8();
+
+    // Check if timer just expired
+    mem16();
+    #[mem16] {
+        aa = enemyHudTimer;
+    }
+    mem8();
+    if zero {
+        _clear_enemy_section();
+        prevEnemyType = a = 0xff;
+        prevEnemyHp = a = 0xff;
+        dirty = a = 1;
+    }
+}
+
+
+// ============================================================
+// VBlank transfer
+// ============================================================
+// DB = 0x7e
+#[mem8, idx16]
+inline func queue_transfer() {
+    // Queue HUD buffer transfer to VRAM via dma_queue
+    // This is safer than direct DMA and avoids overflow
+
+    a = dirty;
+    if !zero {
+        // Set transfer size (BUFFER_SIZE * 2 bytes)
+        mem16();
+        #[mem16] {
+            dma_queue.set_size(aa = BUFFER_SIZE * 2);
+        }
+        mem8();
+
+        // Push to queue: src_bank=0x7e (WRAM), src_lo=&buffer, dst=VRAM_BG3_MAP_WADDR
+        a = #:far &buffer;
+        xx = &buffer as u16;
+        yy = VRAM_BG3_MAP_WADDR;
+        dma_queue.push(a, xx, yy);
+
+        dirty = 0;
+    }
+}
+
+
+}  // in code
+
+}  // namespace hud

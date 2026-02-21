@@ -1,0 +1,111 @@
+// Copyright (c) 2022, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "memmap";
+
+import "engine/entity_api";
+import "engine/game/metatiles";
+import "engine/gamemodes";
+
+import "player";
+
+import "gen/enums";
+
+
+in code {
+
+
+namespace metatiles {
+namespace interactive_tiles {
+
+
+// An empty function that does nothing
+func null_function(tileIndex : u8 in y) { }
+
+let tile_collision_null_function = null_function as func(tileIndex : u8 in y, direction : metatiles.CollisionDirection in a);
+
+
+// unlocked_door
+// =============
+//
+// Triggers progression to next room in the sequential dungeon progression.
+// Waits for door_transition_frames before transitioning.
+namespace unlocked_door {
+
+import "gen/room-progression";
+
+in wram7e {
+    var _transition_timer : u8;
+    var _is_transitioning : u8;
+    var _temp_tile_index : u8;
+}
+
+
+let player_tile_collision = tile_collision_null_function;
+
+
+// Called when the player touches the unlocked door tile
+//
+// DB = 0x7e
+#[mem8, idx8]
+func player_touches_tile(tileIndex : u8 in y) {
+    // Only trigger if player is walking and not already transitioning
+    a = _is_transitioning;
+    if !zero {
+        return;
+    }
+    
+    // Start transition
+    _is_transitioning = a = 1;
+    _transition_timer = a = room_progression.DOOR_TRANSITION_FRAMES;
+    
+    // TODO: Play door transition sound/music
+}
+
+// Process the door transition timer
+// Call this every frame from the main game loop
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process_transition() {
+    a = _is_transitioning;
+    if zero {
+        return;
+    }
+    
+    a = _transition_timer;
+    if zero {
+        // Timer expired - load next room
+        carry = room_progression.load_next_room();
+        if !carry {
+            // Successfully loaded next room data
+            // Use fadein (not fadein_reset_player) to preserve the roomToLoad we just set
+            set_next_game_mode_to_room_transition(RoomTransitions.fadein);
+        }
+        
+        // Reset transition state
+        _is_transitioning = a = 0;
+        return;
+    }
+    
+    // Decrement timer
+    a--;
+    _transition_timer = a;
+}
+
+
+// Reset transition state (call when entering a new room)
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func reset_transition() {
+    _is_transitioning = a = 0;
+    _transition_timer = 0;
+}
+
+}  // namespace unlocked_door
+
+}  // namespace interactive_tiles
+}  // namespace metatiles
+
+}  // in code

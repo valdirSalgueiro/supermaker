@@ -1,0 +1,119 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "memmap";
+import "engine/registers";
+
+// // This import is required to prevent a "could not resolve identifier" compile error
+import "engine/game/entityloop";
+
+import "engine/audio";
+import "engine/wait-frame";
+
+import "engine/gamemodes";
+import "engine/game/metasprites";
+import "engine/game/dungeon";
+
+import "engine/resources/resources";
+import "engine/resources/palette";
+
+import "engine/resources/dma";
+
+
+import "debug-skip";
+
+import "gen/enums";
+
+
+in code {
+
+// Initialize the audio subsystem, load the common audio data and show the
+// loading-audio-data splash screen.
+//
+// MUST only be called once.
+//
+// DB = 0x80
+#[mem8, idx16]
+inline func __initialise_audio__inline() {
+    let VRAM_BG1_MAP_WADDR = 0;
+    let VRAM_BG1_TILES_WADDR = 0x1000;
+
+    let IMAGE = resources.bg_images.loading_audio_data;
+    let PALETTE = resources.palettes.title_screen;
+
+    audio.setup__inline();
+
+    // ::TODO options menu to set audio mode::
+    audio.set_audio_mode(audio.AudioMode.SURROUND);
+
+
+    INIDISP = a = INIDISP_FORCE_BLANK;
+
+    BGMODE = a = BGMODE_MODE_1;
+    BG1SC = a = ((VRAM_BG1_MAP_WADDR / BGxSC_BASE_WALIGN) << BGxSC_BASE_SHIFT) | BGxSC_MAP_32x32;
+    BG12NBA = a = ((VRAM_BG1_TILES_WADDR / BG12NBA_WALIGN) << BG12NBA_BG1_SHIFT);
+    TM = a = TM_BG1;
+
+    resources.load_bg_image_resource_into_vram(IMAGE, VRAM_BG1_MAP_WADDR, VRAM_BG1_TILES_WADDR);
+    palette.load_palette__forceblank(PALETTE);
+
+
+    audio.set_transfer_size(audio.MAX_TRANSFER_PER_FRAME);
+
+    // Waiting 2 frames to ensure the Loader is active
+    wait_frame_and_change_brightness(7);
+    wait_frame_and_change_brightness(15);
+
+    do {
+        wait_frame();
+
+        carry = audio.is_loader_active();
+    } while carry;
+
+    audio.set_transfer_size(audio.DEFAULT_TRANSFER_PER_FRAME);
+}
+
+// Must only be called once.
+//
+// DB = 0x80
+#[fallthrough, mem8, idx16]
+inline func main__inline() {
+    // __initialise_audio__inline();
+
+    // Clear VRAM to remove garbage
+    // VRAM is 64KB, clear as much as possible with u16 limit (0xFFFF bytes)
+    dma.clear_vram__forceblank(xx = 0x0000, yy = 0x0000);
+
+    metasprites.setup__forceblank();
+
+    push8(a = 0x7e);
+    data_bank = pop8();
+// DB = 0x7e
+
+    // // Clear wram7e_roomstate to prevent garbage values (like msFrameAddr)
+    // mem16_idx16();
+    // #[mem16, idx16] {
+    //     *(0x7e2000 as *u16) = 0;
+    //     load_dec_repeat(0x7e, yy = 0x2001,
+    //                     0x7e, xx = 0x2000,
+    //                     aa = 0x900 - 2);
+    // }
+    // mem8_idx8();
+
+    mem8_idx8();
+    #[mem8, idx8] {
+        // Check if we should start in animation test mode
+        if DEBUG_START_ANIMATION_TEST {
+            set_next_game_mode(GameModes.ANIMATION_TEST);
+            ^return execute_game_mode();
+        }
+        
+        dungeon.new_game();
+        // Start with room transition to properly load the dungeon
+        set_next_game_mode_to_room_transition(RoomTransitions.fadein_reset_player);
+        ^return execute_game_mode();
+    }
+
+}
+}
+

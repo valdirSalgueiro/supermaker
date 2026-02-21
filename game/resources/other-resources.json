@@ -1,0 +1,63 @@
+{
+  "palettes": {
+    "slum": {
+      "source": "palettes/slum.png",
+      "n_rows": 8
+    },
+    "dungeon": {
+      "source": "palettes/dungeon.png",
+      "n_rows": 8
+    },
+    "overworld": {
+      "source": "palettes/overworld.png",
+      "n_rows": 8
+    },
+    "hud_tiles": {
+      "source": "palettes/hud-tiles.png",
+      "n_rows": 1
+    },
+    "title_screen": {
+      "source": "palettes/title-screen.png",
+      "n_rows": 1
+    },
+    "stage12": {
+      "source": "palettes/stage12.png",
+      "n_rows": 8
+    },
+    "stage11": {
+      "source": "palettes/stage11.png",
+      "n_rows": 8
+    }
+  },
+  "tiles": {
+    "ui": {
+      "format": "2bpp",
+      "source": "tilesets/ui-2bpp-tiles.png"
+    },
+    "text": {
+      "format": "2bpp",
+      "source": "tilesets/text-2bpp-tiles.png"
+    },
+    "metasprite_hud": {
+      "format": "4bpp",
+      "source": "metasprites/hud-4bpp-tiles.png"
+    },
+    "bg3_ui": {
+      "format": "2bpp_raw",
+      "source": "tilesets/bg3.chr"
+    }
+  },
+  "bg_images": {
+    "loading_audio_data": {
+      "format": "2bpp",
+      "source": "images/loading-audio-data.png",
+      "palette": "title_screen",
+      "tile_priority": 1
+    }
+  },
+  "tilemaps": {
+    "bg3_ui": {
+      "source": "tilesets/bg3.map"
+    }
+  }
+}

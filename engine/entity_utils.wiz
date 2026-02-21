@@ -1,0 +1,79 @@
+// Entity Utility Functions
+// ========================
+// Shared utility functions for entity movement and behavior
+
+import "src/memmap";
+import "entity_api";
+import "game/map-system";
+
+
+namespace entity_utils {
+
+in code {
+
+// Clamp entity Y position to room walk plane (floor/ceiling)
+// Works for any entity ID
+//
+// DB = 0x7e
+#[mem8, idx8]
+func clamp_to_walk_plane(entityId : u8 in y) {
+    // Precompute offsets (u8 → u16) in temp vars
+    // topOffset = bounds_top
+    <:zpTmp_word_1 = a = entities.SoA.bounds_top[unaligned y];
+    >:zpTmp_word_1 = 0;
+    
+    // botOffset = bounds_top + bounds_height
+    a = entities.SoA.bounds_top[unaligned y];
+    carry = false;
+    a +#= entities.SoA.bounds_height[unaligned y];
+    <:zpTmp_word_2 = a;
+    >:zpTmp_word_2 = 0;
+    
+    // ceilingY
+    <:zpTmp_word_3 = a = map_system.mapCeilingY;
+    >:zpTmp_word_3 = 0;
+    
+    // floorY
+    <:zpTmp_word_4 = a = map_system.mapFloorY;
+    >:zpTmp_word_4 = 0;
+    
+    mem16();
+    #[mem16] {
+        // CEILING CLAMP
+        // aabbTop = worldY + topOffset
+        aa = entities.SoA.worldY[unaligned y];
+        carry = false;
+        aa +#= zpTmp_word_1;  // + topOffset
+        zpTmp_word_0 = aa;  // aabbTop
+        
+        // if aabbTop < ceilingY, clamp
+        carry = true;
+        aa -#= zpTmp_word_3;
+        if negative {
+            // Clamp: worldY = ceilingY - topOffset
+            aa = zpTmp_word_3;
+            carry = true;
+            aa -#= zpTmp_word_1;
+            entities.SoA.worldY[unaligned y] = aa;
+        }
+        
+        // FLOOR CLAMP (re-read worldY)
+        aa = entities.SoA.worldY[unaligned y];
+        carry = false;
+        aa +#= zpTmp_word_2;  // + botOffset
+        zpTmp_word_0 = aa;  // aabbBottom
+        
+        // if aabbBottom > floorY, clamp
+        if aa >= zpTmp_word_4 {
+            // Clamp: worldY = floorY - botOffset
+            aa = zpTmp_word_4;
+            carry = true;
+            aa -#= zpTmp_word_2;
+            entities.SoA.worldY[unaligned y] = aa;
+        }
+    }
+    mem8();
+}
+
+}  // in code
+}  // namespace entity_utils

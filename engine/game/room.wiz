@@ -1,0 +1,363 @@
+// Room Data Structures - ROM-Only Unified Map System
+// ==================================================
+// All room data lives in ROM. Maps are accessed via far pointers.
+// No RAM copies of map data - tile properties come from tileset.
+//
+// Copyright (c) 2024
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+import "../registers_math.wiz";
+
+
+// =============================================================================
+// CONSTANTS
+// =============================================================================
+
+let N_ENTITIES_IN_ROOM_DATA = 8;
+
+// Screen dimensions in tiles (16x16 tiles)
+let SCREEN_WIDTH_TILES = 16;
+let SCREEN_HEIGHT_TILES = 14;
+
+// Tile size in pixels
+let TILE_SIZE_PX = 16;
+
+// ROM format sizes
+let ROOM_HEADER_SIZE = 12;  // width, height, player_x(16), player_y(16), flags, floor, ceiling, numSpawnRegions, padding
+let ROOM_ENTITY_DATA_SIZE = N_ENTITIES_IN_ROOM_DATA * 6;  // 48 bytes (16-bit x/y positions)
+
+
+// =============================================================================
+// ROM DATA FORMAT
+// =============================================================================
+
+// Room header stored in ROM (10 bytes)
+// Followed by entity data (48 bytes), then map data (width * height bytes)
+struct RoomHeader {
+    width : u8,              // Map width in tiles
+    height : u8,             // Map height in tiles (typically 14)
+    player_start_x_lo : u8,  // Player start X in pixels (low byte)
+    player_start_x_hi : u8,  // Player start X in pixels (high byte)
+    player_start_y_lo : u8,  // Player start Y in pixels (low byte)
+    player_start_y_hi : u8,  // Player start Y in pixels (high byte)
+    flags : u8,              // Flags: bit 0 = hasBG2
+    floor_y_lo : u8,         // Walk plane floor Y in pixels (low byte)
+    floor_y_hi : u8,         // Walk plane floor Y in pixels (high byte)
+    _padding : u8,           // Reserved
+};
+
+
+// =============================================================================
+// RAM VARIABLES - Current Room State
+// =============================================================================
+
+in lowram {
+    // Current room header (copied from ROM on load)
+    var currentRoom_width : u8;
+    var currentRoom_height : u8;
+    var currentRoom_playerStartX : u16;
+        var currentRoom_playerStartX_lo @ &<:currentRoom_playerStartX : u8;
+        var currentRoom_playerStartX_hi @ &>:currentRoom_playerStartX : u8;
+    var currentRoom_playerStartY : u16;
+        var currentRoom_playerStartY_lo @ &<:currentRoom_playerStartY : u8;
+        var currentRoom_playerStartY_hi @ &>:currentRoom_playerStartY : u8;
+    var currentRoom_floorY : u8;  // Walk plane floor Y in pixels
+    var currentRoom_ceilingY : u8;  // Walk plane ceiling Y in pixels
+    
+    // Far pointer to BG1 map data in ROM
+    var mapDataPtr_lo : u8;
+    var mapDataPtr_hi : u8;
+    var mapDataPtr_bank : u8;
+    
+    // Far pointer to BG2 map data in ROM (if hasBG2 is set)
+    var bg2DataPtr_lo : u8;
+    var bg2DataPtr_hi : u8;
+    var bg2DataPtr_bank : u8;
+    
+    // Flags
+    var hasBG2 : u8;  // Non-zero if room has BG2 layer
+    
+    // Spawn region data (far pointer stored as separate bytes like mapDataPtr)
+    var spawnRegionPtr_lo : u8;
+    var spawnRegionPtr_hi : u8;
+    var spawnRegionPtr_bank : u8;
+    var numSpawnRegions : u8;      // Number of spawn regions (0 if none)
+    
+    // Entity spawn data (copied from ROM on load)
+    // Positions are 16-bit pixel coordinates
+    namespace RoomEntities {
+        var xPos_lo   : [u8 ; N_ENTITIES_IN_ROOM_DATA];
+        var xPos_hi   : [u8 ; N_ENTITIES_IN_ROOM_DATA];
+        var yPos_lo   : [u8 ; N_ENTITIES_IN_ROOM_DATA];
+        var yPos_hi   : [u8 ; N_ENTITIES_IN_ROOM_DATA];
+        var entityType: [u8 ; N_ENTITIES_IN_ROOM_DATA];
+        var parameter : [u8 ; N_ENTITIES_IN_ROOM_DATA];
+    }
+}
+
+
+in code {
+
+
+// Initialize room state to empty
+//
+// DB = 0x7e
+#[mem8, idx8]
+func clear_room_state() {
+    currentRoom_width = 0;
+    currentRoom_height = 0;
+    currentRoom_playerStartX_lo = 0;
+    currentRoom_playerStartX_hi = 0;
+    currentRoom_playerStartY_lo = 0;
+    currentRoom_playerStartY_hi = 0;
+    currentRoom_floorY = a = 224;  // Default to screen height
+    currentRoom_ceilingY = a = 0;   // Default to top of screen
+    
+    mapDataPtr_lo = 0;
+    mapDataPtr_hi = 0;
+    mapDataPtr_bank = 0;
+    
+    bg2DataPtr_lo = 0;
+    bg2DataPtr_hi = 0;
+    bg2DataPtr_bank = 0;
+    hasBG2 = 0;
+    
+    // Clear spawn region data
+    spawnRegionPtr_lo = 0;
+    spawnRegionPtr_hi = 0;
+    spawnRegionPtr_bank = 0;
+    numSpawnRegions = 0;
+    
+    // Clear entity data (0xFF = no entity)
+    x = N_ENTITIES_IN_ROOM_DATA - 1;
+    do {
+        RoomEntities.xPos_lo[x] = a = 0xff;
+        RoomEntities.xPos_hi[x] = a = 0xff;
+        RoomEntities.yPos_lo[x] = a = 0xff;
+        RoomEntities.yPos_hi[x] = a = 0xff;
+        RoomEntities.entityType[x] = a = 0xff;
+        RoomEntities.parameter[x] = a = 0xff;
+        x--;
+    } while !negative;
+}
+
+
+// Load room data from ROM
+// Sets up room state variables and map pointer
+//
+// Parameters:
+//   roomPtr - far pointer to room data in ROM (set in zpTmp_farPtr before call)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func load_room_from_rom() {
+var _roomPtr : far *u8 in zpTmp_farPtr;
+
+    // Read header (10 bytes at offset 0)
+    // Format: width, height, player_start_x(16-bit), player_start_y(16-bit), flags, padding[3]
+    idx16();
+    #[idx16] {
+        yy = 0;
+        a = _roomPtr[yy]; currentRoom_width = a;
+        yy++; a = _roomPtr[yy]; currentRoom_height = a;
+        yy++; a = _roomPtr[yy]; currentRoom_playerStartX_lo = a;
+        yy++; a = _roomPtr[yy]; currentRoom_playerStartX_hi = a;
+        yy++; a = _roomPtr[yy]; currentRoom_playerStartY_lo = a;
+        yy++; a = _roomPtr[yy]; currentRoom_playerStartY_hi = a;
+        
+        // Read flags byte at offset 6
+        yy = 6;
+        a = _roomPtr[yy]; hasBG2 = a;
+        
+        // Read floor_y at offset 7
+        yy = 7;
+        a = _roomPtr[yy]; currentRoom_floorY = a;
+        yy++;        
+        a = _roomPtr[yy]; currentRoom_ceilingY = a;
+        yy++;
+
+        // Read numSpawnRegions at offset 9
+        a = _roomPtr[yy]; numSpawnRegions = a;
+        yy++;
+        
+        // Skip padding bytes at offset 10-11
+        yy++;
+        yy++;
+        
+        // Read entity data (48 bytes starting at offset 12)
+        yy = ROOM_HEADER_SIZE as u16;
+        
+        // xPos_lo[8]
+        a = _roomPtr[yy]; RoomEntities.xPos_lo[0] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.xPos_lo[1] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.xPos_lo[2] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.xPos_lo[3] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.xPos_lo[4] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.xPos_lo[5] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.xPos_lo[6] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.xPos_lo[7] = a; yy++;
+        
+        // xPos_hi[8]
+        a = _roomPtr[yy]; RoomEntities.xPos_hi[0] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.xPos_hi[1] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.xPos_hi[2] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.xPos_hi[3] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.xPos_hi[4] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.xPos_hi[5] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.xPos_hi[6] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.xPos_hi[7] = a; yy++;
+        
+        // yPos_lo[8]
+        a = _roomPtr[yy]; RoomEntities.yPos_lo[0] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.yPos_lo[1] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.yPos_lo[2] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.yPos_lo[3] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.yPos_lo[4] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.yPos_lo[5] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.yPos_lo[6] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.yPos_lo[7] = a; yy++;
+        
+        // yPos_hi[8]
+        a = _roomPtr[yy]; RoomEntities.yPos_hi[0] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.yPos_hi[1] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.yPos_hi[2] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.yPos_hi[3] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.yPos_hi[4] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.yPos_hi[5] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.yPos_hi[6] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.yPos_hi[7] = a; yy++;
+        
+        // entityType[8]
+        a = _roomPtr[yy]; RoomEntities.entityType[0] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.entityType[1] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.entityType[2] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.entityType[3] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.entityType[4] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.entityType[5] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.entityType[6] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.entityType[7] = a; yy++;
+        
+        // parameter[8]
+        a = _roomPtr[yy]; RoomEntities.parameter[0] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.parameter[1] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.parameter[2] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.parameter[3] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.parameter[4] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.parameter[5] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.parameter[6] = a; yy++;
+        a = _roomPtr[yy]; RoomEntities.parameter[7] = a;
+    }
+    idx8();
+    
+    // Calculate far pointer to BG1 map data
+    // Map data starts at offset ROOM_HEADER_SIZE + ROOM_ENTITY_DATA_SIZE (40 bytes)
+    mem16();
+    #[mem16] {
+        aa = *(&_roomPtr as *u16);
+        aa +#= ROOM_HEADER_SIZE + ROOM_ENTITY_DATA_SIZE;
+        *(&mapDataPtr_lo as *u16) = aa;
+    }
+    mem8();
+    mapDataPtr_bank = a = #:_roomPtr;
+    
+    // Calculate far pointer to BG2 map data (if hasBG2 flag is set)
+    // BG2 data follows BG1 data: BG1_offset + (width * height)
+    a = hasBG2;
+    a &= 1;  // Check bit 0
+    if !zero {
+        hasBG2 = a = 1;  // Normalize to 1
+        
+        // BG2 pointer = BG1 pointer + (width * height * 2)
+        // Each tile is 2 bytes (u16 tile word: low=tile_id, high=flip flags)
+        // Use hardware multiply: width * height
+        *(far &WRMPYA) = a = currentRoom_width;
+        *(far &WRMPYB) = a = currentRoom_height;
+        nop(); nop(); nop(); nop();  // Wait for multiply
+
+        // Read multiply result - need to change data bank to access hardware registers
+        push8(data_bank);
+        a = 0;
+        push8(a);
+        data_bank = pop8();  // DB = 0
+
+        mem16();
+        #[mem16] {
+            // Now we can read RDMPY at $4216 in bank 0
+            aa = RDMPY;
+            // Multiply by 2 for u16 tile storage (2 bytes per tile)
+            carry = false;
+            aa <<= 1;
+            // Add to BG1 pointer (stored in bank 7E, but we access via direct page)
+            aa +#= *(&mapDataPtr_lo as *u16);
+            *(&bg2DataPtr_lo as *u16) = aa;
+        }
+        mem8();
+        
+        data_bank = pop8();  // Restore DB to 7E
+        bg2DataPtr_bank = a = mapDataPtr_bank;
+    } else {
+        hasBG2 = 0;
+        bg2DataPtr_lo = 0;
+        bg2DataPtr_hi = 0;
+        bg2DataPtr_bank = 0;
+    }
+    
+    // Calculate far pointer to spawn region data
+    // Spawn regions follow map data: mapData + (width * height) * (1 + hasBG2)
+    a = numSpawnRegions;
+    if !zero {
+        // Use hardware multiply: width * height
+        *(far &WRMPYA) = a = currentRoom_width;
+        *(far &WRMPYB) = a = currentRoom_height;
+        nop(); nop(); nop(); nop();  // Wait for multiply
+        
+        // Save hasBG2 to x before reading multiply result
+        // This avoids destroying aa when we check hasBG2
+        x = hasBG2;
+        
+        push8(data_bank);
+        a = 0;
+        push8(a);
+        data_bank = pop8();  // DB = 0
+        
+        mem16();
+        #[mem16] {
+            // Read multiply result: width * height (in tiles)
+            aa = RDMPY;
+            // Multiply by 2 for u16 tile storage (2 bytes per tile)
+            carry = false;
+            aa <<= 1;
+        }
+        mem8();
+
+        data_bank = pop8();  // Restore DB to 7E
+
+        // If hasBG2, double the offset again (x still has hasBG2 value)
+        // x = hasBG2 was saved earlier
+        if !zero {
+            mem16();
+            #[mem16] {
+                aa = aa << 1;  // Double for BG2 layer
+            }
+            mem8();
+        }
+        
+        mem16();
+        #[mem16] {
+            aa +#= *(&mapDataPtr_lo as *u16);
+            *(&spawnRegionPtr_lo as *u16) = aa;
+        }
+        mem8();
+        
+        spawnRegionPtr_bank = a = mapDataPtr_bank;
+    } else {
+        // No spawn regions
+        spawnRegionPtr_lo = a = 0;
+        spawnRegionPtr_hi = a = 0;
+        spawnRegionPtr_bank = a = 0;
+    }
+}
+
+
+}

@@ -1,0 +1,915 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+
+import "metasprites";
+import "entity-misc";
+import "spawn-regions";
+
+import "../entity_api";
+import "../vram-slots";
+import "../registers";
+
+import "gen/entities";
+import "gen/function-tables";
+
+import "src/joypad";
+import "src/player";
+
+namespace entityloop {
+
+
+in zeropage {
+    var __currentEntityTablePos : u8;
+
+    var currentEntityId : u8 in entities.currentEntityId;
+}
+
+
+// Effect entities use separate reserved slots (last N_EFFECT_SLOTS of entity SoA)
+// This allows effects to be drawn with lower OAM priority without iterating all entities
+let N_EFFECT_SLOTS = 4;
+let FIRST_EFFECT_SLOT = entities.N_ENTITIES - N_EFFECT_SLOTS;  // = 17
+let N_NORMAL_SLOTS = FIRST_EFFECT_SLOT;  // = 17 (including player at 0)
+
+in wram7e_roomstate {
+    // Mapping of active and unused NORMAL entities (including player).
+    //
+    // indexes 0 to `numberOfActiveEntities - 1` (inclusive) are active entityIds.
+    // indexes `numberOfActiveEntities` to `ACTIVE_ENTITIES_TABLE__LAST_POS` (inclusive) are unused entities.
+    //
+    // (list of SoA indexes) - only uses slots 0..FIRST_EFFECT_SLOT-1
+    var activeEntitiesTable : [u8 ; N_NORMAL_SLOTS];
+
+
+    // The number of active normal entities (not including effects).
+    //
+    // This variable is used as the mid-point separating active and unused entities in `activeEntitiesTable`.
+    //
+    // This variable is set to 1 if only the player entity is active.
+    //
+    // This variable MUST NEVER BE zero.
+    //
+    // (byte counter)
+    var numberOfActiveEntities : u8;
+
+
+    // Mapping of active and unused EFFECT entities.
+    //
+    // indexes 0 to `numberOfActiveEffects - 1` (inclusive) are active effect entityIds.
+    // indexes `numberOfActiveEffects` to `N_EFFECT_SLOTS - 1` (inclusive) are unused effect slots.
+    //
+    // (list of SoA indexes) - uses slots FIRST_EFFECT_SLOT..N_ENTITIES-1
+    var activeEffectsTable : [u8 ; N_EFFECT_SLOTS];
+
+
+    // The number of active effect entities.
+    //
+    // (byte counter)
+    var numberOfActiveEffects : u8;
+
+
+    // The number of active enemies.
+    //
+    // Incremented on entity spawn, decremented when an enemy entity is deactivated.
+    //
+    // (byte counter)
+    var _enemyCount : i8;
+
+
+    let ACTIVE_ENTITIES_TABLE__LAST_POS = sizeof(typeof(activeEntitiesTable)) - 1;
+
+    var _customSprite_data : [u16 ; 4];
+    
+    // Create byte-accessible aliases
+    var xPos: u16;
+    var yPos : u16;
+    var xVel : u16;
+    var yVel : u16;
+}
+
+
+in code {
+
+    #[mem8, idx8]
+    inline func init_custom_sprite__inline() {
+        mem16();
+        #[mem16] {
+            xPos = aa = 0x64;  // Start at x=100
+            yPos = aa = 0x65;  // Start at y=101
+            xVel = 0;
+            yVel = 0;
+        }
+        mem8();
+    }
+
+// Initialize the entity subsystem
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func init__inline() {
+    // MUST NOT modify player entity variables.
+    // (player is active before a room-transition and must be unchanged).
+
+    // Set player's process and draw function to a blank function.
+    // Required as the player is processed before `process_active_entities()` is called.
+    entities.SoA.entityFunction[0] = entities.EntityFunction.null;
+    init_custom_sprite__inline();
+    
+    // Initialize VRAM slot allocator (reserves slot 0 for player)
+    vram_slots.init();
+    
+    mem16();
+    #[mem16] {
+        x = entities.SoA.LAST_INDEX;
+        do {
+            // Reset entity functions
+            (&entities.SoA._entityAndMsDrawFunction as *u16)[unaligned x] = (entities.EntityFunction.null as u16) | (MsDrawFunction.null as u16 << 8);
+            // Clear entity flags and queue tiles function
+            (&entities.SoA._entityFlagsAndQueueTilesFunction as *u16)[unaligned x] = aa = 0;
+            // Clear entity shadow and VRAM slot (set slot to NO_SLOT = 0xFF)
+            (&entities.SoA._isEnemyAndDynamicVramSlot as *u16)[unaligned x] = aa = (vram_slots.NO_SLOT as u16 << 8);
+
+            x--;
+            x--;
+        } while !zero;
+    }
+    mem8();
+
+
+    // Populate `activeEntitiesTable` with normal entity slots (1 to FIRST_EFFECT_SLOT-1)
+    // Slot 0 is player (always active at position 0)
+    {
+        numberOfActiveEntities = a = 1;
+
+        // Fill unused normal slots: positions 1..ACTIVE_ENTITIES_TABLE__LAST_POS
+        // with byte indices (FIRST_EFFECT_SLOT-1)*2 down to 2
+        a = (FIRST_EFFECT_SLOT - 1) * 2;  // = 32 (slot 16)
+        x = ACTIVE_ENTITIES_TABLE__LAST_POS;  // = 16
+
+        do {
+            activeEntitiesTable[x] = a;
+
+            a--;
+            a--;
+
+            x--;
+        }
+        while !zero;  // Stop when x becomes 0 (don't overwrite position 0)
+    }
+
+    // Populate `activeEffectsTable` with effect slots (FIRST_EFFECT_SLOT to N_ENTITIES-1)
+    {
+        numberOfActiveEffects = a = 0;
+
+        // Fill all effect slots: byte indices from (N_ENTITIES-1)*2 down to FIRST_EFFECT_SLOT*2
+        a = entities.SoA.LAST_INDEX;  // = 40 (slot 20)
+        x = N_EFFECT_SLOTS - 1;  // = 3
+
+        do {
+            activeEffectsTable[x] = a;
+
+            a--;
+            a--;
+
+            x--;
+        }
+        while !negative;
+    }
+
+    _enemyCount = 0;
+}
+
+
+
+// Spawn entity with 16-bit world position (for scrolling maps)
+//
+// NOTE: This function may fail if `entityType` is invalid or there are no more unused entityIds.
+// Effect entities (hit_effect) are automatically routed to the effect list.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func spawn_entity(worldX : u16 in zpTmp_word_0, worldY : u16 in zpTmp_word_1, entityType : u8 in a, initParameter : u8 in y) {
+
+    // Route effect entities to separate spawn function (check first before validation)
+    if a == entities.EntityTypes.hit_effect as u8 {
+        ^return _spawn_effect(worldX, worldY, a, y);
+    }
+
+    ^if a < entities.N_ENTITY_TYPES {
+
+        // Retrieve the next unused entity from the `activeEntitiesTable` (if one is available)
+        x = numberOfActiveEntities;
+        ^if x < sizeof(typeof(activeEntitiesTable)) {
+            // This code path MUST spawn an entity
+            push8(y);
+
+            y = activeEntitiesTable[x];
+            // Y = entityId
+
+            // mark entity active
+            numberOfActiveEntities = ++x;
+
+            x = a = a <<< 1;
+
+            mem16();
+            #[mem16] {
+                // msDrawFunction is set below in the MetaSprite section
+                (&entities.SoA._entityAndMsDrawFunction[0] as *u16)[unaligned y] = aa = (far &entity_rom_data.__entity_function_index as far *u16)[unaligned x];
+
+                (&entities.SoA._visionAB[0] as *u16)[unaligned y] = aa = entity_rom_data.vision_ab[unaligned x];
+
+                (&entities.SoA._zPosAndIsEnemy[0] as *u16)[unaligned y] = aa = entity_rom_data.initial_zpos_and_is_enemy[unaligned x];
+
+                (&entities.SoA._healthAndAttackPower[0] as *u16)[unaligned y] = aa = entity_rom_data.health_and_attack_power[unaligned x];
+
+                // Load entity_flags (low byte only - high byte is reserved)
+                aa = entity_rom_data.entity_flags[unaligned x];
+            }
+            mem8();
+            // Store entity_flags (a still has low byte)
+            entities.SoA._entityFlags[unaligned y] = a;
+            mem16();
+
+            #[mem16] {
+                aa = (entity_rom_data.metasprite_framesets as far *u16)[unaligned x];
+            }
+
+            mem16_idx16();
+            #[mem16, idx16] {
+                // MetaSprite Data
+                xx = aa;
+
+                // Entity bounds AABB for camera/collision/hitbox
+                // Format: left offset, top offset (packed as u16), width, height (packed as u16)
+                (&entities.SoA._boundsLT[0].first as *u16)[unaligned yy] = aa = metasprites.MsFsData.boundsLT[unaligned xx];
+                (&entities.SoA._boundsWH[0].first as *u16)[unaligned yy] = aa = metasprites.MsFsData.boundsWH[unaligned xx];
+
+                (&<:entities.SoA.metaSpriteFrameTable[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.frameTable[unaligned xx];
+                (&<:entities.SoA.msAnimationTable[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.animationTable[unaligned xx];
+
+                mem8();
+                #[mem8] {
+                    a = metasprites.MsFsData.drawFunction[unaligned xx];
+                    entities.SoA.msDrawFunction[unaligned yy] = a as MsDrawFunction;
+                }
+                mem16();
+            }
+            idx8();
+
+            #[mem16, idx8] {
+                metasprites.init_entity_metasprite_animation__inline(y);
+
+                // Clear unused data
+                // Required: No `stz.w addr,y` instruction.
+                x = y;
+
+                entities.SoA.xVelocity[unaligned x] = 0;
+                entities.SoA.yVelocity[unaligned x] = 0;
+
+                (&entities.SoA._movementStateAndIframeCounter as *u16)[unaligned x] = 0;
+
+                // Set msLastQueuedFrame to invalid value to force first tile upload
+                entities.SoA.msLastQueuedFrame[unaligned x] = aa = 0;
+
+                entities.SoA.var_0[unaligned x] = 0;
+                entities.SoA.var_1[unaligned x] = 0;
+                entities.SoA.var_2[unaligned x] = 0;
+                entities.SoA.var_3[unaligned x] = 0;
+                // entities.SoA.var_4[unaligned x] = 0;
+                // entities.SoA.var_5[unaligned x] = 0;
+                // entities.SoA.var_6[unaligned x] = 0;
+                // entities.SoA.var_7[unaligned x] = 0;
+                // entities.SoA.var_8[unaligned x] = 0;
+                // entities.SoA.var_9[unaligned x] = 0;
+                
+                // Set 16-bit world position
+                entities.SoA.worldX[unaligned x] = aa = worldX;
+                entities.SoA.worldY[unaligned x] = aa = worldY;
+            }
+            mem8_idx8();
+
+            // Initialize VRAM slot to "no slot" (entity init can allocate one if needed)
+            entities.SoA.dynamicVramSlot[unaligned y] = a = vram_slots.NO_SLOT;
+
+            // Set _isEnemy from entity_flags (bit 7 = IS_ENEMY)
+            entities.SoA._isEnemy[unaligned y] = a = entities.SoA._entityFlags[unaligned y] & entities.EntityFlags.IS_ENEMY;
+            if !zero {
+                _enemyCount++;
+            }
+
+            // x & y = entityId
+            // Set legacy 8-bit positions (low byte of world position for compatibility)
+            a = <:worldX;
+            entities.SoA.previousXpos[x] = a;
+            entities.SoA.xPos_px[x] = a;
+            entities.SoA.xPos_sx[x] = 0;
+
+            a = <:worldY;
+            entities.SoA.previousYpos[x] = a;
+            entities.SoA.yPos_px[x] = a;
+            entities.SoA.yPos_sx[x] = 0;
+
+            a = pop8();  // initParameter
+
+            // Push entityId onto stack.
+            // Y is NOT preserved by init function and the init function may call `spawn_entity`
+            push8(y);
+
+            x = entities.SoA.entityFunction[unaligned y] as u8;
+            entities.init_function_table[unaligned x](y, a);
+
+            y = pop8();
+
+            a = entities.SoA.health[y];
+            if !zero {
+                ^return metasprites.init_entity_metasprite_animation__after_init(y);
+            }
+            else {
+                x = y;
+
+                // Entity's heath is 0.
+                // We cannot remove the entity from the list by decrementing `numberOfActiveEntities`, the entity's init function might spawn more entities.
+                // Instead, the entity functions are changed to blank functions so the entity is not drawn during room transitions.
+                // We may also need to decrement the `_enemyCount` (if the entity is an enemy), which is done in `process_active_entities()`.
+                mem16();
+                #[mem16] {
+                    // Set entityFunction and msDrawFunction to null
+                    (&entities.SoA._entityAndMsDrawFunction as *u16)[unaligned x] = (entities.EntityFunction.null as u16) | (MsDrawFunction.null as u16 << 8);
+                }
+                mem8();
+            }
+        }
+    }
+}
+
+
+
+// Spawn an effect entity (uses separate effect list for OAM priority)
+//
+// NOTE: This function may fail if there are no more unused effect slots.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _spawn_effect(worldX : u16 in zpTmp_word_0, worldY : u16 in zpTmp_word_1, entityType : u8 in a, initParameter : u8 in y) {
+
+    // Retrieve the next unused effect slot from `activeEffectsTable` (if one is available)
+    x = numberOfActiveEffects;
+    ^if x < N_EFFECT_SLOTS {
+        // This code path MUST spawn an effect entity
+        push8(y);
+
+        y = activeEffectsTable[x];
+        // Y = entityId (byte index into SoA)
+
+        // mark effect slot active
+        numberOfActiveEffects = ++x;
+
+        x = a = a <<< 1;
+
+        mem16();
+        #[mem16] {
+            // msDrawFunction is set below in the MetaSprite section
+            (&entities.SoA._entityAndMsDrawFunction[0] as *u16)[unaligned y] = aa = (far &entity_rom_data.__entity_function_index as far *u16)[unaligned x];
+
+            (&entities.SoA._visionAB[0] as *u16)[unaligned y] = aa = entity_rom_data.vision_ab[unaligned x];
+
+            (&entities.SoA._zPosAndIsEnemy[0] as *u16)[unaligned y] = aa = entity_rom_data.initial_zpos_and_is_enemy[unaligned x];
+
+            (&entities.SoA._healthAndAttackPower[0] as *u16)[unaligned y] = aa = entity_rom_data.health_and_attack_power[unaligned x];
+
+            // Load entity_flags (low byte only - high byte is reserved)
+            aa = entity_rom_data.entity_flags[unaligned x];
+        }
+        mem8();
+        // Store entity_flags (a still has low byte)
+        entities.SoA._entityFlags[unaligned y] = a;
+        mem16();
+
+        #[mem16] {
+            aa = (entity_rom_data.metasprite_framesets as far *u16)[unaligned x];
+        }
+
+        mem16_idx16();
+        #[mem16, idx16] {
+            // MetaSprite Data
+            xx = aa;
+
+            // Entity bounds AABB for camera/collision/hitbox
+            (&entities.SoA._boundsLT[0].first as *u16)[unaligned yy] = aa = metasprites.MsFsData.boundsLT[unaligned xx];
+            (&entities.SoA._boundsWH[0].first as *u16)[unaligned yy] = aa = metasprites.MsFsData.boundsWH[unaligned xx];
+
+            (&<:entities.SoA.metaSpriteFrameTable[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.frameTable[unaligned xx];
+            (&<:entities.SoA.msAnimationTable[0] as *u16)[unaligned yy] = aa = metasprites.MsFsData.animationTable[unaligned xx];
+
+            mem8();
+            #[mem8] {
+                a = metasprites.MsFsData.drawFunction[unaligned xx];
+                entities.SoA.msDrawFunction[unaligned yy] = a as MsDrawFunction;
+            }
+            mem16();
+        }
+        idx8();
+
+        #[mem16, idx8] {
+            metasprites.init_entity_metasprite_animation__inline(y);
+
+            // Clear unused data
+            x = y;
+
+            entities.SoA.xVelocity[unaligned x] = 0;
+            entities.SoA.yVelocity[unaligned x] = 0;
+
+            (&entities.SoA._movementStateAndIframeCounter as *u16)[unaligned x] = 0;
+
+            // Set msLastQueuedFrame to invalid value to force first tile upload
+            entities.SoA.msLastQueuedFrame[unaligned x] = aa = 0;
+
+            entities.SoA.var_0[unaligned x] = 0;
+            entities.SoA.var_1[unaligned x] = 0;
+            entities.SoA.var_2[unaligned x] = 0;
+            entities.SoA.var_3[unaligned x] = 0;
+
+            // Set 16-bit world position
+            entities.SoA.worldX[unaligned x] = aa = worldX;
+            entities.SoA.worldY[unaligned x] = aa = worldY;
+        }
+        mem8_idx8();
+
+        // Initialize VRAM slot to "no slot" (effects typically don't need dynamic VRAM)
+        entities.SoA.dynamicVramSlot[unaligned y] = a = vram_slots.NO_SLOT;
+
+        // Effects are not enemies (skip enemy count)
+        a = 0;
+        entities.SoA._isEnemy[unaligned y] = a;
+
+        // x & y = entityId
+        // Set legacy 8-bit positions (low byte of world position for compatibility)
+        a = <:worldX;
+        entities.SoA.previousXpos[x] = a;
+        entities.SoA.xPos_px[x] = a;
+        entities.SoA.xPos_sx[x] = 0;
+
+        a = <:worldY;
+        entities.SoA.previousYpos[x] = a;
+        entities.SoA.yPos_px[x] = a;
+        entities.SoA.yPos_sx[x] = 0;
+
+        a = pop8();  // initParameter
+
+        // Push entityId onto stack.
+        push8(y);
+
+        x = entities.SoA.entityFunction[unaligned y] as u8;
+        entities.init_function_table[unaligned x](y, a);
+
+        y = pop8();
+
+        a = entities.SoA.health[y];
+        if !zero {
+            ^return metasprites.init_entity_metasprite_animation__after_init(y);
+        }
+        else {
+            x = y;
+
+            // Effect's health is 0 immediately after init - set functions to null
+            mem16();
+            #[mem16] {
+                (&entities.SoA._entityAndMsDrawFunction as *u16)[unaligned x] = (entities.EntityFunction.null as u16) | (MsDrawFunction.null as u16 << 8);
+            }
+            mem8();
+        }
+    }
+}
+
+
+
+// Retrieve the enemy count
+//
+// KEEP: X & Y
+// DB = 0x7e
+#[mem8]
+inline func get_enemy_count_a() : u8 in a {
+    return _enemyCount;
+}
+
+
+
+// Return true if there are no enemies alive
+//
+// KEEP: X & Y
+// DB = 0x7e
+#[mem8]
+inline func is_all_enemies_defeated() : bool in zero {
+    a = _enemyCount as u8;
+    return zero;
+}
+
+
+
+// Execute the process routine in all active entities
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process_active_entities()
+{
+    x = numberOfActiveEntities;
+    ^if zero { return; }
+    
+__process_loop:
+    x--;
+    __currentEntityTablePos = x;
+
+    // The `!zero` below test prevents the player from being processed or animated by the function.
+    // (it also stops this function from despawning the player when the player's health is 0)
+
+    y = activeEntitiesTable[x];
+    ^if !zero {
+        currentEntityId = y;
+
+        x = entities.SoA.entityFunction[unaligned y] as u8;
+        entities.process_function_table[unaligned x](y);
+        y = currentEntityId;
+        a = entities.SoA.health[y];
+        ^if zero {
+            // Entity's health is 0, check death timer (var_3_h)
+            // Entity handles its own death countdown in process()
+            a = entities.SoA.var_3_h[y];
+            ^if !zero {
+                // Death timer still running - keep entity active
+                y = currentEntityId;
+                metasprites.process_entity_animation(y);
+            }
+            else {
+                // Death timer expired - remove entity
+                y = currentEntityId;
+
+                // Decrement enemy count (if the entity is an enemy)
+                a = entities.SoA._isEnemy[unaligned y];
+                if !zero {
+                    _enemyCount--;
+                    if negative {
+                        _enemyCount = 0;
+                    }
+                    // Notify spawn region system of enemy death
+                    // Save y: on_enemy_death trashes y when regionSpawnedCount reaches 0
+                    push8(y);
+                    spawn_regions.on_enemy_death();
+                    y = pop8();
+                }
+
+                // Free VRAM slot if one was allocated
+                a = entities.SoA.dynamicVramSlot[unaligned y];
+                if a != vram_slots.NO_SLOT {
+                    vram_slots.free_slot(a);
+                    entities.SoA.dynamicVramSlot[unaligned y] = a = vram_slots.NO_SLOT;
+                }
+
+                // Remove entity from active entities list, preserving active entity order.
+                //
+                // Preserving entity order should be friendlier to `sort_active_entities()`.
+                numberOfActiveEntities--;
+
+                mem16();
+                #[mem16] {
+                    // ASSUMES numberOfActiveEntities <= ACTIVE_ENTITIES_TABLE__LAST_POS
+                    // ASSUMES numberOfActiveEntities < sizeof(activeEntitiesTable)
+
+                    // Must not change Y
+
+                    x = __currentEntityTablePos;
+                    if x < numberOfActiveEntities {
+                        do {
+                            // Swap activeEntitiesTable[x] and activeEntitiesTable[x + 1]
+                            aa = (&activeEntitiesTable as *u16)[unaligned x];
+                            swap_bytes(aa);
+                            (&activeEntitiesTable as *u16)[unaligned x] = aa;
+
+                            x++;
+                        } while x < numberOfActiveEntities;
+                    }
+
+                    // Set process_function and ms_draw_function to a blank function (just in case they are accidentally called)
+                    x = y;
+                    (&entities.SoA._entityAndMsDrawFunction as *u16)[unaligned x] = (entities.EntityFunction.null as u16) | (MsDrawFunction.null as u16 << 8);
+                }
+                mem8();
+
+                entity_misc.set_ms_draw_function(y, MsDrawFunction.null);
+            }
+        }
+        else {
+            metasprites.process_entity_animation(y);
+        }
+    }
+
+    x = __currentEntityTablePos;
+    if !zero { ^goto __process_loop; }
+}
+
+
+// Execute the process routine for all active effect entities
+// Effects check their own health/animation and despawn when done
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process_effects()
+{
+    x = numberOfActiveEffects;
+    ^if zero { return; }
+    
+__process_loop:
+    x--;
+    __currentEntityTablePos = x;
+
+    y = activeEffectsTable[x];
+    currentEntityId = y;
+
+    // Process the effect's function
+    x = entities.SoA.entityFunction[unaligned y] as u8;
+    entities.process_function_table[unaligned x](y);
+    y = currentEntityId;
+    
+    // Check if effect should be removed (health == 0)
+    a = entities.SoA.health[y];
+    ^if zero {
+        // Effect is done - remove from effect list
+        y = currentEntityId;
+
+        // Free VRAM slot if one was allocated (unlikely for effects but be safe)
+        a = entities.SoA.dynamicVramSlot[unaligned y];
+        if a != vram_slots.NO_SLOT {
+            vram_slots.free_slot(a);
+            entities.SoA.dynamicVramSlot[unaligned y] = a = vram_slots.NO_SLOT;
+        }
+
+        // Remove effect from active effects list, preserving order
+        numberOfActiveEffects--;
+
+        mem16();
+        #[mem16] {
+            // Must not change Y
+            x = __currentEntityTablePos;
+            if x < numberOfActiveEffects {
+                do {
+                    // Swap activeEffectsTable[x] and activeEffectsTable[x + 1]
+                    aa = (&activeEffectsTable as *u16)[unaligned x];
+                    swap_bytes(aa);
+                    (&activeEffectsTable as *u16)[unaligned x] = aa;
+
+                    x++;
+                } while x < numberOfActiveEffects;
+            }
+
+            // Set process_function and ms_draw_function to null
+            x = y;
+            (&entities.SoA._entityAndMsDrawFunction as *u16)[unaligned x] = (entities.EntityFunction.null as u16) | (MsDrawFunction.null as u16 << 8);
+        }
+        mem8();
+
+        entity_misc.set_ms_draw_function(y, MsDrawFunction.null);
+    }
+    else {
+        // Effect still alive - process animation
+        metasprites.process_entity_animation(y);
+    }
+
+    x = __currentEntityTablePos;
+    if !zero { ^goto __process_loop; }
+}
+
+
+// Execute the ms_draw_function for all active normal entities (including player)
+// Effect entities are in a separate list and drawn by draw_effect_entities()
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func draw_active_entities()
+{
+    x = 0;
+    if x < numberOfActiveEntities {
+        do {
+            __currentEntityTablePos = x;
+
+            y = activeEntitiesTable[x];
+            metasprites._draw_entity(y);
+
+            x = __currentEntityTablePos;
+            x++;
+        } while x < numberOfActiveEntities;
+    }
+}
+
+
+// Draw effect entities (from separate effect list)
+// Called LAST so they get lower OAM slots = appear in front
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func draw_effect_entities()
+{
+    x = 0;
+    if x < numberOfActiveEffects {
+        do {
+            __currentEntityTablePos = x;
+
+            y = activeEffectsTable[x];
+            metasprites._draw_entity(y);
+
+            x = __currentEntityTablePos;
+            x++;
+        } while x < numberOfActiveEffects;
+    }
+}
+
+
+
+// Sort the active entities by their Y position.
+//
+// This function is not inline so I can measure its CPU usage with Mesen-S.
+//
+// Insertion sort.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func sort_active_entities()
+{
+    // Insertion sort by AABB bottom edge (feet position) for proper depth ordering.
+    // Sort key = yPos_px + bounds_top + bounds_height
+    // TRUE stable sort: when Y values equal, maintain current table order (don't swap)
+    //
+    // Thanks Wikipedia for the Insertion sort algorithm.
+    //
+    // "Insertion sort."  Wikipedia, The Free Encyclopedia.
+    // https://en.wikipedia.org/wiki/Insertion_sort#Algorithm
+    // (accessed October 16, 2021).
+
+
+    var _entityId      : u8 in zpTmp_byte_0;
+    var _sortKey       : u8 in zpTmp_byte_1;
+
+
+    // A = sort key (yPos + bounds_bottom) to compare
+    // X = index into activeEntitiesTable
+    // Y = index into entities SoA
+
+
+    x = 1;
+    if x < numberOfActiveEntities {
+        do {
+            y = activeEntitiesTable[x];
+            
+            // Calculate sort key: yPos_px + bounds_top + bounds_height
+            a = entities.SoA.yPos_px[y];
+            carry = false;
+            a +#= entities.SoA.bounds_top[y];
+            carry = false;
+            a +#= entities.SoA.bounds_height[y];
+
+            _entityId = y;
+            _sortKey = a;
+
+            y = (&activeEntitiesTable[-1])[x];
+            
+            // Calculate comparison key for previous entity
+            a = entities.SoA.yPos_px[y];
+            carry = false;
+            a +#= entities.SoA.bounds_top[y];
+            carry = false;
+            a +#= entities.SoA.bounds_height[y];
+            
+            // Stable sort: only swap if prevKey > sortKey (strict >)
+            // Skip if prevKey <= sortKey (maintain order when equal)
+            cmp(a, _sortKey);
+            if !carry {
+                // prevKey < sortKey - already in order, skip
+            } else {
+                // prevKey >= sortKey - check if strictly greater
+                if a == _sortKey {
+                    // Equal - don't swap (stable)
+                } else {
+                    // prevKey > sortKey - swap
+                    __currentEntityTablePos = x;
+
+                    do {
+                        activeEntitiesTable[x] = a = y;
+
+                        x--;
+                        break if zero;
+
+                        y = (&activeEntitiesTable[-1])[x];
+                        
+                        // Calculate comparison key
+                        a = entities.SoA.yPos_px[y];
+                        carry = false;
+                        a +#= entities.SoA.bounds_top[y];
+                        carry = false;
+                        a +#= entities.SoA.bounds_height[y];
+                        
+                        // Stop shifting if prevKey <= sortKey
+                        cmp(a, _sortKey);
+                        if carry {
+                            // prevKey >= sortKey - check for equality
+                            if a == _sortKey {
+                                break;  // Equal - stop here (stable)
+                            }
+                            // prevKey > sortKey - continue shifting
+                        }
+                    } while carry;
+
+
+                    activeEntitiesTable[x] = a = _entityId;
+
+                    x = __currentEntityTablePos;
+                }
+            }
+
+            x++;
+        } while x < numberOfActiveEntities;
+    }
+}
+
+// Draw entities
+// Effect entities are drawn LAST (buffer fills backwards, so last = low OAM slots = in front)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func draw_entities() {
+    idx16();
+    #[idx16] {
+        metasprites.reset_buffer_and_draw_entity_shadows();
+    }
+    idx8();
+
+    // Draw normal entities first (fills backwards from high OAM slots)
+    entityloop.draw_active_entities();
+
+    // Draw effect entities LAST (gets low OAM slots = appears in front)
+    entityloop.draw_effect_entities();
+
+    idx16();
+    #[idx16] {
+        metasprites.finalize_buffer();
+    }
+    idx8();
+}
+}
+}
+
+namespace entities {
+in code {
+
+// A blank init process function that does nothing
+//
+// DB = 0x7e
+func _null_init_function(entityId : u8 in y, parameter : u8 in a) {
+}
+
+
+// A blank entity process function that does nothing
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _null_process_function(entityId : u8 in y) {
+}
+
+}
+
+}
+
+
+// Entity ROM Data is populated by the `tools/insert_resources.py` and `tools/_entity_data.py` scripts
+namespace entity_rom_data {
+
+let N_ENTRIES = entities.N_ENTITY_TYPES;
+
+// Filling the data with `0x00` and `0xaa` bytes.
+// This is used by the *insert_resources* script, to ensure the entity_rom_data is inserted into the correct location.
+in rodata0 {
+    const __entity_function_index : [ u16 ; N_ENTRIES ] = [ 0x00 ; N_ENTRIES ];
+        let entity_function_index = far &__entity_function_index as far *u8;
+        // ::TODO do something with the second byte::
+
+    const __metasprite_framesets : [ *const metasprites.MsFramesetFormat ; N_ENTRIES ] = [ 0xaaaa as *metasprites.MsFramesetFormat ; N_ENTRIES ];
+    let metasprite_framesets = far &__metasprite_framesets;
+
+    // Byte 0: zpos, Byte 1: is_enemy flag (bit 7 = is enemy)
+    const __initial_zpos_and_is_enemy : [u8 ; N_ENTRIES * 2] = [ 0xaa ; N_ENTRIES * 2];
+    let initial_zpos_and_is_enemy = far &__initial_zpos_and_is_enemy as far *u16;
+
+    const __vision_ab : [u8 ; N_ENTRIES * 2] = [ 0xaa ; N_ENTRIES * 2];
+    let vision_ab = far &__vision_ab as far *u16;
+
+    const __health_and_attack_power : [u8 ; N_ENTRIES * 2] = [ 0xaa ; N_ENTRIES * 2];
+    let health_and_attack_power = far &__health_and_attack_power as far *u16;
+
+    // Entity collision flags
+    // Byte 0: bit 7=is_enemy, bit 6=is_killable, bit 5=is_player_projectile
+    // Byte 1: reserved
+    const __entity_flags : [u8 ; N_ENTRIES * 2] = [ 0xaa ; N_ENTRIES * 2];
+    let entity_flags = far &__entity_flags as far *u16;
+}
+
+}
+

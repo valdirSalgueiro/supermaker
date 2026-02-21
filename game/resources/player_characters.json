@@ -1,0 +1,55 @@
+{
+  "characters": [
+    {
+      "name": "guy",
+      "metasprites": "guy.Guy",
+      "portrait": 2,
+      "anim_roles": {
+        "attack1": "punch1",
+        "attack2": "punch2",
+        "attack3": "punch3",
+        "attack4": "kick"
+      },
+      "health": 100,
+      "move_speed_x": 2, "move_speed_y": 2,
+      "gravity": 56, "jump_velocity": 1536,
+      "hitstun_frames": 12, "knockdown_frames": 45, "getup_frames": 60,
+      "knockback_speed": 8, "hits_to_knockdown": 3,
+      "special": { "startup": 10, "active": 20, "recovery": 25, "damage": "0x94", "health_cost": 1, "iframes": 12 },
+      "grab": { "distance_x_min": 8, "distance_x_max": 24, "distance_y": 6, "distance_z": 10, "escape_frames": 90, "attack_frames": 12, "max_attacks": 3, "attack_damage": "0x04", "throw_damage": "0x88" },
+      "combo": {
+        "stages": 5,
+        "startup":  [3, 3, 3, 3, 4],
+        "active":   [3, 3, 3, 3, 3],
+        "recovery": [6, 6, 6, 6, 8],
+        "damage":   ["0x02", "0x02", "0x03", "0x04", "0x88"],
+        "anim":     ["attack1", "attack1", "attack2", "attack3", "attack4"]
+      }
+    },
+    {
+      "name": "cody",
+      "metasprites": "cody.Cody",
+      "portrait": 1,
+      "anim_roles": {
+        "attack1": "punch1",
+        "attack2": "punch2",
+        "attack3": "hook"
+      },
+      "health": 100,
+      "move_speed_x": 2, "move_speed_y": 1,
+      "gravity": 56, "jump_velocity": 1536,
+      "hitstun_frames": 14, "knockdown_frames": 50, "getup_frames": 60,
+      "knockback_speed": 7, "hits_to_knockdown": 4,
+      "special": { "startup": 8, "active": 18, "recovery": 22, "damage": "0x98", "health_cost": 1, "iframes": 12 },
+      "grab": { "distance_x_min": 8, "distance_x_max": 24, "distance_y": 6, "distance_z": 10, "escape_frames": 90, "attack_frames": 12, "max_attacks": 3, "attack_damage": "0x06", "throw_damage": "0x8A" },
+      "combo": {
+        "stages": 4,
+        "startup":  [4, 4, 4, 5],
+        "active":   [4, 4, 4, 4],
+        "recovery": [7, 7, 7, 10],
+        "damage":   ["0x03", "0x03", "0x04", "0x8A"],
+        "anim":     ["attack1","attack1", "attack2", "attack3"]
+      }
+    }
+  ]
+}

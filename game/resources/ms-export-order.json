@@ -1,0 +1,67 @@
+{
+  "patterns": [
+    {
+      "name": "square_single16",
+      "objects": [
+        {
+          "x": 0,
+          "y": 0,
+          "size": 16
+        }
+      ]
+    },
+    {
+      "name": "square_four_32",
+      "objects": [
+        {
+          "x": 0,
+          "y": 0,
+          "size": 16
+        },
+        {
+          "x": 16,
+          "y": 0,
+          "size": 16
+        },
+        {
+          "x": 0,
+          "y": 16,
+          "size": 16
+        },
+        {
+          "x": 16,
+          "y": 16,
+          "size": 16
+        }
+      ]
+    }
+  ],
+  "custom_draw_functions": [],
+  "dynamic_metasprites": {
+    "Guy": {
+      "first_tile_id": 0,
+      "genetic": false,
+      "genetic_iterations": 10000
+    },
+    "Cody": {
+      "first_tile_id": 0,
+      "genetic": false,
+      "genetic_iterations": 10000
+    },
+    "Bred": {
+      "first_tile_id": 0,
+      "genetic": false,
+      "genetic_iterations": 10000
+    },
+    "Dug": {
+      "first_tile_id": 0,
+      "genetic": false,
+      "genetic_iterations": 10000
+    },
+    "J": {
+      "first_tile_id": 0,
+      "genetic": false,
+      "genetic_iterations": 10000
+    }
+  }
+}

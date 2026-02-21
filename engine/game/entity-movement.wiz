@@ -1,0 +1,209 @@
+// Entity Movement System
+// ======================
+// Common velocity-based movement for all entities.
+// Velocity is computed from input/AI each frame, then position += velocity.
+//
+// Velocity format: 16-bit signed (8:8 fixed point)
+//   High byte = pixels per frame (signed)
+//   Low byte = subpixel fraction
+//
+// Example speeds:
+//   0x0200 = 2.0 pixels/frame
+//   0x0180 = 1.5 pixels/frame
+//   0x0100 = 1.0 pixels/frame
+//   0xFE00 = -2.0 pixels/frame (moving left/up)
+
+import "src/memmap";
+import "../entity_api";
+
+namespace entity_movement {
+
+in code {
+
+// Apply velocity to entity position (signed 16-bit velocity → 16-bit position)
+//
+// worldX += xVelocity
+// worldY += yVelocity
+//
+// INPUT: y = entityId (byte index into SoA)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func apply_velocity(entityId : u8 in y) {
+    x = y;
+    
+    mem16();
+    #[mem16] {
+        // worldX += xVelocity (signed add)
+        aa = entities.SoA.worldX[unaligned x];
+        carry = false;
+        aa +#= entities.SoA.xVelocity[unaligned x];
+        entities.SoA.worldX[unaligned x] = aa;
+        
+        // worldY += yVelocity (signed add)
+        aa = entities.SoA.worldY[unaligned x];
+        carry = false;
+        aa +#= entities.SoA.yVelocity[unaligned x];
+        entities.SoA.worldY[unaligned x] = aa;
+    }
+    mem8();
+}
+
+
+// Apply velocity to player (entity 0) - optimized version with direct indexing
+//
+// player.worldX += player.xVelocity
+// player.worldY += player.yVelocity
+//
+// NOTE: Velocity values should be in pixels (e.g., 2 for 2 pixels/frame),
+// NOT 8:8 fixed point. If using fixed point velocities, divide by 256 first.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func apply_velocity_player__inline() {
+    mem16();
+    #[mem16] {
+        // worldX += xVelocity (signed add)
+        aa = entities.SoA.worldX[0];
+        carry = false;
+        aa +#= entities.SoA.xVelocity[0];
+        entities.SoA.worldX[0] = aa;
+        
+        // worldY += yVelocity (signed add)
+        aa = entities.SoA.worldY[0];
+        carry = false;
+        aa +#= entities.SoA.yVelocity[0];
+        entities.SoA.worldY[0] = aa;
+    }
+    mem8();
+    
+    // Sync yPos_px from worldY_lo for sorting (sprite draw order by Y position)
+    entities.SoA.yPos_px[0] = a = entities.SoA.worldY_lo[0];
+}
+
+
+// Clear velocity for entity (used at start of frame before input processing)
+//
+// INPUT: y = entityId (byte index into SoA)
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func clear_velocity__inline(entityId : u8 in y) {
+    x = y;
+    
+    mem16();
+    #[mem16] {
+        entities.SoA.xVelocity[unaligned x] = 0;
+        entities.SoA.yVelocity[unaligned x] = 0;
+    }
+    mem8();
+}
+
+
+// Clear player velocity (entity 0)
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func clear_velocity_player__inline() {
+    mem16();
+    #[mem16] {
+        entities.SoA.xVelocity[0] = 0;
+        entities.SoA.yVelocity[0] = 0;
+    }
+    mem8();
+}
+
+
+// Set entity velocity from direction and speed
+// 
+// direction: 0=RIGHT, 1=LEFT, 2=DOWN, 3=UP (matching FacingDirection enum + vertical)
+// speed: unsigned 16-bit speed value (will be negated for LEFT/UP)
+//
+// INPUT: y = entityId, a = direction, speed in zpTmp_word_0
+//
+// DB = 0x7e
+#[mem8, idx8]
+func set_velocity_from_direction(entityId : u8 in y, direction : u8 in a, speed : u16 in zpTmp_word_0) {
+    x = y;
+    
+    if a == 0 {
+        // RIGHT: +X velocity
+        mem16();
+        #[mem16] {
+            entities.SoA.xVelocity[unaligned x] = aa = speed;
+            entities.SoA.yVelocity[unaligned x] = 0;
+        }
+        mem8();
+        return;
+    }
+    
+    if a == 1 {
+        // LEFT: -X velocity
+        mem16();
+        #[mem16] {
+            aa = 0;
+            carry = true;
+            aa -#= speed;
+            entities.SoA.xVelocity[unaligned x] = aa;
+            entities.SoA.yVelocity[unaligned x] = 0;
+        }
+        mem8();
+        return;
+    }
+    
+    if a == 2 {
+        // DOWN: +Y velocity
+        mem16();
+        #[mem16] {
+            entities.SoA.xVelocity[unaligned x] = 0;
+            entities.SoA.yVelocity[unaligned x] = aa = speed;
+        }
+        mem8();
+        return;
+    }
+    
+    // UP: -Y velocity
+    mem16();
+    #[mem16] {
+        entities.SoA.xVelocity[unaligned x] = 0;
+        aa = 0;
+        carry = true;
+        aa -#= speed;
+        entities.SoA.yVelocity[unaligned x] = aa;
+    }
+    mem8();
+}
+
+
+// Apply knockback impulse to entity
+// Adds impulse to current velocity (doesn't replace)
+//
+// INPUT: y = entityId
+//        zpTmp_word_0 = knockbackX (signed 16-bit)
+//        zpTmp_word_1 = knockbackY (signed 16-bit)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func apply_knockback(entityId : u8 in y, knockbackX : u16 in zpTmp_word_0, knockbackY : u16 in zpTmp_word_1) {
+    x = y;
+    
+    mem16();
+    #[mem16] {
+        // xVelocity += knockbackX
+        aa = entities.SoA.xVelocity[unaligned x];
+        carry = false;
+        aa +#= knockbackX;
+        entities.SoA.xVelocity[unaligned x] = aa;
+        
+        // yVelocity += knockbackY
+        aa = entities.SoA.yVelocity[unaligned x];
+        carry = false;
+        aa +#= knockbackY;
+        entities.SoA.yVelocity[unaligned x] = aa;
+    }
+    mem8();
+}
+
+
+}
+}

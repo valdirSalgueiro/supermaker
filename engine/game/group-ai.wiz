@@ -1,0 +1,250 @@
+// Group AI Coordination System
+// =============================
+// Centralized attack arbitration and movement intent resolution.
+// Ensures fair, readable arcade-style group behavior.
+//
+// Design:
+//   - Single attacker slot (1 active + 1 "on deck" who commits but waits)
+//   - Movement intent buffer to prevent enemy overlap/jitter
+//   - Priority: attacking > committed > approaching
+//
+// DB = 0x7e (all functions)
+
+import "src/memmap";
+import "engine/entity_api";
+import "engine/game/entity-movement";
+
+
+namespace group_ai {
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+let MAX_ENEMIES = 20;  // entities 1-20 (0 is player)
+
+// Attack slot states
+let SLOT_FREE     = 0xFF;  // No one holds this slot
+
+// Movement priority levels (all must be non-zero to be processed)
+namespace Priority {
+    let IDLE        = 1;  // Lowest - waiting/orbiting
+    let APPROACHING = 2;  // Moving toward player
+    let COMMITTED   = 3;  // Committed to attack (on deck)
+    let ATTACKING   = 4;  // Highest - currently attacking
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STATE VARIABLES
+// ═══════════════════════════════════════════════════════════════════════════
+
+in wram7e {
+    // Attack slot - entityId of current attacker (SLOT_FREE if none)
+    var currentAttacker : u8;
+    
+    // On-deck slot - entityId committed to attack next (SLOT_FREE if none)
+    var onDeckAttacker : u8;
+    
+    // Frame counter for attack cooldown between different enemies
+    var attackCooldown : u8;
+    
+    // Movement intent buffer
+    // Each enemy writes desired velocity; arbiter resolves conflicts
+    namespace intent {
+        // Using u16 for velocity (signed values stored as two's complement)
+        var desiredVelX : [u16 ; MAX_ENEMIES];  // 8:8 fixed point (signed as two's complement)
+        var desiredVelY : [u16 ; MAX_ENEMIES];
+        var priority    : [u8 ; MAX_ENEMIES];   // Priority level for conflict resolution
+    }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INITIALIZATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+in code {
+
+// Reset group AI state (call on room load)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func reset() {
+    currentAttacker = a = SLOT_FREE;
+    onDeckAttacker = a = SLOT_FREE;
+    attackCooldown = a = 0;
+    
+    // Clear all intent priorities
+    y = (MAX_ENEMIES - 1) * 2;
+    do {
+        intent.priority[unaligned y] = a = 0;
+        y--;
+        y--;
+    } while !negative;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ATTACK SLOT MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Request permission to attack
+// Returns: carry set if granted, clear if denied
+//
+// The caller should be in COMMIT state before calling this.
+// If denied, caller becomes "on deck" (first in queue).
+//
+// DB = 0x7e
+#[mem8, idx8]
+func request_attack(entityId : u8 in y) : bool in carry {
+    // Check if we already have the slot
+    a = y;
+    if a == currentAttacker {
+        carry = true;
+        return carry;
+    }
+
+    // Check if slot is free
+    a = currentAttacker;
+    if a == SLOT_FREE {
+        // Check cooldown
+        a = attackCooldown;
+        if zero {
+            // Grant attack slot
+            currentAttacker = a = y;
+            carry = true;
+            return carry;
+        }
+    }
+    
+    // Slot taken - try to get on deck
+    a = onDeckAttacker;
+    if a == SLOT_FREE {
+        onDeckAttacker = a = y;
+    }
+    
+    carry = false;
+    return carry;
+}
+
+
+// Release attack slot (call when attack ends or entity dies)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func release_attack(entityId : u8 in y) {
+    // Check if we're the current attacker
+    a = y;
+    if a == currentAttacker {
+        // Promote on-deck to current
+        a = onDeckAttacker;
+        currentAttacker = a;
+        onDeckAttacker = a = SLOT_FREE;
+        
+        // Set cooldown before on-deck can actually attack
+        attackCooldown = a = 15;  // ~0.25 sec at 60fps
+        return;
+    }
+    
+    // Check if we're on deck
+    a = y;
+    cmp(a, onDeckAttacker);
+    if zero {
+        onDeckAttacker = a = SLOT_FREE;
+    }
+}
+
+
+// Check if entity currently holds attack slot
+//
+// DB = 0x7e
+#[mem8, idx8]
+func has_attack_slot(entityId : u8 in y) : bool in carry {
+    a = y;
+    cmp(a, currentAttacker);
+    if zero {
+        carry = true;
+    } else {
+        carry = false;
+    }
+    return carry;
+}
+
+
+// Check if entity is on deck (committed, waiting for slot)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func is_on_deck(entityId : u8 in y) : bool in carry {
+    a = y;
+    cmp(a, onDeckAttacker);
+    if zero {
+        carry = true;
+    } else {
+        carry = false;
+    }
+    return carry;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MOVEMENT INTENT SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+
+// NOTE: write_intent functions removed - enemies write directly to intent arrays
+
+
+// Process all movement intents and resolve conflicts
+// Called once per frame after all enemies have written intents
+//
+// Simple overlap resolution: if two enemies would be too close,
+// the lower-priority one has velocity zeroed.
+//
+// DB = 0x7e
+#[mem8, idx8]
+func resolve_intents() {
+    // Decrement attack cooldown
+    a = attackCooldown;
+    if !zero {
+        a--;
+        attackCooldown = a;
+    }
+    
+    // For now, just apply intents directly to entity velocities
+    // TODO: Add overlap detection and priority-based yielding
+    
+    y = 2;  // Start at entity 1 (skip player)
+    do {
+        // Only process if entity has an intent this frame
+        a = intent.priority[unaligned y];
+        if !zero {
+            // Apply intent to entity velocity
+            mem16();
+            #[mem16] {
+                aa = intent.desiredVelX[unaligned y];
+                entities.SoA.xVelocity[unaligned y] = aa;
+                
+                aa = intent.desiredVelY[unaligned y];
+                entities.SoA.yVelocity[unaligned y] = aa;
+            }
+            mem8();
+            
+            // Apply velocity to world position (for scrolling maps)
+            entity_movement.apply_velocity(y);
+            
+            // Sync yPos_px from worldY_lo for Y-sorting (sprite draw order)
+            entities.SoA.yPos_px[unaligned y] = a = entities.SoA.worldY_lo[unaligned y];
+            
+            // Clear intent for next frame
+            intent.priority[unaligned y] = a = 0;
+        }
+        
+        y++;
+        y++;
+    } while y < entities.SoA.LAST_INDEX + 2;
+}
+
+
+}  // in code
+}  // namespace group_ai

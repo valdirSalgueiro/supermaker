@@ -1,0 +1,297 @@
+// Simple flags system (replaces gamestate flags without SRAM persistence)
+//
+// Copyright (c) 2024
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+import "gen/enums";
+
+namespace flags {
+
+// Number of flag bytes (256 flags = 32 bytes)
+let N_FLAG_BYTES = 32;
+
+in wram7e {
+    // Global flags (256 bit bitfield)
+    var globalFlags : [ u8 ; N_FLAG_BYTES ];
+
+    // Dungeon flags (256 bit bitfield)
+    // Reset when entering a new dungeon
+    var dungeonFlags : [ u8 ; N_FLAG_BYTES ];
+}
+
+
+in rodata0 {
+    const _BitTable : [u8 ; 8] = [ 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80 ];
+}
+
+
+in code {
+
+// Reset all flags
+//
+// DB = 0x7e
+#[mem8, idx8]
+func reset_all_flags() {
+    x = N_FLAG_BYTES - 1;
+    do {
+        globalFlags[x] = 0;
+        dungeonFlags[x] = 0;
+        x--;
+    } while !negative;
+}
+
+
+// Reset dungeon flags only
+//
+// DB = 0x7e
+#[mem8, idx8]
+func reset_dungeon_flags() {
+    x = N_FLAG_BYTES - 1;
+    do {
+        dungeonFlags[x] = 0;
+        x--;
+    } while !negative;
+}
+
+
+// Global Flag Functions
+// =====================
+
+// Check if global flag is clear
+//
+// DB = 0x7e
+#[fallthrough, mem8, idx8]
+func __is_global_flag_clear_a(flag_id : gs.gf in a) {
+    x = a;
+}
+
+let is_global_flag_clear_a = __is_global_flag_clear_a as func(flag_id : gs.gf in a) : bool in zero;
+
+
+// Check if global flag is clear (flag_id in X)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func is_global_flag_clear(flag_id : gs.gf in x) : bool in zero {
+var _byte_idx : u8 in zpTmp_byte_0;
+var _bit_idx : u8 in zpTmp_byte_1;
+
+    // flag_id in x
+    // byte_index = flag_id >> 3
+    // bit_index = flag_id & 7
+    a = x;
+    _bit_idx = a = a & 0x07;  // bit_index
+    a = x;
+    a >>>= 3;   // byte_index
+    y = a;
+    x = _bit_idx;
+
+    a = globalFlags[y] & _BitTable[x];
+
+    // zero flag set if flag is clear (bit == 0)
+    return zero;
+}
+
+
+// Same but preserves Y
+#[fallthrough, mem8, idx8]
+func __is_global_flag_clear_a__keep_y(flag_id : gs.gf in a) {
+    x = a;
+}
+
+let is_global_flag_clear_a__keep_y = __is_global_flag_clear_a__keep_y as func(flag_id : gs.gf in a) : bool in zero;
+
+
+#[mem8, idx8]
+func is_global_flag_clear__keep_y(flag_id : gs.gf in x) : bool in zero {
+var _y_backup : u8 in zpTmp_byte_0;
+var _bit_idx : u8 in zpTmp_byte_1;
+
+    _y_backup = y;
+
+    // Inline is_global_flag_clear logic
+    a = x;
+    _bit_idx = a = a & 0x07;
+    a = x;
+    a >>>= 3;
+    y = a;
+    x = _bit_idx;
+
+    a = globalFlags[y] & _BitTable[x];
+
+    y = _y_backup;
+    return zero;
+}
+
+
+// Set global flag
+//
+// DB = 0x7e
+#[fallthrough, mem8, idx8]
+func __set_global_flag_a(flag_id : u8 in a) {
+    x = a;
+}
+
+let set_global_flag_a = __set_global_flag_a as func(flag_id : u8 in a) : bool in zero;
+
+
+#[mem8, idx8]
+func set_global_flag(flag_id : gs.gf in x) {
+var _byte_idx : u8 in zpTmp_byte_0;
+var _bit_idx : u8 in zpTmp_byte_1;
+
+    a = x;
+    _bit_idx = a = a & 0x07;  // bit_index
+    a = x;
+    a >>>= 3;   // byte_index
+    y = a;
+    x = _bit_idx;
+
+    globalFlags[y] = a = globalFlags[y] | _BitTable[x];
+}
+
+
+// Same but preserves Y
+#[fallthrough, mem8, idx8]
+func __set_global_flag_a__keep_y(flag_id : u8 in a) {
+    x = a;
+}
+
+let set_global_flag_a__keep_y = __set_global_flag_a__keep_y as func(flag_id : u8 in a) : bool in zero;
+
+
+#[mem8, idx8]
+func set_global_flag__keep_y(flag_id : gs.gf in x) {
+var _y_backup : u8 in zpTmp_byte_0;
+var _bit_idx : u8 in zpTmp_byte_1;
+
+    _y_backup = y;
+
+    // Inline set_global_flag logic
+    a = x;
+    _bit_idx = a = a & 0x07;
+    a = x;
+    a >>>= 3;
+    y = a;
+    x = _bit_idx;
+
+    globalFlags[y] = a = globalFlags[y] | _BitTable[x];
+
+    y = _y_backup;
+}
+
+
+// Dungeon Flag Functions
+// ======================
+
+#[fallthrough, mem8, idx8]
+func __is_dungeon_flag_clear_a(flag_id : u8 in a) {
+    x = a;
+}
+
+let is_dungeon_flag_clear_a = __is_dungeon_flag_clear_a as func(flag_id : u8 in a) : bool in zero;
+
+
+#[mem8, idx8]
+func is_dungeon_flag_clear(flag_id : u8 in x) : bool in zero {
+var _byte_idx : u8 in zpTmp_byte_0;
+var _bit_idx : u8 in zpTmp_byte_1;
+
+    a = x;
+    _bit_idx = a = a & 0x07;
+    a = x;
+    a >>>= 3;
+    y = a;
+    x = _bit_idx;
+
+    a = dungeonFlags[y] & _BitTable[x];
+    return zero;
+}
+
+
+#[fallthrough, mem8, idx8]
+func __is_dungeon_flag_clear_a__keep_y(flag_id : u8 in a) {
+    x = a;
+}
+
+let is_dungeon_flag_clear_a__keep_y = __is_dungeon_flag_clear_a__keep_y as func(flag_id : u8 in a) : bool in zero;
+
+
+#[mem8, idx8]
+func is_dungeon_flag_clear__keep_y(flag_id : u8 in x) : bool in zero {
+var _y_backup : u8 in zpTmp_byte_0;
+var _bit_idx : u8 in zpTmp_byte_1;
+
+    _y_backup = y;
+
+    // Inline is_dungeon_flag_clear logic
+    a = x;
+    _bit_idx = a = a & 0x07;
+    a = x;
+    a >>>= 3;
+    y = a;
+    x = _bit_idx;
+
+    a = dungeonFlags[y] & _BitTable[x];
+
+    y = _y_backup;
+    return zero;
+}
+
+
+#[fallthrough, mem8, idx8]
+func __set_dungeon_flag_a(flag_id : u8 in a) {
+    x = a;
+}
+
+let set_dungeon_flag_a = __set_dungeon_flag_a as func(flag_id : u8 in a) : bool in zero;
+
+
+#[mem8, idx8]
+func set_dungeon_flag(flag_id : u8 in x) {
+var _byte_idx : u8 in zpTmp_byte_0;
+var _bit_idx : u8 in zpTmp_byte_1;
+
+    a = x;
+    _bit_idx = a = a & 0x07;
+    a = x;
+    a >>>= 3;
+    y = a;
+    x = _bit_idx;
+
+    dungeonFlags[y] = a = dungeonFlags[y] | _BitTable[x];
+}
+
+
+#[fallthrough, mem8, idx8]
+func __set_dungeon_flag_a__keep_y(flag_id : u8 in a) {
+    x = a;
+}
+
+let set_dungeon_flag_a__keep_y = __set_dungeon_flag_a__keep_y as func(flag_id : u8 in a) : bool in zero;
+
+
+#[mem8, idx8]
+func set_dungeon_flag__keep_y(flag_id : u8 in x) {
+var _y_backup : u8 in zpTmp_byte_0;
+var _bit_idx : u8 in zpTmp_byte_1;
+
+    _y_backup = y;
+
+    // Inline set_dungeon_flag logic
+    a = x;
+    _bit_idx = a = a & 0x07;
+    a = x;
+    a >>>= 3;
+    y = a;
+    x = _bit_idx;
+
+    dungeonFlags[y] = a = dungeonFlags[y] | _BitTable[x];
+
+    y = _y_backup;
+}
+
+}
+
+}

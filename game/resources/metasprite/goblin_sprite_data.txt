@@ -1,0 +1,226 @@
+# Dynamic Metasprite Sprite Data Debug
+# Spritesheet: j
+# Format: 5 bytes per sprite (x, y, char, attr, size), terminated by x=0xFF
+
+=== Frameset: J ===
+
+Frame frame0: 2 DMA transfer(s), 2752 bytes
+  Large tiles: 17, Small tiles: 4
+  Row 0: ROM $0000, 2048 bytes
+  Row 4: ROM $0800, 704 bytes
+Frame: frame0
+  Raw data (from offset 13): 040c0008040c00080000003000002201201002220130100422014010062201202008220130200a220140200c220120300e22013030202201403022220120402422013040262201404028220110502a220120502c220130502e220140504022012808522200400853220018485422005058552200ff00000000
+  Hitbox: 04 0c 00 08
+  Hurtbox: 04 0c 00 08
+  Pattern: 00, XOff: 0, YOff: 0
+  Sprites (5 bytes each: x, y, char, attr, size):
+    [0] x= +48, y=  +0, tile=  0 (0x000), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [1] x= +32, y= +16, tile=  2 (0x002), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [2] x= +48, y= +16, tile=  4 (0x004), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [3] x= +64, y= +16, tile=  6 (0x006), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [4] x= +32, y= +32, tile=  8 (0x008), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [5] x= +48, y= +32, tile= 10 (0x00A), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [6] x= +64, y= +32, tile= 12 (0x00C), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [7] x= +32, y= +48, tile= 14 (0x00E), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [8] x= +48, y= +48, tile= 32 (0x020), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [9] x= +64, y= +48, tile= 34 (0x022), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [10] x= +32, y= +64, tile= 36 (0x024), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [11] x= +48, y= +64, tile= 38 (0x026), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [12] x= +64, y= +64, tile= 40 (0x028), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [13] x= +16, y= +80, tile= 42 (0x02A), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [14] x= +32, y= +80, tile= 44 (0x02C), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [15] x= +48, y= +80, tile= 46 (0x02E), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [16] x= +64, y= +80, tile= 64 (0x040), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [17] x= +40, y=  +8, tile= 82 (0x052), pal=1, pri=2, hflip=False, vflip=False, size=8x8
+    [18] x= +64, y=  +8, tile= 83 (0x053), pal=1, pri=2, hflip=False, vflip=False, size=8x8
+    [19] x= +24, y= +72, tile= 84 (0x054), pal=1, pri=2, hflip=False, vflip=False, size=8x8
+    [20] x= +80, y= +88, tile= 85 (0x055), pal=1, pri=2, hflip=False, vflip=False, size=8x8
+    [21] TERMINATOR
+  Summary: 0 large (16x16), 0 small (8x8), total 21 sprites
+
+Frame frame1: 2 DMA transfer(s), 2656 bytes
+  Large tiles: 17, Small tiles: 1
+  Row 0: ROM $0AC0, 2048 bytes
+  Row 4: ROM $12C0, 608 bytes
+Frame: frame1
+  Raw data (from offset 13): 040c0008040c00080000003000002201400002220120100422013010062201401008220120200a220130200c220140200e22012030202201303022220140302422012040262201304028220140402a220120502c220130502e220140504022015010522200ff00000000
+  Hitbox: 04 0c 00 08
+  Hurtbox: 04 0c 00 08
+  Pattern: 00, XOff: 0, YOff: 0
+  Sprites (5 bytes each: x, y, char, attr, size):
+    [0] x= +48, y=  +0, tile=  0 (0x000), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [1] x= +64, y=  +0, tile=  2 (0x002), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [2] x= +32, y= +16, tile=  4 (0x004), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [3] x= +48, y= +16, tile=  6 (0x006), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [4] x= +64, y= +16, tile=  8 (0x008), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [5] x= +32, y= +32, tile= 10 (0x00A), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [6] x= +48, y= +32, tile= 12 (0x00C), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [7] x= +64, y= +32, tile= 14 (0x00E), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [8] x= +32, y= +48, tile= 32 (0x020), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [9] x= +48, y= +48, tile= 34 (0x022), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [10] x= +64, y= +48, tile= 36 (0x024), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [11] x= +32, y= +64, tile= 38 (0x026), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [12] x= +48, y= +64, tile= 40 (0x028), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [13] x= +64, y= +64, tile= 42 (0x02A), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [14] x= +32, y= +80, tile= 44 (0x02C), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [15] x= +48, y= +80, tile= 46 (0x02E), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [16] x= +64, y= +80, tile= 64 (0x040), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [17] x= +80, y= +16, tile= 82 (0x052), pal=1, pri=2, hflip=False, vflip=False, size=8x8
+    [18] TERMINATOR
+  Summary: 0 large (16x16), 0 small (8x8), total 18 sprites
+
+Frame frame2: 2 DMA transfer(s), 3008 bytes
+  Large tiles: 19, Small tiles: 8
+  Row 0: ROM $1520, 2048 bytes
+  Row 4: ROM $1D20, 960 bytes
+Frame: frame2
+  Raw data (from offset 13): 040c0008040c00080000003000002201201002220130100422014010062201501008220160100a220110200c220120200e22013020202201103022220120302422013030262201104028220120402a220130402c220140402e2201005040220110504222014050442201181856220008285722004020582200083059220040385a220008485b220038505c220050585d2200ff00000000
+  Hitbox: 04 0c 00 08
+  Hurtbox: 04 0c 00 08
+  Pattern: 00, XOff: 0, YOff: 0
+  Sprites (5 bytes each: x, y, char, attr, size):
+    [0] x= +48, y=  +0, tile=  0 (0x000), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [1] x= +32, y= +16, tile=  2 (0x002), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [2] x= +48, y= +16, tile=  4 (0x004), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [3] x= +64, y= +16, tile=  6 (0x006), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [4] x= +80, y= +16, tile=  8 (0x008), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [5] x= +96, y= +16, tile= 10 (0x00A), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [6] x= +16, y= +32, tile= 12 (0x00C), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [7] x= +32, y= +32, tile= 14 (0x00E), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [8] x= +48, y= +32, tile= 32 (0x020), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [9] x= +16, y= +48, tile= 34 (0x022), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [10] x= +32, y= +48, tile= 36 (0x024), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [11] x= +48, y= +48, tile= 38 (0x026), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [12] x= +16, y= +64, tile= 40 (0x028), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [13] x= +32, y= +64, tile= 42 (0x02A), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [14] x= +48, y= +64, tile= 44 (0x02C), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [15] x= +64, y= +64, tile= 46 (0x02E), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [16] x=  +0, y= +80, tile= 64 (0x040), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [17] x= +16, y= +80, tile= 66 (0x042), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [18] x= +64, y= +80, tile= 68 (0x044), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [19] x= +24, y= +24, tile= 86 (0x056), pal=1, pri=2, hflip=False, vflip=False, size=8x8
+    [20] x=  +8, y= +40, tile= 87 (0x057), pal=1, pri=2, hflip=False, vflip=False, size=8x8
+    [21] x= +64, y= +32, tile= 88 (0x058), pal=1, pri=2, hflip=False, vflip=False, size=8x8
+    [22] x=  +8, y= +48, tile= 89 (0x059), pal=1, pri=2, hflip=False, vflip=False, size=8x8
+    [23] x= +64, y= +56, tile= 90 (0x05A), pal=1, pri=2, hflip=False, vflip=False, size=8x8
+    [24] x=  +8, y= +72, tile= 91 (0x05B), pal=1, pri=2, hflip=False, vflip=False, size=8x8
+    [25] x= +56, y= +80, tile= 92 (0x05C), pal=1, pri=2, hflip=False, vflip=False, size=8x8
+    [26] x= +80, y= +88, tile= 93 (0x05D), pal=1, pri=2, hflip=False, vflip=False, size=8x8
+    [27] TERMINATOR
+  Summary: 0 large (16x16), 0 small (8x8), total 27 sprites
+
+Frame frame3: 1 DMA transfer(s), 2048 bytes
+  Large tiles: 16, Small tiles: 0
+  Row 0: ROM $20E0, 2048 bytes
+Frame: frame3
+  Raw data (from offset 7): 040c0008040c00080000001020002201202002220130200422014020062201103008220120300a220130300c220140300e22015030202201204022220130402422014040262201504028220160402a220150502c220160502e2201ff00000000
+  Hitbox: 04 0c 00 08
+  Hurtbox: 04 0c 00 08
+  Pattern: 00, XOff: 0, YOff: 0
+  Sprites (5 bytes each: x, y, char, attr, size):
+    [0] x= +16, y= +32, tile=  0 (0x000), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [1] x= +32, y= +32, tile=  2 (0x002), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [2] x= +48, y= +32, tile=  4 (0x004), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [3] x= +64, y= +32, tile=  6 (0x006), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [4] x= +16, y= +48, tile=  8 (0x008), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [5] x= +32, y= +48, tile= 10 (0x00A), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [6] x= +48, y= +48, tile= 12 (0x00C), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [7] x= +64, y= +48, tile= 14 (0x00E), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [8] x= +80, y= +48, tile= 32 (0x020), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [9] x= +32, y= +64, tile= 34 (0x022), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [10] x= +48, y= +64, tile= 36 (0x024), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [11] x= +64, y= +64, tile= 38 (0x026), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [12] x= +80, y= +64, tile= 40 (0x028), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [13] x= +96, y= +64, tile= 42 (0x02A), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [14] x= +80, y= +80, tile= 44 (0x02C), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [15] x= +96, y= +80, tile= 46 (0x02E), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [16] TERMINATOR
+  Summary: 0 large (16x16), 0 small (8x8), total 16 sprites
+
+Frame frame4: 2 DMA transfer(s), 1952 bytes
+  Large tiles: 14, Small tiles: 1
+  Row 0: ROM $28E0, 1024 bytes
+  Row 2: ROM $2CE0, 928 bytes
+Frame: frame4
+  Raw data (from offset 13): 040c0008040c00080000000040002201104002220120400422013040062201404008220150400a220160400c220110500e22012050202201305022220140502422015050262201605028220170502a220108503c2200ff00000000
+  Hitbox: 04 0c 00 08
+  Hurtbox: 04 0c 00 08
+  Pattern: 00, XOff: 0, YOff: 0
+  Sprites (5 bytes each: x, y, char, attr, size):
+    [0] x=  +0, y= +64, tile=  0 (0x000), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [1] x= +16, y= +64, tile=  2 (0x002), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [2] x= +32, y= +64, tile=  4 (0x004), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [3] x= +48, y= +64, tile=  6 (0x006), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [4] x= +64, y= +64, tile=  8 (0x008), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [5] x= +80, y= +64, tile= 10 (0x00A), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [6] x= +96, y= +64, tile= 12 (0x00C), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [7] x= +16, y= +80, tile= 14 (0x00E), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [8] x= +32, y= +80, tile= 32 (0x020), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [9] x= +48, y= +80, tile= 34 (0x022), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [10] x= +64, y= +80, tile= 36 (0x024), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [11] x= +80, y= +80, tile= 38 (0x026), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [12] x= +96, y= +80, tile= 40 (0x028), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [13] x=+112, y= +80, tile= 42 (0x02A), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [14] x=  +8, y= +80, tile= 60 (0x03C), pal=1, pri=2, hflip=False, vflip=False, size=8x8
+    [15] TERMINATOR
+  Summary: 0 large (16x16), 0 small (8x8), total 15 sprites
+
+Frame frame5: 2 DMA transfer(s), 2048 bytes
+  Large tiles: 14, Small tiles: 4
+  Row 0: ROM $3080, 1024 bytes
+  Row 2: ROM $3480, 1024 bytes
+Frame: frame5
+  Raw data (from offset 13): 040c0008040c00080000004000002201201002220130100422014010062201102008220120200a220130200c220140200e22012030202201303022220120402422013040262201205028220130502a220118303c220040303d220018583e220040503f2200ff00000000
+  Hitbox: 04 0c 00 08
+  Hurtbox: 04 0c 00 08
+  Pattern: 00, XOff: 0, YOff: 0
+  Sprites (5 bytes each: x, y, char, attr, size):
+    [0] x= +64, y=  +0, tile=  0 (0x000), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [1] x= +32, y= +16, tile=  2 (0x002), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [2] x= +48, y= +16, tile=  4 (0x004), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [3] x= +64, y= +16, tile=  6 (0x006), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [4] x= +16, y= +32, tile=  8 (0x008), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [5] x= +32, y= +32, tile= 10 (0x00A), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [6] x= +48, y= +32, tile= 12 (0x00C), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [7] x= +64, y= +32, tile= 14 (0x00E), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [8] x= +32, y= +48, tile= 32 (0x020), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [9] x= +48, y= +48, tile= 34 (0x022), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [10] x= +32, y= +64, tile= 36 (0x024), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [11] x= +48, y= +64, tile= 38 (0x026), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [12] x= +32, y= +80, tile= 40 (0x028), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [13] x= +48, y= +80, tile= 42 (0x02A), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [14] x= +24, y= +48, tile= 60 (0x03C), pal=1, pri=2, hflip=False, vflip=False, size=8x8
+    [15] x= +64, y= +48, tile= 61 (0x03D), pal=1, pri=2, hflip=False, vflip=False, size=8x8
+    [16] x= +24, y= +88, tile= 62 (0x03E), pal=1, pri=2, hflip=False, vflip=False, size=8x8
+    [17] x= +64, y= +80, tile= 63 (0x03F), pal=1, pri=2, hflip=False, vflip=False, size=8x8
+    [18] TERMINATOR
+  Summary: 0 large (16x16), 0 small (8x8), total 18 sprites
+
+Frame frame6: 2 DMA transfer(s), 1888 bytes
+  Large tiles: 12, Small tiles: 3
+  Row 0: ROM $3880, 1024 bytes
+  Row 2: ROM $3C80, 864 bytes
+Frame: frame6
+  Raw data (from offset 13): 040c0008040c00080000003020002201402002220120300422013030062201403008220120400a220130400c220140400e220110502022012050222201305024220140502622015028382200503039220018483a2200ff00000000
+  Hitbox: 04 0c 00 08
+  Hurtbox: 04 0c 00 08
+  Pattern: 00, XOff: 0, YOff: 0
+  Sprites (5 bytes each: x, y, char, attr, size):
+    [0] x= +48, y= +32, tile=  0 (0x000), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [1] x= +64, y= +32, tile=  2 (0x002), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [2] x= +32, y= +48, tile=  4 (0x004), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [3] x= +48, y= +48, tile=  6 (0x006), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [4] x= +64, y= +48, tile=  8 (0x008), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [5] x= +32, y= +64, tile= 10 (0x00A), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [6] x= +48, y= +64, tile= 12 (0x00C), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [7] x= +64, y= +64, tile= 14 (0x00E), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [8] x= +16, y= +80, tile= 32 (0x020), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [9] x= +32, y= +80, tile= 34 (0x022), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [10] x= +48, y= +80, tile= 36 (0x024), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [11] x= +64, y= +80, tile= 38 (0x026), pal=1, pri=2, hflip=False, vflip=False, size=16x16
+    [12] x= +80, y= +40, tile= 56 (0x038), pal=1, pri=2, hflip=False, vflip=False, size=8x8
+    [13] x= +80, y= +48, tile= 57 (0x039), pal=1, pri=2, hflip=False, vflip=False, size=8x8
+    [14] x= +24, y= +72, tile= 58 (0x03A), pal=1, pri=2, hflip=False, vflip=False, size=8x8
+    [15] TERMINATOR
+  Summary: 0 large (16x16), 0 small (8x8), total 15 sprites
+

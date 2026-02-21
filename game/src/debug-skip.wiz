@@ -1,0 +1,175 @@
+// Debug Skip Functionality
+// ========================
+//
+// For testing/debugging purposes - skip rooms and dungeons with button presses.
+// 
+// SELECT button: Skip to next dungeon
+// START button: Skip to next room in current dungeon
+
+// ═══════════════════════════════════════════════════════════════
+// DEBUG COMPILE-TIME FLAGS
+// ═══════════════════════════════════════════════════════════════
+// Set to true to boot directly into animation test screen
+let DEBUG_START_ANIMATION_TEST = false;
+
+import "memmap";
+import "joypad";
+import "engine/registers";
+import "engine/game/dungeon";
+import "engine/gamemodes";
+import "gen/enums";
+import "gen/room-progression";
+
+namespace debug_skip {
+
+in wram7e {
+    // Prevent repeated skips on held buttons
+    var _select_pressed_last_frame : u8;
+    var _start_pressed_last_frame : u8;
+    
+    // Temp vars for room skip calculations
+    var _temp_room_x : u8;
+    var _temp_room_y : u8;
+    var _temp_width : u8;
+    var _temp_height : u8;
+}
+
+
+in code {
+
+// Check for debug skip button presses and trigger transitions
+// Call this each frame from the game loop
+//
+// DB = 0x7e
+#[mem8, idx8]
+func check_skip_buttons() {
+    // Check SELECT button (skip to next dungeon)
+    a = joypad.pressed_h;
+    if a & joypad.JOYH.SELECT != 0 {
+        a = _select_pressed_last_frame;
+        if zero {
+            // SELECT just pressed, not held
+            skip_to_next_dungeon();
+            _select_pressed_last_frame = a = 1;
+        }
+    }
+    else {
+        _select_pressed_last_frame = a = 0;
+    }
+    
+    // Check START button (skip to next room)
+    a = joypad.pressed_h;
+    if a & joypad.JOYH.START != 0 {
+        a = _start_pressed_last_frame;
+        if zero {
+            // START just pressed, not held
+            skip_to_next_room();
+            _start_pressed_last_frame = a = 1;
+        }
+    }
+    else {
+        _start_pressed_last_frame = a = 0;
+    }
+}
+
+
+// Skip to the next room in the current dungeon
+// Wraps around to (0,0) if at the edge
+//
+// DB = 0x7e
+#[mem8, idx8]
+func skip_to_next_room() {
+    // Get current room position
+    _temp_room_x = a = dungeon.roomToLoad.room_x;
+    _temp_room_y = a = dungeon.roomToLoad.room_y;
+    
+    // Increment room_x
+    a = _temp_room_x;
+    a++;
+    _temp_room_x = a;
+    
+    // Check if we need to wrap to next row
+    _temp_width = a = dungeon.dungeonData.width;
+    a = _temp_room_x;
+    cmp(a, _temp_width);
+    if !carry {
+        // Within bounds, use it
+        dungeon.roomToLoad.room_x = a;
+        a = _temp_room_y;
+        dungeon.roomToLoad.room_y = a;
+    }
+    else {
+        // Wrapped past width, go to next row
+        dungeon.roomToLoad.room_x = a = 0;
+        
+        a = _temp_room_y;
+        a++;
+        _temp_room_y = a;
+        
+        // Check if we need to wrap to (0,0)
+        _temp_height = a = dungeon.dungeonData.height;
+        a = _temp_room_y;
+        cmp(a, _temp_height);
+        if !carry {
+            // Within bounds
+            dungeon.roomToLoad.room_y = a;
+        }
+        else {
+            // Wrapped to (0, 0)
+            dungeon.roomToLoad.room_y = a = 0;
+        }
+    }
+    
+    // Use default starting position
+    a = dungeon.dungeonData.startingTile_x;
+    a <<= 4;  // Convert tile to pixel
+    dungeon.roomToLoad.player_x_lo = a;
+    dungeon.roomToLoad.player_x_hi = a = 0;
+    
+    a = dungeon.dungeonData.startingTile_y;
+    a <<= 4;  // Convert tile to pixel
+    dungeon.roomToLoad.player_y_lo = a;
+    dungeon.roomToLoad.player_y_hi = a = 0;
+    
+    // Trigger room transition (fade in)
+    set_next_game_mode_to_room_transition(RoomTransitions.fadein);
+}
+
+
+// Skip to the next dungeon (dungeon 0 -> dungeon 1, etc.)
+// Wraps back to dungeon 0 after the last dungeon
+//
+// DB = 0x7e
+#[mem8, idx8]
+func skip_to_next_dungeon() {
+    // Read dungeons.json to count total dungeons
+    // For now, assume 2 dungeons (0 = playground, 1 = overworld)
+    // TODO: This should be generated or read from a constant
+    
+    a = dungeon.roomToLoad.dungeon;
+    a++;
+    
+    if a >= 9 {
+        a = 0;
+    }
+    
+    dungeon.roomToLoad.dungeon = a;
+    
+    // Go to the default room (0, 0) of the new dungeon
+    dungeon.roomToLoad.room_x = a = 0;
+    dungeon.roomToLoad.room_y = a = 0;
+    
+    // The engine will set the starting position from dungeon metadata
+    // But we need to set something here to avoid issues
+    dungeon.roomToLoad.player_x_lo = a = 64;
+    dungeon.roomToLoad.player_x_hi = a = 0;
+    dungeon.roomToLoad.player_y_lo = a = 64;
+    dungeon.roomToLoad.player_y_hi = a = 0;
+    
+    // Trigger dungeon + room load transition
+    set_next_game_mode_to_room_transition(RoomTransitions.fadein);
+}
+
+}  // in code
+
+}  // namespace debug_skip

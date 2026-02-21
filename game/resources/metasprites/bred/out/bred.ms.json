@@ -1,0 +1,116 @@
+{
+  "name": "bred",
+  "palette": "bred",
+  "firstTile": 0,
+  "endTile": 256,
+  "dynamic": true,
+  "framesets": [
+    {
+      "name": "Bred",
+      "source": "bred.png",
+      "frameWidth": 128,
+      "frameHeight": 128,
+      "autoFlip": "h",
+      "frames": [
+        "frame0",
+        "frame1",
+        "frame2",
+        "frame3",
+        "frame4",
+        "frame5",
+        "frame6",
+        "frame7",
+        "frame8",
+        "frame9",
+        "frame10",
+        "frame11",
+        "frame12",
+        "frame13",
+        "frame14",
+        "frame15",
+        "frame16",
+        "frame17",
+        "frame18",
+        "frame19",
+        "frame20",
+        "frame21",
+        "frame22",
+        "frame23",
+        "frame24",
+        "frame25"
+      ],
+      "animations": {
+        "animation0": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame0",
+            "frame1",
+            "frame2",
+            "frame3",
+            "frame4"
+          ],
+          "loop": true
+        },
+        "animation1": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame5",
+            "frame6",
+            "frame7",
+            "frame8",
+            "frame9"
+          ],
+          "loop": true
+        },
+        "animation2": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame10",
+            "frame11",
+            "frame12",
+            "frame13",
+            "frame14"
+          ],
+          "loop": true
+        },
+        "animation3": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame15",
+            "frame16",
+            "frame17",
+            "frame18",
+            "frame19"
+          ],
+          "loop": true
+        },
+        "animation4": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame20",
+            "frame21",
+            "frame22",
+            "frame23",
+            "frame24"
+          ],
+          "loop": true
+        },
+        "animation5": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame25"
+          ],
+          "loop": true
+        }
+      },
+      "defaultLayout": "auto 0 0",
+      "order": 2
+    }
+  ]
+}

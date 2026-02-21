@@ -1,0 +1,1429 @@
+# Dynamic Metasprite Sprite Data Debug
+# Spritesheet: dug
+# Format: 5 bytes per sprite (x, y, char, attr, size), terminated by x=0xFF
+
+=== Frameset: Dug ===
+
+Frame 0: frame0
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +48, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +64, +32) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +48, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +64, +48) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +80, +48) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +48, +64) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +64, +64) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=( +80, +64) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +48, +80) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +64, +80) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +48, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +64, +96) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=( +48,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16
+    [13] pos=( +64,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16
+    [14] TERMINATOR (0xFF)
+  Total: 14 sprites
+
+Frame 1: frame1
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +64, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +48, +48) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +64, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +48, +64) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +64, +64) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +80, +64) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +48, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=( +64, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +48, +96) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +64, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +80, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +32,+112) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=( +48,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16
+    [13] pos=( +64,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16
+    [14] pos=( +80,+112) tile= 44 (0x02C) pal=2 pri=2 size=16x16
+    [15] pos=( +80, +56) tile= 62 (0x03E) pal=2 pri=2 size=8x8
+    [16] pos=( +80, +88) tile= 63 (0x03F) pal=2 pri=2 size=8x8
+    [17] pos=( +40,+104) tile= 64 (0x040) pal=2 pri=2 size=8x8
+    [18] pos=( +96,+120) tile= 65 (0x041) pal=2 pri=2 size=8x8
+    [19] TERMINATOR (0xFF)
+  Total: 19 sprites
+
+Frame 2: frame2
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +64, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +48, +48) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +64, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +48, +64) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +64, +64) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +80, +64) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +48, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=( +64, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +48, +96) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +64, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +32,+112) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +48,+112) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=( +64,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16
+    [13] pos=( +56, +40) tile= 58 (0x03A) pal=2 pri=2 size=8x8
+    [14] pos=( +80, +56) tile= 59 (0x03B) pal=2 pri=2 size=8x8
+    [15] pos=( +40,+104) tile= 60 (0x03C) pal=2 pri=2 size=8x8
+    [16] pos=( +80,+120) tile= 61 (0x03D) pal=2 pri=2 size=8x8
+    [17] TERMINATOR (0xFF)
+  Total: 17 sprites
+
+Frame 3: frame3
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +48, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +64, +32) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +48, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +64, +48) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +48, +64) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +64, +64) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +80, +64) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=( +48, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +64, +80) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +48, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +64, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +48,+112) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=( +64,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16
+    [13] pos=( +80, +56) tile= 58 (0x03A) pal=2 pri=2 size=8x8
+    [14] TERMINATOR (0xFF)
+  Total: 14 sprites
+
+Frame 4: frame4
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +48, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +32, +48) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +48, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +64, +48) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +32, +64) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +48, +64) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +64, +64) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=( +32, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +48, +80) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +64, +80) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +32, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +48, +96) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=( +64, +96) tile= 40 (0x028) pal=2 pri=2 size=16x16
+    [13] pos=( +32,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16
+    [14] pos=( +48,+112) tile= 44 (0x02C) pal=2 pri=2 size=16x16
+    [15] pos=( +64,+112) tile= 46 (0x02E) pal=2 pri=2 size=16x16
+    [16] pos=( +64, +40) tile= 64 (0x040) pal=2 pri=2 size=8x8
+    [17] pos=( +80, +64) tile= 65 (0x041) pal=2 pri=2 size=8x8
+    [18] pos=( +24,+120) tile= 66 (0x042) pal=2 pri=2 size=8x8
+    [19] pos=( +80,+120) tile= 67 (0x043) pal=2 pri=2 size=8x8
+    [20] TERMINATOR (0xFF)
+  Total: 20 sprites
+
+Frame 5: frame5
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +48, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +64, +32) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +48, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +64, +48) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +48, +64) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +64, +64) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +80, +64) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=( +48, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +64, +80) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +48, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +64, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +32,+112) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=( +48,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16
+    [13] pos=( +64,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16
+    [14] pos=( +80, +56) tile= 60 (0x03C) pal=2 pri=2 size=8x8
+    [15] pos=( +40,+104) tile= 61 (0x03D) pal=2 pri=2 size=8x8
+    [16] TERMINATOR (0xFF)
+  Total: 16 sprites
+
+Frame 6: frame6
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +64, +48) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +80, +48) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +48, +64) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +64, +64) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +80, +64) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +48, +80) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +64, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=( +80, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +48, +96) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +64, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +80, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +32,+112) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=( +48,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16
+    [13] pos=( +64,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16
+    [14] pos=( +80,+112) tile= 44 (0x02C) pal=2 pri=2 size=16x16
+    [15] pos=( +56, +56) tile= 62 (0x03E) pal=2 pri=2 size=8x8
+    [16] pos=( +96, +72) tile= 63 (0x03F) pal=2 pri=2 size=8x8
+    [17] pos=( +96, +80) tile= 64 (0x040) pal=2 pri=2 size=8x8
+    [18] pos=( +40,+104) tile= 65 (0x041) pal=2 pri=2 size=8x8
+    [19] TERMINATOR (0xFF)
+  Total: 19 sprites
+
+Frame 7: frame7
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +64, +48) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +80, +48) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +48, +64) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +64, +64) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +80, +64) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +96, +64) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +48, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=( +64, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +80, +80) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +48, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +64, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +80, +96) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=( +48,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16
+    [13] pos=( +64,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16
+    [14] pos=( +80,+112) tile= 44 (0x02C) pal=2 pri=2 size=16x16
+    [15] pos=( +56, +56) tile= 62 (0x03E) pal=2 pri=2 size=8x8
+    [16] pos=( +96, +56) tile= 63 (0x03F) pal=2 pri=2 size=8x8
+    [17] pos=( +96, +80) tile= 64 (0x040) pal=2 pri=2 size=8x8
+    [18] TERMINATOR (0xFF)
+  Total: 18 sprites
+
+Frame 8: frame8
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +64, +48) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +80, +48) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +48, +64) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +64, +64) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +80, +64) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +48, +80) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +64, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=( +80, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +48, +96) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +64, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +80, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +48,+112) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=( +64,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16
+    [13] pos=( +56, +56) tile= 58 (0x03A) pal=2 pri=2 size=8x8
+    [14] pos=( +96, +72) tile= 59 (0x03B) pal=2 pri=2 size=8x8
+    [15] pos=( +96, +80) tile= 60 (0x03C) pal=2 pri=2 size=8x8
+    [16] TERMINATOR (0xFF)
+  Total: 16 sprites
+
+Frame 9: frame9
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +32, +48) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +48, +48) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +64, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +80, +48) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +32, +64) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +48, +64) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +64, +64) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=( +80, +64) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +32, +80) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +48, +80) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +64, +80) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +32, +96) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=( +48, +96) tile= 40 (0x028) pal=2 pri=2 size=16x16
+    [13] pos=( +64, +96) tile= 42 (0x02A) pal=2 pri=2 size=16x16
+    [14] pos=( +32,+112) tile= 44 (0x02C) pal=2 pri=2 size=16x16
+    [15] pos=( +48,+112) tile= 46 (0x02E) pal=2 pri=2 size=16x16
+    [16] pos=( +64,+112) tile= 64 (0x040) pal=2 pri=2 size=16x16
+    [17] pos=( +56, +40) tile= 82 (0x052) pal=2 pri=2 size=8x8
+    [18] pos=( +64, +40) tile= 83 (0x053) pal=2 pri=2 size=8x8
+    [19] pos=( +24,+120) tile= 84 (0x054) pal=2 pri=2 size=8x8
+    [20] pos=( +80,+120) tile= 85 (0x055) pal=2 pri=2 size=8x8
+    [21] TERMINATOR (0xFF)
+  Total: 21 sprites
+
+Frame 10: frame10
+  Hitbox: x=86, y=40, w=42, h=20
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +64, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=(+112, +32) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +32, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +48, +48) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +64, +48) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +80, +48) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +96, +48) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=(+112, +48) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +48, +64) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +64, +64) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +48, +80) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +64, +80) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=( +48, +96) tile= 40 (0x028) pal=2 pri=2 size=16x16
+    [13] pos=( +64, +96) tile= 42 (0x02A) pal=2 pri=2 size=16x16
+    [14] pos=( +32,+112) tile= 44 (0x02C) pal=2 pri=2 size=16x16
+    [15] pos=( +48,+112) tile= 46 (0x02E) pal=2 pri=2 size=16x16
+    [16] pos=( +64,+112) tile= 64 (0x040) pal=2 pri=2 size=16x16
+    [17] pos=( +56, +40) tile= 82 (0x052) pal=2 pri=2 size=8x8
+    [18] pos=(+104, +40) tile= 83 (0x053) pal=2 pri=2 size=8x8
+    [19] pos=( +40, +64) tile= 84 (0x054) pal=2 pri=2 size=8x8
+    [20] pos=( +80, +64) tile= 85 (0x055) pal=2 pri=2 size=8x8
+    [21] pos=( +40,+104) tile= 86 (0x056) pal=2 pri=2 size=8x8
+    [22] TERMINATOR (0xFF)
+  Total: 22 sprites
+
+Frame 11: frame11
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +64, +48) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +48, +64) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +64, +64) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +80, +64) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +32, +80) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +48, +80) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +64, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=( +80, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +48, +96) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +64, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +80, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +48,+112) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=( +64,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16
+    [13] pos=( +80,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16
+    [14] pos=( +56, +56) tile= 60 (0x03C) pal=2 pri=2 size=8x8
+    [15] pos=( +40, +72) tile= 61 (0x03D) pal=2 pri=2 size=8x8
+    [16] pos=( +96, +80) tile= 62 (0x03E) pal=2 pri=2 size=8x8
+    [17] TERMINATOR (0xFF)
+  Total: 17 sprites
+
+Frame 12: frame12
+  Hitbox: x=101, y=104, w=26, h=23
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +64, +48) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +32, +64) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +48, +64) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +64, +64) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +80, +64) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +32, +80) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +48, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=( +64, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +80, +80) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +48, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +64, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +80, +96) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=( +96, +96) tile= 40 (0x028) pal=2 pri=2 size=16x16
+    [13] pos=( +32,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16
+    [14] pos=( +48,+112) tile= 44 (0x02C) pal=2 pri=2 size=16x16
+    [15] pos=( +64,+112) tile= 46 (0x02E) pal=2 pri=2 size=16x16
+    [16] pos=( +80,+112) tile= 64 (0x040) pal=2 pri=2 size=16x16
+    [17] pos=( +96,+112) tile= 66 (0x042) pal=2 pri=2 size=16x16
+    [18] pos=(+112,+112) tile= 68 (0x044) pal=2 pri=2 size=16x16
+    [19] pos=( +40,+104) tile= 86 (0x056) pal=2 pri=2 size=8x8
+    [20] TERMINATOR (0xFF)
+  Total: 20 sprites
+
+Frame 13: frame13
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +64, +48) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +48, +64) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +64, +64) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +80, +64) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +32, +80) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +48, +80) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +64, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=( +80, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +48, +96) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +64, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +80, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +48,+112) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=( +64,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16
+    [13] pos=( +80,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16
+    [14] pos=( +40, +72) tile= 60 (0x03C) pal=2 pri=2 size=8x8
+    [15] pos=( +96, +80) tile= 61 (0x03D) pal=2 pri=2 size=8x8
+    [16] TERMINATOR (0xFF)
+  Total: 16 sprites
+
+Frame 14: frame14
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +64, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +48, +40) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +64, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +80, +48) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +40, +56) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +56, +64) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +72, +64) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=( +56, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +72, +80) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +56, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +56,+112) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +96, +48) tile= 54 (0x036) pal=2 pri=2 size=8x8
+    [12] pos=( +56, +56) tile= 55 (0x037) pal=2 pri=2 size=8x8
+    [13] pos=( +96, +56) tile= 56 (0x038) pal=2 pri=2 size=8x8
+    [14] pos=( +88, +64) tile= 57 (0x039) pal=2 pri=2 size=8x8
+    [15] pos=( +72, +96) tile= 58 (0x03A) pal=2 pri=2 size=8x8
+    [16] pos=( +72,+104) tile= 59 (0x03B) pal=2 pri=2 size=8x8
+    [17] pos=( +80,+104) tile= 60 (0x03C) pal=2 pri=2 size=8x8
+    [18] pos=( +48,+120) tile= 61 (0x03D) pal=2 pri=2 size=8x8
+    [19] pos=( +72,+120) tile= 62 (0x03E) pal=2 pri=2 size=8x8
+    [20] TERMINATOR (0xFF)
+  Total: 20 sprites
+
+Frame 15: frame15
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +64, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +80, +32) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +48, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +64, +48) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +80, +48) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +96, +48) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +48, +64) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=( +64, +64) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +80, +64) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +96, +64) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +64, +80) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +80, +80) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=( +96, +80) tile= 40 (0x028) pal=2 pri=2 size=16x16
+    [13] pos=( +48, +96) tile= 42 (0x02A) pal=2 pri=2 size=16x16
+    [14] pos=( +64, +96) tile= 44 (0x02C) pal=2 pri=2 size=16x16
+    [15] pos=( +48,+112) tile= 46 (0x02E) pal=2 pri=2 size=16x16
+    [16] pos=( +64,+112) tile= 64 (0x040) pal=2 pri=2 size=16x16
+    [17] pos=( +56, +40) tile= 82 (0x052) pal=2 pri=2 size=8x8
+    [18] pos=(+112, +72) tile= 83 (0x053) pal=2 pri=2 size=8x8
+    [19] TERMINATOR (0xFF)
+  Total: 19 sprites
+
+Frame 16: frame16
+  Hitbox: x=92, y=41, w=35, h=35
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +72, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +56, +40) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=(+112, +40) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +72, +48) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +40, +56) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +56, +56) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +88, +56) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=(+104, +56) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +72, +64) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +56, +72) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +56, +88) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +48,+104) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=( +48, +48) tile= 56 (0x038) pal=2 pri=2 size=8x8
+    [13] pos=( +88, +48) tile= 57 (0x039) pal=2 pri=2 size=8x8
+    [14] pos=(+120, +56) tile= 58 (0x03A) pal=2 pri=2 size=8x8
+    [15] pos=( +88, +72) tile= 59 (0x03B) pal=2 pri=2 size=8x8
+    [16] pos=( +96, +72) tile= 60 (0x03C) pal=2 pri=2 size=8x8
+    [17] pos=( +72, +80) tile= 61 (0x03D) pal=2 pri=2 size=8x8
+    [18] pos=( +80, +80) tile= 62 (0x03E) pal=2 pri=2 size=8x8
+    [19] pos=( +88, +80) tile= 63 (0x03F) pal=2 pri=2 size=8x8
+    [20] pos=( +72, +88) tile= 64 (0x040) pal=2 pri=2 size=8x8
+    [21] pos=( +48, +96) tile= 65 (0x041) pal=2 pri=2 size=8x8
+    [22] pos=( +64,+104) tile= 66 (0x042) pal=2 pri=2 size=8x8
+    [23] pos=( +48,+120) tile= 67 (0x043) pal=2 pri=2 size=8x8
+    [24] pos=( +56,+120) tile= 68 (0x044) pal=2 pri=2 size=8x8
+    [25] pos=( +64,+120) tile= 69 (0x045) pal=2 pri=2 size=8x8
+    [26] TERMINATOR (0xFF)
+  Total: 26 sprites
+
+Frame 17: frame17
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +48, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +64, +32) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +48, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +64, +48) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +80, +48) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +48, +64) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +64, +64) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=( +80, +64) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +48, +80) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +64, +80) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +80, +80) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +48, +96) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=( +64, +96) tile= 40 (0x028) pal=2 pri=2 size=16x16
+    [13] pos=( +48,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16
+    [14] pos=( +64,+112) tile= 44 (0x02C) pal=2 pri=2 size=16x16
+    [15] pos=( +40, +56) tile= 62 (0x03E) pal=2 pri=2 size=8x8
+    [16] pos=( +40, +64) tile= 63 (0x03F) pal=2 pri=2 size=8x8
+    [17] TERMINATOR (0xFF)
+  Total: 17 sprites
+
+Frame 18: frame18
+  Hitbox: x=98, y=71, w=29, h=17
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +56, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +40, +40) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +56, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +24, +56) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +40, +56) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +72, +56) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +56, +64) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=( +40, +72) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +72, +72) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +88, +72) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=(+104, +72) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +40, +88) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=( +32,+104) tile= 40 (0x028) pal=2 pri=2 size=16x16
+    [13] pos=( +32, +48) tile= 58 (0x03A) pal=2 pri=2 size=8x8
+    [14] pos=( +72, +48) tile= 59 (0x03B) pal=2 pri=2 size=8x8
+    [15] pos=(+120, +72) tile= 60 (0x03C) pal=2 pri=2 size=8x8
+    [16] pos=( +56, +80) tile= 61 (0x03D) pal=2 pri=2 size=8x8
+    [17] pos=( +64, +80) tile= 62 (0x03E) pal=2 pri=2 size=8x8
+    [18] pos=(+120, +80) tile= 63 (0x03F) pal=2 pri=2 size=8x8
+    [19] pos=( +56, +88) tile= 64 (0x040) pal=2 pri=2 size=8x8
+    [20] pos=( +32, +96) tile= 65 (0x041) pal=2 pri=2 size=8x8
+    [21] pos=( +48,+104) tile= 66 (0x042) pal=2 pri=2 size=8x8
+    [22] pos=( +32,+120) tile= 67 (0x043) pal=2 pri=2 size=8x8
+    [23] pos=( +40,+120) tile= 68 (0x044) pal=2 pri=2 size=8x8
+    [24] pos=( +48,+120) tile= 69 (0x045) pal=2 pri=2 size=8x8
+    [25] TERMINATOR (0xFF)
+  Total: 25 sprites
+
+Frame 19: frame19
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=255, y=255, w=255, h=255
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +64, +48) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +80, +48) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +96, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +48, +64) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +64, +64) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +80, +64) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +48, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=( +64, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +80, +80) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +48, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +64, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +80, +96) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=( +48,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16
+    [13] pos=( +64,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16
+    [14] pos=( +80,+112) tile= 44 (0x02C) pal=2 pri=2 size=16x16
+    [15] pos=( +56, +56) tile= 62 (0x03E) pal=2 pri=2 size=8x8
+    [16] TERMINATOR (0xFF)
+  Total: 16 sprites
+
+Frame 20: frame20
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=255, y=255, w=255, h=255
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +48, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +32, +48) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +48, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +64, +48) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +80, +48) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +48, +64) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +64, +64) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=( +80, +64) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +48, +80) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +64, +80) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +48, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +64, +96) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=( +48,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16
+    [13] pos=( +64,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16
+    [14] pos=( +40, +64) tile= 60 (0x03C) pal=2 pri=2 size=8x8
+    [15] TERMINATOR (0xFF)
+  Total: 15 sprites
+
+Frame 21: frame21
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=255, y=255, w=255, h=255
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +16, +64) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +32, +64) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +48, +64) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +64, +64) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +80, +64) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +16, +80) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +32, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=( +48, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +64, +80) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +80, +80) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +64, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +80, +96) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=( +96, +96) tile= 40 (0x028) pal=2 pri=2 size=16x16
+    [13] pos=( +96,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16
+    [14] pos=(+112,+112) tile= 44 (0x02C) pal=2 pri=2 size=16x16
+    [15] pos=( +96, +88) tile= 62 (0x03E) pal=2 pri=2 size=8x8
+    [16] pos=( +56, +96) tile= 63 (0x03F) pal=2 pri=2 size=8x8
+    [17] pos=(+112,+104) tile= 64 (0x040) pal=2 pri=2 size=8x8
+    [18] pos=( +88,+112) tile= 65 (0x041) pal=2 pri=2 size=8x8
+    [19] TERMINATOR (0xFF)
+  Total: 19 sprites
+
+Frame 22: frame22
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=255, y=255, w=255, h=255
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +16, +96) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +32, +96) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +48, +96) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +64, +96) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +80, +96) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=(  +0,+112) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +16,+112) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=( +32,+112) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +48,+112) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +64,+112) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +80,+112) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +96,+112) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=(+112,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16
+    [13] pos=(  +8,+104) tile= 58 (0x03A) pal=2 pri=2 size=8x8
+    [14] pos=( +96,+104) tile= 59 (0x03B) pal=2 pri=2 size=8x8
+    [15] pos=(+120,+104) tile= 60 (0x03C) pal=2 pri=2 size=8x8
+    [16] TERMINATOR (0xFF)
+  Total: 16 sprites
+
+Frame 23: frame23
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=255, y=255, w=255, h=255
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +64, +64) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +80, +64) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +96, +64) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +48, +80) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +64, +80) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +80, +80) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +96, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=( +48, +96) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +64, +96) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +80, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +32,+112) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +48,+112) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=( +64,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16
+    [13] pos=( +80,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16
+    [14] TERMINATOR (0xFF)
+  Total: 14 sprites
+
+Frame 24: frame24
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=255, y=255, w=255, h=255
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +64, +64) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +80, +64) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +96, +64) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +48, +80) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +64, +80) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +80, +80) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +96, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=( +48, +96) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +64, +96) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +80, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +32,+112) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +48,+112) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=( +64,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16
+    [13] pos=( +80,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16
+    [14] TERMINATOR (0xFF)
+  Total: 14 sprites
+
+Frame 25: frame25
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=255, y=255, w=255, h=255
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +64, +64) tile=  0 (0x000) pal=2 pri=2 size=16x16
+    [1] pos=( +80, +64) tile=  2 (0x002) pal=2 pri=2 size=16x16
+    [2] pos=( +96, +64) tile=  4 (0x004) pal=2 pri=2 size=16x16
+    [3] pos=( +48, +80) tile=  6 (0x006) pal=2 pri=2 size=16x16
+    [4] pos=( +64, +80) tile=  8 (0x008) pal=2 pri=2 size=16x16
+    [5] pos=( +80, +80) tile= 10 (0x00A) pal=2 pri=2 size=16x16
+    [6] pos=( +96, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16
+    [7] pos=( +48, +96) tile= 14 (0x00E) pal=2 pri=2 size=16x16
+    [8] pos=( +64, +96) tile= 32 (0x020) pal=2 pri=2 size=16x16
+    [9] pos=( +80, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16
+    [10] pos=( +32,+112) tile= 36 (0x024) pal=2 pri=2 size=16x16
+    [11] pos=( +48,+112) tile= 38 (0x026) pal=2 pri=2 size=16x16
+    [12] pos=( +64,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16
+    [13] pos=( +80,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16
+    [14] TERMINATOR (0xFF)
+  Total: 14 sprites
+
+Frame 26: frame0h
+  Clone of: frame0
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +64, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +48, +32) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +64, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +48, +48) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +32, +48) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +64, +64) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +48, +64) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=( +32, +64) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +64, +80) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +48, +80) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +64, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +48, +96) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=( +64,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16 hflip
+    [13] pos=( +48,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16 hflip
+    [14] TERMINATOR (0xFF)
+  Total: 14 sprites
+
+Frame 27: frame1h
+  Clone of: frame1
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +48, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +64, +48) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +48, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +64, +64) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +48, +64) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +32, +64) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +64, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=( +48, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +64, +96) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +48, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +32, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +80,+112) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=( +64,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16 hflip
+    [13] pos=( +48,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16 hflip
+    [14] pos=( +32,+112) tile= 44 (0x02C) pal=2 pri=2 size=16x16 hflip
+    [15] pos=( +40, +56) tile= 62 (0x03E) pal=2 pri=2 size=8x8 hflip
+    [16] pos=( +40, +88) tile= 63 (0x03F) pal=2 pri=2 size=8x8 hflip
+    [17] pos=( +80,+104) tile= 64 (0x040) pal=2 pri=2 size=8x8 hflip
+    [18] pos=( +24,+120) tile= 65 (0x041) pal=2 pri=2 size=8x8 hflip
+    [19] TERMINATOR (0xFF)
+  Total: 19 sprites
+
+Frame 28: frame2h
+  Clone of: frame2
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +48, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +64, +48) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +48, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +64, +64) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +48, +64) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +32, +64) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +64, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=( +48, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +64, +96) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +48, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +80,+112) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +64,+112) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=( +48,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16 hflip
+    [13] pos=( +64, +40) tile= 58 (0x03A) pal=2 pri=2 size=8x8 hflip
+    [14] pos=( +40, +56) tile= 59 (0x03B) pal=2 pri=2 size=8x8 hflip
+    [15] pos=( +80,+104) tile= 60 (0x03C) pal=2 pri=2 size=8x8 hflip
+    [16] pos=( +40,+120) tile= 61 (0x03D) pal=2 pri=2 size=8x8 hflip
+    [17] TERMINATOR (0xFF)
+  Total: 17 sprites
+
+Frame 29: frame3h
+  Clone of: frame3
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +64, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +48, +32) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +64, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +48, +48) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +64, +64) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +48, +64) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +32, +64) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=( +64, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +48, +80) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +64, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +48, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +64,+112) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=( +48,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16 hflip
+    [13] pos=( +40, +56) tile= 58 (0x03A) pal=2 pri=2 size=8x8 hflip
+    [14] TERMINATOR (0xFF)
+  Total: 14 sprites
+
+Frame 30: frame4h
+  Clone of: frame4
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +64, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +80, +48) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +64, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +48, +48) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +80, +64) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +64, +64) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +48, +64) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=( +80, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +64, +80) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +48, +80) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +80, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +64, +96) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=( +48, +96) tile= 40 (0x028) pal=2 pri=2 size=16x16 hflip
+    [13] pos=( +80,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16 hflip
+    [14] pos=( +64,+112) tile= 44 (0x02C) pal=2 pri=2 size=16x16 hflip
+    [15] pos=( +48,+112) tile= 46 (0x02E) pal=2 pri=2 size=16x16 hflip
+    [16] pos=( +56, +40) tile= 64 (0x040) pal=2 pri=2 size=8x8 hflip
+    [17] pos=( +40, +64) tile= 65 (0x041) pal=2 pri=2 size=8x8 hflip
+    [18] pos=( +96,+120) tile= 66 (0x042) pal=2 pri=2 size=8x8 hflip
+    [19] pos=( +40,+120) tile= 67 (0x043) pal=2 pri=2 size=8x8 hflip
+    [20] TERMINATOR (0xFF)
+  Total: 20 sprites
+
+Frame 31: frame5h
+  Clone of: frame5
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +64, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +48, +32) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +64, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +48, +48) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +64, +64) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +48, +64) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +32, +64) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=( +64, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +48, +80) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +64, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +48, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +80,+112) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=( +64,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16 hflip
+    [13] pos=( +48,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16 hflip
+    [14] pos=( +40, +56) tile= 60 (0x03C) pal=2 pri=2 size=8x8 hflip
+    [15] pos=( +80,+104) tile= 61 (0x03D) pal=2 pri=2 size=8x8 hflip
+    [16] TERMINATOR (0xFF)
+  Total: 16 sprites
+
+Frame 32: frame6h
+  Clone of: frame6
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +48, +48) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +32, +48) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +64, +64) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +48, +64) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +32, +64) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +64, +80) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +48, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=( +32, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +64, +96) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +48, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +32, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +80,+112) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=( +64,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16 hflip
+    [13] pos=( +48,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16 hflip
+    [14] pos=( +32,+112) tile= 44 (0x02C) pal=2 pri=2 size=16x16 hflip
+    [15] pos=( +64, +56) tile= 62 (0x03E) pal=2 pri=2 size=8x8 hflip
+    [16] pos=( +24, +72) tile= 63 (0x03F) pal=2 pri=2 size=8x8 hflip
+    [17] pos=( +24, +80) tile= 64 (0x040) pal=2 pri=2 size=8x8 hflip
+    [18] pos=( +80,+104) tile= 65 (0x041) pal=2 pri=2 size=8x8 hflip
+    [19] TERMINATOR (0xFF)
+  Total: 19 sprites
+
+Frame 33: frame7h
+  Clone of: frame7
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +48, +48) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +32, +48) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +64, +64) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +48, +64) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +32, +64) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +16, +64) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +64, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=( +48, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +32, +80) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +64, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +48, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +32, +96) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=( +64,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16 hflip
+    [13] pos=( +48,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16 hflip
+    [14] pos=( +32,+112) tile= 44 (0x02C) pal=2 pri=2 size=16x16 hflip
+    [15] pos=( +64, +56) tile= 62 (0x03E) pal=2 pri=2 size=8x8 hflip
+    [16] pos=( +24, +56) tile= 63 (0x03F) pal=2 pri=2 size=8x8 hflip
+    [17] pos=( +24, +80) tile= 64 (0x040) pal=2 pri=2 size=8x8 hflip
+    [18] TERMINATOR (0xFF)
+  Total: 18 sprites
+
+Frame 34: frame8h
+  Clone of: frame8
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +48, +48) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +32, +48) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +64, +64) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +48, +64) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +32, +64) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +64, +80) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +48, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=( +32, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +64, +96) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +48, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +32, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +64,+112) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=( +48,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16 hflip
+    [13] pos=( +64, +56) tile= 58 (0x03A) pal=2 pri=2 size=8x8 hflip
+    [14] pos=( +24, +72) tile= 59 (0x03B) pal=2 pri=2 size=8x8 hflip
+    [15] pos=( +24, +80) tile= 60 (0x03C) pal=2 pri=2 size=8x8 hflip
+    [16] TERMINATOR (0xFF)
+  Total: 16 sprites
+
+Frame 35: frame9h
+  Clone of: frame9
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +80, +48) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +64, +48) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +48, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +32, +48) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +80, +64) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +64, +64) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +48, +64) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=( +32, +64) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +80, +80) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +64, +80) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +48, +80) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +80, +96) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=( +64, +96) tile= 40 (0x028) pal=2 pri=2 size=16x16 hflip
+    [13] pos=( +48, +96) tile= 42 (0x02A) pal=2 pri=2 size=16x16 hflip
+    [14] pos=( +80,+112) tile= 44 (0x02C) pal=2 pri=2 size=16x16 hflip
+    [15] pos=( +64,+112) tile= 46 (0x02E) pal=2 pri=2 size=16x16 hflip
+    [16] pos=( +48,+112) tile= 64 (0x040) pal=2 pri=2 size=16x16 hflip
+    [17] pos=( +64, +40) tile= 82 (0x052) pal=2 pri=2 size=8x8 hflip
+    [18] pos=( +56, +40) tile= 83 (0x053) pal=2 pri=2 size=8x8 hflip
+    [19] pos=( +96,+120) tile= 84 (0x054) pal=2 pri=2 size=8x8 hflip
+    [20] pos=( +40,+120) tile= 85 (0x055) pal=2 pri=2 size=8x8 hflip
+    [21] TERMINATOR (0xFF)
+  Total: 21 sprites
+
+Frame 36: frame10h
+  Clone of: frame10
+  Hitbox: x=0, y=40, w=42, h=20
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +48, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=(  +0, +32) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +80, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +64, +48) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +48, +48) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +32, +48) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +16, +48) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=(  +0, +48) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +64, +64) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +48, +64) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +64, +80) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +48, +80) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=( +64, +96) tile= 40 (0x028) pal=2 pri=2 size=16x16 hflip
+    [13] pos=( +48, +96) tile= 42 (0x02A) pal=2 pri=2 size=16x16 hflip
+    [14] pos=( +80,+112) tile= 44 (0x02C) pal=2 pri=2 size=16x16 hflip
+    [15] pos=( +64,+112) tile= 46 (0x02E) pal=2 pri=2 size=16x16 hflip
+    [16] pos=( +48,+112) tile= 64 (0x040) pal=2 pri=2 size=16x16 hflip
+    [17] pos=( +64, +40) tile= 82 (0x052) pal=2 pri=2 size=8x8 hflip
+    [18] pos=( +16, +40) tile= 83 (0x053) pal=2 pri=2 size=8x8 hflip
+    [19] pos=( +80, +64) tile= 84 (0x054) pal=2 pri=2 size=8x8 hflip
+    [20] pos=( +40, +64) tile= 85 (0x055) pal=2 pri=2 size=8x8 hflip
+    [21] pos=( +80,+104) tile= 86 (0x056) pal=2 pri=2 size=8x8 hflip
+    [22] TERMINATOR (0xFF)
+  Total: 22 sprites
+
+Frame 37: frame11h
+  Clone of: frame11
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +48, +48) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +64, +64) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +48, +64) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +32, +64) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +80, +80) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +64, +80) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +48, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=( +32, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +64, +96) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +48, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +32, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +64,+112) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=( +48,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16 hflip
+    [13] pos=( +32,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16 hflip
+    [14] pos=( +64, +56) tile= 60 (0x03C) pal=2 pri=2 size=8x8 hflip
+    [15] pos=( +80, +72) tile= 61 (0x03D) pal=2 pri=2 size=8x8 hflip
+    [16] pos=( +24, +80) tile= 62 (0x03E) pal=2 pri=2 size=8x8 hflip
+    [17] TERMINATOR (0xFF)
+  Total: 17 sprites
+
+Frame 38: frame12h
+  Clone of: frame12
+  Hitbox: x=1, y=104, w=26, h=23
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +48, +48) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +80, +64) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +64, +64) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +48, +64) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +32, +64) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +80, +80) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +64, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=( +48, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +32, +80) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +64, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +48, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +32, +96) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=( +16, +96) tile= 40 (0x028) pal=2 pri=2 size=16x16 hflip
+    [13] pos=( +80,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16 hflip
+    [14] pos=( +64,+112) tile= 44 (0x02C) pal=2 pri=2 size=16x16 hflip
+    [15] pos=( +48,+112) tile= 46 (0x02E) pal=2 pri=2 size=16x16 hflip
+    [16] pos=( +32,+112) tile= 64 (0x040) pal=2 pri=2 size=16x16 hflip
+    [17] pos=( +16,+112) tile= 66 (0x042) pal=2 pri=2 size=16x16 hflip
+    [18] pos=(  +0,+112) tile= 68 (0x044) pal=2 pri=2 size=16x16 hflip
+    [19] pos=( +80,+104) tile= 86 (0x056) pal=2 pri=2 size=8x8 hflip
+    [20] TERMINATOR (0xFF)
+  Total: 20 sprites
+
+Frame 39: frame13h
+  Clone of: frame13
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +48, +48) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +64, +64) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +48, +64) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +32, +64) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +80, +80) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +64, +80) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +48, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=( +32, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +64, +96) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +48, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +32, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +64,+112) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=( +48,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16 hflip
+    [13] pos=( +32,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16 hflip
+    [14] pos=( +80, +72) tile= 60 (0x03C) pal=2 pri=2 size=8x8 hflip
+    [15] pos=( +24, +80) tile= 61 (0x03D) pal=2 pri=2 size=8x8 hflip
+    [16] TERMINATOR (0xFF)
+  Total: 16 sprites
+
+Frame 40: frame14h
+  Clone of: frame14
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +48, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +64, +40) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +48, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +32, +48) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +72, +56) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +56, +64) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +40, +64) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=( +56, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +40, +80) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +56, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +56,+112) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +24, +48) tile= 54 (0x036) pal=2 pri=2 size=8x8 hflip
+    [12] pos=( +64, +56) tile= 55 (0x037) pal=2 pri=2 size=8x8 hflip
+    [13] pos=( +24, +56) tile= 56 (0x038) pal=2 pri=2 size=8x8 hflip
+    [14] pos=( +32, +64) tile= 57 (0x039) pal=2 pri=2 size=8x8 hflip
+    [15] pos=( +48, +96) tile= 58 (0x03A) pal=2 pri=2 size=8x8 hflip
+    [16] pos=( +48,+104) tile= 59 (0x03B) pal=2 pri=2 size=8x8 hflip
+    [17] pos=( +40,+104) tile= 60 (0x03C) pal=2 pri=2 size=8x8 hflip
+    [18] pos=( +72,+120) tile= 61 (0x03D) pal=2 pri=2 size=8x8 hflip
+    [19] pos=( +48,+120) tile= 62 (0x03E) pal=2 pri=2 size=8x8 hflip
+    [20] TERMINATOR (0xFF)
+  Total: 20 sprites
+
+Frame 41: frame15h
+  Clone of: frame15
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +48, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +32, +32) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +64, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +48, +48) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +32, +48) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +16, +48) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +64, +64) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=( +48, +64) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +32, +64) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +16, +64) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +48, +80) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +32, +80) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=( +16, +80) tile= 40 (0x028) pal=2 pri=2 size=16x16 hflip
+    [13] pos=( +64, +96) tile= 42 (0x02A) pal=2 pri=2 size=16x16 hflip
+    [14] pos=( +48, +96) tile= 44 (0x02C) pal=2 pri=2 size=16x16 hflip
+    [15] pos=( +64,+112) tile= 46 (0x02E) pal=2 pri=2 size=16x16 hflip
+    [16] pos=( +48,+112) tile= 64 (0x040) pal=2 pri=2 size=16x16 hflip
+    [17] pos=( +64, +40) tile= 82 (0x052) pal=2 pri=2 size=8x8 hflip
+    [18] pos=(  +8, +72) tile= 83 (0x053) pal=2 pri=2 size=8x8 hflip
+    [19] TERMINATOR (0xFF)
+  Total: 19 sprites
+
+Frame 42: frame16h
+  Clone of: frame16
+  Hitbox: x=1, y=41, w=35, h=35
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +40, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +56, +40) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=(  +0, +40) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +40, +48) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +72, +56) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +56, +56) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +24, +56) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=(  +8, +56) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +40, +64) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +56, +72) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +56, +88) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +64,+104) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=( +72, +48) tile= 56 (0x038) pal=2 pri=2 size=8x8 hflip
+    [13] pos=( +32, +48) tile= 57 (0x039) pal=2 pri=2 size=8x8 hflip
+    [14] pos=(  +0, +56) tile= 58 (0x03A) pal=2 pri=2 size=8x8 hflip
+    [15] pos=( +32, +72) tile= 59 (0x03B) pal=2 pri=2 size=8x8 hflip
+    [16] pos=( +24, +72) tile= 60 (0x03C) pal=2 pri=2 size=8x8 hflip
+    [17] pos=( +48, +80) tile= 61 (0x03D) pal=2 pri=2 size=8x8 hflip
+    [18] pos=( +40, +80) tile= 62 (0x03E) pal=2 pri=2 size=8x8 hflip
+    [19] pos=( +32, +80) tile= 63 (0x03F) pal=2 pri=2 size=8x8 hflip
+    [20] pos=( +48, +88) tile= 64 (0x040) pal=2 pri=2 size=8x8 hflip
+    [21] pos=( +72, +96) tile= 65 (0x041) pal=2 pri=2 size=8x8 hflip
+    [22] pos=( +56,+104) tile= 66 (0x042) pal=2 pri=2 size=8x8 hflip
+    [23] pos=( +72,+120) tile= 67 (0x043) pal=2 pri=2 size=8x8 hflip
+    [24] pos=( +64,+120) tile= 68 (0x044) pal=2 pri=2 size=8x8 hflip
+    [25] pos=( +56,+120) tile= 69 (0x045) pal=2 pri=2 size=8x8 hflip
+    [26] TERMINATOR (0xFF)
+  Total: 26 sprites
+
+Frame 43: frame17h
+  Clone of: frame17
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +64, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +48, +32) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +64, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +48, +48) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +32, +48) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +64, +64) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +48, +64) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=( +32, +64) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +64, +80) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +48, +80) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +32, +80) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +64, +96) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=( +48, +96) tile= 40 (0x028) pal=2 pri=2 size=16x16 hflip
+    [13] pos=( +64,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16 hflip
+    [14] pos=( +48,+112) tile= 44 (0x02C) pal=2 pri=2 size=16x16 hflip
+    [15] pos=( +80, +56) tile= 62 (0x03E) pal=2 pri=2 size=8x8 hflip
+    [16] pos=( +80, +64) tile= 63 (0x03F) pal=2 pri=2 size=8x8 hflip
+    [17] TERMINATOR (0xFF)
+  Total: 17 sprites
+
+Frame 44: frame18h
+  Clone of: frame18
+  Hitbox: x=1, y=71, w=29, h=17
+  Hurtbox: x=46, y=36, w=36, h=91
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +56, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +72, +40) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +56, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +88, +56) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +72, +56) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +40, +56) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +56, +64) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=( +72, +72) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +40, +72) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +24, +72) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=(  +8, +72) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +72, +88) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=( +80,+104) tile= 40 (0x028) pal=2 pri=2 size=16x16 hflip
+    [13] pos=( +88, +48) tile= 58 (0x03A) pal=2 pri=2 size=8x8 hflip
+    [14] pos=( +48, +48) tile= 59 (0x03B) pal=2 pri=2 size=8x8 hflip
+    [15] pos=(  +0, +72) tile= 60 (0x03C) pal=2 pri=2 size=8x8 hflip
+    [16] pos=( +64, +80) tile= 61 (0x03D) pal=2 pri=2 size=8x8 hflip
+    [17] pos=( +56, +80) tile= 62 (0x03E) pal=2 pri=2 size=8x8 hflip
+    [18] pos=(  +0, +80) tile= 63 (0x03F) pal=2 pri=2 size=8x8 hflip
+    [19] pos=( +64, +88) tile= 64 (0x040) pal=2 pri=2 size=8x8 hflip
+    [20] pos=( +88, +96) tile= 65 (0x041) pal=2 pri=2 size=8x8 hflip
+    [21] pos=( +72,+104) tile= 66 (0x042) pal=2 pri=2 size=8x8 hflip
+    [22] pos=( +88,+120) tile= 67 (0x043) pal=2 pri=2 size=8x8 hflip
+    [23] pos=( +80,+120) tile= 68 (0x044) pal=2 pri=2 size=8x8 hflip
+    [24] pos=( +72,+120) tile= 69 (0x045) pal=2 pri=2 size=8x8 hflip
+    [25] TERMINATOR (0xFF)
+  Total: 25 sprites
+
+Frame 45: frame19h
+  Clone of: frame19
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=255, y=255, w=255, h=255
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +48, +48) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +32, +48) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +16, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +64, +64) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +48, +64) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +32, +64) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +64, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=( +48, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +32, +80) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +64, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +48, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +32, +96) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=( +64,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16 hflip
+    [13] pos=( +48,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16 hflip
+    [14] pos=( +32,+112) tile= 44 (0x02C) pal=2 pri=2 size=16x16 hflip
+    [15] pos=( +64, +56) tile= 62 (0x03E) pal=2 pri=2 size=8x8 hflip
+    [16] TERMINATOR (0xFF)
+  Total: 16 sprites
+
+Frame 46: frame20h
+  Clone of: frame20
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=255, y=255, w=255, h=255
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +64, +32) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +80, +48) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +64, +48) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +48, +48) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +32, +48) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +64, +64) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +48, +64) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=( +32, +64) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +64, +80) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +48, +80) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +64, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +48, +96) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=( +64,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16 hflip
+    [13] pos=( +48,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16 hflip
+    [14] pos=( +80, +64) tile= 60 (0x03C) pal=2 pri=2 size=8x8 hflip
+    [15] TERMINATOR (0xFF)
+  Total: 15 sprites
+
+Frame 47: frame21h
+  Clone of: frame21
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=255, y=255, w=255, h=255
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +96, +64) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +80, +64) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +64, +64) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +48, +64) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +32, +64) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +96, +80) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +80, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=( +64, +80) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +48, +80) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +32, +80) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +48, +96) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +32, +96) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=( +16, +96) tile= 40 (0x028) pal=2 pri=2 size=16x16 hflip
+    [13] pos=( +16,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16 hflip
+    [14] pos=(  +0,+112) tile= 44 (0x02C) pal=2 pri=2 size=16x16 hflip
+    [15] pos=( +24, +88) tile= 62 (0x03E) pal=2 pri=2 size=8x8 hflip
+    [16] pos=( +64, +96) tile= 63 (0x03F) pal=2 pri=2 size=8x8 hflip
+    [17] pos=(  +8,+104) tile= 64 (0x040) pal=2 pri=2 size=8x8 hflip
+    [18] pos=( +32,+112) tile= 65 (0x041) pal=2 pri=2 size=8x8 hflip
+    [19] TERMINATOR (0xFF)
+  Total: 19 sprites
+
+Frame 48: frame22h
+  Clone of: frame22
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=255, y=255, w=255, h=255
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +96, +96) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +80, +96) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +64, +96) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +48, +96) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +32, +96) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=(+112,+112) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +96,+112) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=( +80,+112) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +64,+112) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +48,+112) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +32,+112) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +16,+112) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=(  +0,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16 hflip
+    [13] pos=(+112,+104) tile= 58 (0x03A) pal=2 pri=2 size=8x8 hflip
+    [14] pos=( +24,+104) tile= 59 (0x03B) pal=2 pri=2 size=8x8 hflip
+    [15] pos=(  +0,+104) tile= 60 (0x03C) pal=2 pri=2 size=8x8 hflip
+    [16] TERMINATOR (0xFF)
+  Total: 16 sprites
+
+Frame 49: frame23h
+  Clone of: frame23
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=255, y=255, w=255, h=255
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +48, +64) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +32, +64) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +16, +64) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +64, +80) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +48, +80) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +32, +80) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +16, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=( +64, +96) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +48, +96) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +32, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +80,+112) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +64,+112) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=( +48,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16 hflip
+    [13] pos=( +32,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16 hflip
+    [14] TERMINATOR (0xFF)
+  Total: 14 sprites
+
+Frame 50: frame24h
+  Clone of: frame24
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=255, y=255, w=255, h=255
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +48, +64) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +32, +64) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +16, +64) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +64, +80) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +48, +80) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +32, +80) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +16, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=( +64, +96) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +48, +96) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +32, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +80,+112) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +64,+112) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=( +48,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16 hflip
+    [13] pos=( +32,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16 hflip
+    [14] TERMINATOR (0xFF)
+  Total: 14 sprites
+
+Frame 51: frame25h
+  Clone of: frame25
+  Hitbox: x=255, y=255, w=255, h=255
+  Hurtbox: x=255, y=255, w=255, h=255
+  Offset: x=+0, y=+0
+  Pattern ID: 0
+  Sprites (5-byte format: x, y, char, attr, size):
+    [0] pos=( +48, +64) tile=  0 (0x000) pal=2 pri=2 size=16x16 hflip
+    [1] pos=( +32, +64) tile=  2 (0x002) pal=2 pri=2 size=16x16 hflip
+    [2] pos=( +16, +64) tile=  4 (0x004) pal=2 pri=2 size=16x16 hflip
+    [3] pos=( +64, +80) tile=  6 (0x006) pal=2 pri=2 size=16x16 hflip
+    [4] pos=( +48, +80) tile=  8 (0x008) pal=2 pri=2 size=16x16 hflip
+    [5] pos=( +32, +80) tile= 10 (0x00A) pal=2 pri=2 size=16x16 hflip
+    [6] pos=( +16, +80) tile= 12 (0x00C) pal=2 pri=2 size=16x16 hflip
+    [7] pos=( +64, +96) tile= 14 (0x00E) pal=2 pri=2 size=16x16 hflip
+    [8] pos=( +48, +96) tile= 32 (0x020) pal=2 pri=2 size=16x16 hflip
+    [9] pos=( +32, +96) tile= 34 (0x022) pal=2 pri=2 size=16x16 hflip
+    [10] pos=( +80,+112) tile= 36 (0x024) pal=2 pri=2 size=16x16 hflip
+    [11] pos=( +64,+112) tile= 38 (0x026) pal=2 pri=2 size=16x16 hflip
+    [12] pos=( +48,+112) tile= 40 (0x028) pal=2 pri=2 size=16x16 hflip
+    [13] pos=( +32,+112) tile= 42 (0x02A) pal=2 pri=2 size=16x16 hflip
+    [14] TERMINATOR (0xFF)
+  Total: 14 sprites
+
+

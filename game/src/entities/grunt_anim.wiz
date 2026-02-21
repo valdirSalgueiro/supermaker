@@ -1,0 +1,347 @@
+// Grunt Animation Selection System
+// ==================================
+// Data-driven animation selection for grunt enemies.
+// Maps AI states to animation roles, supports random variants.
+// Animation descriptors and h-flip offsets are auto-generated per entity type
+// from entities.json anim_roles by generate_entities_wiz.py.
+//
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+
+import "engine/entity_api";
+import "engine/game/metasprites";
+
+import "grunt_ai";
+import "../rng";
+
+import "gen/entities";
+
+
+namespace grunt_anim {
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ANIMATION ROLE SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Semantic animation roles (state-independent)
+// Each role maps to one or more animation variants
+namespace AnimRole {
+    let IDLE      = 0;   // Standing still
+    let WALK      = 1;   // Erect walk (far from player)
+    let HUNCH     = 2;   // Hunched walk (attack intent)
+    let ATTACK    = 3;   // Attack animations (N variants)
+    let HURT      = 4;   // Hurt animations (N variants)
+    let KNOCKBACK = 5;   // Knocked to ground
+    let RECOVER   = 6;   // Getting up
+    let N_ROLES   = 7;
+}
+
+// Animation descriptor format (3 bytes per role):
+//   byte 0: baseAnimId   - Base animation ID (right-facing)
+//   byte 1: variantCount - Number of random variants (1-N)
+//   byte 2: reserved     - For future use (sound effect ID, etc.)
+let DESCRIPTOR_SIZE = 3;
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STATE-TO-ROLE MAPPING (shared by all grunt types)
+// ═══════════════════════════════════════════════════════════════════════════
+
+in rodata0 {
+
+// State-to-animation role mapping table
+// Index by GruntState enum value (0-11)
+const __state_to_anim_role : [u8 ; 12] = [
+    AnimRole.WALK,      // 0 = SPAWN_IN (walk onto screen)
+    AnimRole.WALK,      // 1 = APPROACH (posture checked separately)
+    AnimRole.HUNCH,     // 2 = ORBIT (menacing stance)
+    AnimRole.HUNCH,     // 3 = COMMIT (wind-up)
+    AnimRole.ATTACK,    // 4 = ATTACK (variant locked)
+    AnimRole.HURT,      // 5 = HITSTUN (variant locked)
+    AnimRole.KNOCKBACK, // 6 = KNOCKDOWN
+    AnimRole.RECOVER,   // 7 = GETUP
+    AnimRole.IDLE,      // 8 = GRABBED (idle while held, hurt briefly when kicked)
+    AnimRole.WALK,      // 9 = RETREAT (walk animation while backing away)
+    AnimRole.WALK,      // 10 = SHUFFLE (walk animation, velocity checked separately)
+    AnimRole.WALK,      // 11 = FLANK (walk animation while circling)
+];
+
+let state_to_anim_role = far &__state_to_anim_role as far *u8;
+
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TEMPORARY VARIABLES
+// ═══════════════════════════════════════════════════════════════════════════
+
+in zeropage {
+    // Temporary for animation ID computation
+    var _animTemp : u8;
+
+    // Far pointer to current entity's animation descriptor table (ROM)
+    var _animDescPtr : u16;
+    var _animDescBank : u8;
+
+    // H-flip offset for current entity
+    var _hflipOffset : u8;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ANIMATION UPDATE FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+in code {
+
+
+// Load animation descriptor pointer and h-flip offset for the given entity.
+// Must be called before update_animation or select_random_variant.
+//
+// Reads entityTypeIndex SoA field (bits 0-6 = EntityTypes index).
+// Sets _animDescPtr, _animDescBank, and _hflipOffset zero-page vars.
+//
+// DB = 0x7e
+#[mem8, idx8]
+inline func _load_entity_anim_data(entityId : u8 in y) {
+    // Get EntityTypes index from entityTypeIndex (mask off is_enemy bit 7)
+    a = entities.SoA.entityTypeIndex[unaligned y];
+    a &= 0x7F;
+    x = a;
+
+    // Load h-flip offset (byte table indexed by EntityTypes)
+    _hflipOffset = a = entity_data.hflip_offsets[x];
+
+    // Load descriptor bank byte (byte table indexed by EntityTypes)
+    _animDescBank = a = entity_data.anim_descriptor_banks[x];
+
+    // Load descriptor pointer from separate lo/hi byte tables (indexed by EntityTypes)
+    a = entities.SoA.entityTypeIndex[unaligned y];
+    a &= 0x7F;
+    x = a;
+    
+    // Build 16-bit pointer by writing lo/hi bytes directly to word variable
+    push8(y);
+    a = entity_data.anim_descriptor_ptrs_lo[x];
+    (&<:_animDescPtr as *u8)[0] = a;  // Write lo byte
+    a = entity_data.anim_descriptor_ptrs_hi[x];
+    (&>:_animDescPtr as *u8)[0] = a;  // Write hi byte
+    y = pop8();
+}
+
+
+// Update entity animation based on current AI state
+//
+// Reads:
+//   - var_0_l (aiState)
+//   - var_1_l (facing)
+//   - var_3_l (locked variant index)
+//   - grunt_ai._tempAbsDx (distance to player)
+//   - entityTypeIndex (for per-entity descriptor lookup)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func update_animation(entityId : u8 in y) {
+    // 0. Load per-entity animation data (descriptor ptr + hflip offset)
+    _load_entity_anim_data(y);
+
+    // 1. Get animation role from current state
+    a = entities.SoA.var_0_l[unaligned y];  // aiState
+    x = a;
+    a = state_to_anim_role[x];
+
+    // 2. Special handling for APPROACH state - check distance for posture
+    x = entities.SoA.var_0_l[unaligned y];
+    if x == grunt_ai.GruntState.APPROACH as u8 {
+        // Check distance to player - use hunch_threshold from AI profile
+        a = grunt_ai._tempAbsDx;
+        if a < grunt_ai._hunchThreshold {
+            // Close to player - aggressive/hunched posture
+            a = AnimRole.HUNCH as u8;
+        } else {
+            // Far from player - casual/erect posture
+            a = AnimRole.WALK as u8;
+        }
+    }
+
+    // 2b. Special handling for RETREAT, SHUFFLE, FLANK states - check velocity
+    x = entities.SoA.var_0_l[unaligned y];
+    if x == grunt_ai.GruntState.RETREAT as u8 || x == grunt_ai.GruntState.SHUFFLE as u8 || x == grunt_ai.GruntState.FLANK as u8 {
+        // Check if actually moving
+        mem16();
+        #[mem16] {
+            aa = entities.SoA.xVelocity[unaligned y];
+            aa |= entities.SoA.yVelocity[unaligned y];
+        }
+        mem8();
+        if zero {
+            a = AnimRole.IDLE as u8;
+        } else {
+            a = AnimRole.WALK as u8;
+        }
+    }
+
+    // 3. Special handling for GRABBED state - hurt animation when kicked
+    x = entities.SoA.var_0_l[unaligned y];
+    if x == grunt_ai.GruntState.GRABBED as u8 {
+        // Check stun timer (var_0_h) - if > 0, show hurt animation
+        a = entities.SoA.var_0_h[unaligned y];
+        if !zero {
+            a = AnimRole.HURT as u8;
+        } else {
+            a = AnimRole.IDLE as u8;
+        }
+    }
+
+    // 4. Look up base animation ID from descriptor (per-entity ROM table)
+    // Role * 3 to get descriptor offset
+    _animTemp = a;  // Save role
+    a <<= 1;        // role * 2
+    carry = false;
+    a +#= _animTemp; // role * 3 = descriptor offset
+    x = a;          // Save offset in X
+    
+    // Set up far pointer to descriptor table
+    (&<:zpTmp_farPtr as *u8)[0] = a = <:_animDescPtr;
+    (&<:zpTmp_farPtr as *u8)[1] = a = >:_animDescPtr;
+    (&<:zpTmp_farPtr as *u8)[2] = a = _animDescBank;
+    
+    // Read baseAnimId using far pointer
+    push8(y);
+    // Store offset in zpTmp_word_1 (zero-extended)
+    a = x & 0xFF;
+    (&<:zpTmp_word_1 as *u8)[0] = a;
+    (&>:zpTmp_word_1 as *u8)[0] = a = 0;
+    {
+    var _descPtr : far *u8 in zpTmp_farPtr;
+        mem16();
+        idx16();
+        #[mem16, idx16] {
+            yy = zpTmp_word_1;
+            mem8();
+            #[mem8, idx16] {
+                a = _descPtr[yy];
+            }
+            mem16();
+        }
+        mem8();
+        idx8();
+    }
+    y = pop8();
+
+    // 5. Add locked variant index (stored in var_3_l)
+    carry = false;
+    a +#= entities.SoA.var_3_l[unaligned y];
+
+    // 6. Add h-flip offset if facing left
+    x = entities.SoA.var_1_l[unaligned y];
+    if x == grunt_ai.Facing.LEFT {
+        carry = false;
+        a +#= _hflipOffset;
+    }
+
+    // 7. Set animation (only if changed)
+    if a != entities.SoA.msAnimationId[unaligned y] {
+        metasprites.set_entity_animation(y, a);
+    }
+}
+
+
+// Select a random variant index and store in var_3_l.
+// Reads the variant count from the entity's animation descriptor table
+// for the given role, then picks a random index in [0, variantCount).
+//
+// Parameters:
+//   entityId - Entity to update (Y register)
+//   role     - AnimRole to get variant count for (A register)
+//
+// KEEP: Y (entityId)
+//
+// DB = 0x7e (lowram)
+#[mem8, idx8]
+func select_random_variant(entityId : u8 in y, role : u8 in a) {
+    // Save role on stack before _load_entity_anim_data clobbers A
+    push8(a);
+
+    // Load per-entity descriptor
+    _load_entity_anim_data(y);
+
+    // Compute descriptor offset: role * 3 + 1 (variantCount field)
+    a = pop8();
+    _animTemp = a;
+    a <<= 1;
+    carry = false;
+    a +#= _animTemp;
+    x = a;          // Save base offset (role * 3) in X
+    x++;            // +1 to get variantCount byte (baseAnimId is at offset 0, variantCount at offset 1)
+    
+    // Set up far pointer to descriptor table
+    push8(y);
+    (&<:zpTmp_farPtr as *u8)[0] = a = <:_animDescPtr;
+    (&<:zpTmp_farPtr as *u8)[1] = a = >:_animDescPtr;
+    (&<:zpTmp_farPtr as *u8)[2] = a = _animDescBank;
+    
+    // Read variant count using far pointer
+    // Store offset in zpTmp_word_1 (zero-extended)
+    a = x & 0xFF;
+    (&<:zpTmp_word_1 as *u8)[0] = a;
+    (&>:zpTmp_word_1 as *u8)[0] = a = 0;
+    {
+    var _descPtr : far *u8 in zpTmp_farPtr;
+        mem16();
+        idx16();
+        #[mem16, idx16] {
+            yy = zpTmp_word_1;
+            mem8();
+            #[mem8, idx16] {
+                a = _descPtr[yy];
+            }
+            mem16();
+        }
+        mem8();
+        idx8();
+    }
+    _animTemp = a;  // Save variant count
+    y = pop8();
+
+    // Get random byte
+    push8(y);
+    a = rng.random();
+    y = pop8();
+
+    // Modulo by variant count using repeated subtraction
+    // (variant counts are small: 1-4 typically)
+    x = _animTemp;
+    if x == 1 {
+        a = 0;
+    } else if x == 2 {
+        a &= 0x01;
+    } else if x == 4 {
+        a &= 0x03;
+    } else {
+        // General case: modulo by repeated subtraction
+        // For counts like 3, 5, etc.
+        while true {
+            if a < _animTemp { break; }
+            carry = true;
+            a -#= _animTemp;
+        }
+    }
+
+    entities.SoA.var_3_l[unaligned y] = a;
+}
+
+
+#[mem8, idx8]
+func clear_variant(entityId : u8 in y) {
+    // Clear variant index (for states with single animation)
+    entities.SoA.var_3_l[unaligned y] = a = 0;
+}
+
+
+}
+
+}

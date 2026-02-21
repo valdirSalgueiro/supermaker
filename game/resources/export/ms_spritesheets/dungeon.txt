@@ -1,0 +1,64 @@
+# Metasprite: dungeon
+# Palette: effects
+# First Tile: 96
+# Format per OAM entry: tile_id,hflip,vflip,palette,priority
+
+## Frameset: dungeon.HitEffect
+## Export Order: HitEffect
+## Pattern: square_four_32
+## Shadow Size: 0
+## Tile Hitbox: 0, 0
+## Frame Size: 32x32
+## Origin: (0, 0)
+## Source: hit-effect.png
+
+### Frame 0: frame0
+# Hitbox: x1=255, x2=255, y1=255, y2=255
+# Hurtbox: x1=255, x2=255, y1=255, y2=255
+# Pattern ID: 4
+# Offset: x=0, y=0
+  Sprite 0: tile=96, hflip=False, vflip=False, pal=3, pri=2
+  Sprite 1: tile=98, hflip=False, vflip=False, pal=3, pri=2
+  Sprite 2: tile=100, hflip=False, vflip=False, pal=3, pri=2
+  Sprite 3: tile=102, hflip=False, vflip=False, pal=3, pri=2
+
+### Frame 1: frame1
+# Hitbox: x1=255, x2=255, y1=255, y2=255
+# Hurtbox: x1=255, x2=255, y1=255, y2=255
+# Pattern ID: 4
+# Offset: x=0, y=0
+  Sprite 0: tile=104, hflip=False, vflip=False, pal=3, pri=2
+  Sprite 1: tile=106, hflip=False, vflip=False, pal=3, pri=2
+  Sprite 2: tile=108, hflip=False, vflip=False, pal=3, pri=2
+  Sprite 3: tile=110, hflip=False, vflip=False, pal=3, pri=2
+
+### Frame 2: frame2
+# Hitbox: x1=255, x2=255, y1=255, y2=255
+# Hurtbox: x1=255, x2=255, y1=255, y2=255
+# Pattern ID: 4
+# Offset: x=0, y=0
+  Sprite 0: tile=128, hflip=False, vflip=False, pal=3, pri=2
+  Sprite 1: tile=130, hflip=False, vflip=False, pal=3, pri=2
+  Sprite 2: tile=132, hflip=False, vflip=False, pal=3, pri=2
+  Sprite 3: tile=134, hflip=False, vflip=False, pal=3, pri=2
+
+### Frame 3: frame3
+# Hitbox: x1=255, x2=255, y1=255, y2=255
+# Hurtbox: x1=255, x2=255, y1=255, y2=255
+# Pattern ID: 4
+# Offset: x=0, y=0
+  Sprite 0: tile=136, hflip=False, vflip=False, pal=3, pri=2
+  Sprite 1: tile=138, hflip=False, vflip=False, pal=3, pri=2
+  Sprite 2: tile=140, hflip=False, vflip=False, pal=3, pri=2
+  Sprite 3: tile=142, hflip=False, vflip=False, pal=3, pri=2
+
+### Animations (1)
+Animation 'effect':
+  Type: frame, Loop: False
+  Delay: 2
+  Binary: process_func=24, length=10 bytes
+  Frames: frame0(2) -> frame1(2) -> frame2(2) -> frame3(2)
+  Original frames: frame0, frame1, frame2, frame3
+
+============================================================
+

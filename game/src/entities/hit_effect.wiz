@@ -1,0 +1,66 @@
+// Hit Effect Entity
+// ==================
+// A simple visual effect that plays an animation and despawns.
+// Spawned at the point of impact when player hits an enemy or enemy hits player.
+//
+// Uses entity SoA.var_*:
+//   var_0_l: Frame countdown timer (fallback for looping animations)
+//
+// For non-looping animations: despawns when animation finishes
+// For looping animations (placeholder): despawns after EFFECT_DURATION frames
+//
+// DB = 0x7e (all functions)
+
+import "../memmap";
+
+import "engine/entity_api";
+import "engine/game/metasprites";
+
+import "gen/entities";
+
+
+namespace entities {
+namespace hit_effect {
+
+
+// Fallback duration for looping animations
+let EFFECT_DURATION = 20;
+
+// Animation IDs (must match _metasprites.json order)
+namespace Anim {
+    let EFFECT = 0;  // The effect animation
+}
+
+in code {
+
+// Initialize hit effect entity
+// Starts the effect animation and sets fallback timer
+//
+// DB = 0x7e
+#[mem8, idx8]
+func init(entityId : u8 in y, parameter : u8 in a) {
+    // Start the effect animation
+    a = Anim.EFFECT;
+    metasprites.set_entity_animation(y, a);
+}
+
+
+// Process hit effect entity
+// Despawns when animation finishes
+//
+// DB = 0x7e
+#[mem8, idx8]
+func process(entityId : u8 in y) {
+    // Check if non-looping animation has finished
+    // (returns carry=false if animation is done or if it's a looping animation)
+    carry = metasprites.is_entity_non_looping_animation_running(y);
+    if !carry {
+        entities.SoA.health[unaligned y] = a;
+    }
+    // If carry is set, non-looping animation is still running - keep alive
+}
+
+
+}  // end in code
+}  // end namespace hit_effect
+}  // end namespace entities

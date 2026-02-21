@@ -1,0 +1,422 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+import "registers";
+
+import "audio";
+import "src/hud";
+import "interrupts";
+import "game/metasprites";
+import "game/metatiles";
+
+import "common/reset";
+
+import "src/engine-hooks";
+
+
+let FRAMES_PER_SECOND = 60;
+
+
+in lowram {
+    // Number of frames processed.
+    // (incremented every `WaitFrame` call)
+    //
+    // MUST be in the `lowram` bank to work correctly.
+    //
+    // (u32)
+    var frameCounter : u32;
+
+        var frameCounter_lobyte @ &<:frameCounter : u8;
+
+        var frameCounter_loword @ &frameCounter              : u16;
+        var frameCounter_hiword @ (&frameCounter as u16 + 2) : u16;
+
+    // A shadow of the INIDISP register
+    var _brightness_buffer : u8;
+
+    // Screen shake counter (frames remaining)
+    // When non-zero, applies random offset to scroll registers
+    var screenShakeCounter : u8;
+    
+    // Screen shake intensity (max pixels of offset)
+    var screenShakeIntensity : u8;
+
+    // Flag to determine which scroll shadow variable goes to BG1 and BG2.
+    //
+    // If `swapBg1AndBg2ScrollShadows` is zero, bgA is BG1 and bgB is BG2.
+    // If `swapBg1AndBg2ScrollShadows` is non-zero, bgA is BG2 and bgB is BG1.
+    //
+    // NOTE: This variable is reset in `reset_registers()`.
+    //
+    // (byte flag)
+    var swapBg1AndBg2ScrollShadows : u8 in __swapBg1AndBg2ScrollShadows;
+
+    // A shadow of the BG1 and BG2 scroll registers.
+    //
+    // See `swapBg1AndBg2ScrollShadows`.
+    //
+    // (4x u16 words)
+    var bgA_scroll_x : u16;
+    var bgA_scroll_y : u16;
+    var bgB_scroll_x : u16;
+    var bgB_scroll_y : u16;
+}
+
+
+in code {
+
+
+
+// Pause the game for a second
+//
+// DB = 0x7e
+#[mem8, idx8]
+func wait_one_second() {
+
+    a = FRAMES_PER_SECOND;
+
+    do {
+        push8(a);
+
+        wait_frame();
+
+        a = pop8();
+        a--;
+    } while !zero;
+}
+
+
+
+// Wait until the end of the current frame, process VBlank routines.
+//
+// REQUIRES: NMI enabled, IRQs disabled
+//
+// DB unknown
+func wait_frame() {
+    // MUST NOT modify zpTmp variables.
+
+    push8(p);
+    push8(data_bank);
+
+    mem8();
+    idx16();
+    #[mem8, idx16] {
+        a = 0x80;
+        push8(a);
+        data_bank = pop8();
+    // DB = 0x80
+
+        // INIDISP = a = 0x7;
+
+        a = _brightness_buffer | INIDISP_FORCE_BLANK;
+
+        wait_until_interrupt();
+
+        // Force-blank screen to prevent corrupt graphics on VBlank overrun
+        INIDISP = a;
+
+
+        metasprites.update_oam__vblank();
+        ms_palettes.update_cgram__vblank();
+
+
+        // Update scroll registers with screen shake offset
+        // Uses proper 16-bit math to avoid nametable switching
+        var _shakeOffsetX : u8 in zpTmp_byte_0;
+        var _shakeOffsetY : u8 in zpTmp_byte_1;
+        var _shakeExtX : u16 in zpTmp_word_0;  // Sign-extended X offset
+        var _shakeExtY : u16 in zpTmp_word_1;  // Sign-extended Y offset
+        var _tempMag : u8 in zpTmp_byte_2;
+        
+        _shakeOffsetX = 0;
+        _shakeOffsetY = 0;
+        
+        a = screenShakeCounter;
+        if !zero {
+            // Decrement shake counter
+            a--;
+            screenShakeCounter = a;
+            
+            // Generate shake offset from frame counter (pseudo-random)
+            // X offset: intensity, negated based on bit 0
+            a = screenShakeIntensity;
+            _tempMag = a;  // Save magnitude
+            a = (far &frameCounter_loword as far *u8)[0];
+            if a & 1 == 0 {
+                // Negate
+                a = _tempMag;
+                a = ~a;
+                a++;
+            } else {
+                a = _tempMag;
+            }
+            _shakeOffsetX = a;
+            
+            // Y offset: intensity, negated based on bit 1
+            a = screenShakeIntensity;
+            if a >= 4 { a = 3; }
+            _tempMag = a;
+            a = (far &frameCounter_loword as far *u8)[0];
+            if a & 2 == 0 {
+                a = _tempMag;
+                a = ~a;
+                a++;
+            } else {
+                a = _tempMag;
+            }
+            _shakeOffsetY = a;
+        }
+        
+        // Sign-extend shake offsets to 16-bit (do this in 8-bit mode first)
+        // X offset
+        a = _shakeOffsetX;
+        *(&<:_shakeExtX as *u8) = a;
+        if a & 0x80 == 0 {
+            *(&>:_shakeExtX as *u8) = a = 0;     // Positive: high byte = 0
+        } else {
+            *(&>:_shakeExtX as *u8) = a = 0xFF;  // Negative: high byte = FF
+        }
+        
+        // Y offset
+        a = _shakeOffsetY;
+        *(&<:_shakeExtY as *u8) = a;
+        if a & 0x80 == 0 {
+            *(&>:_shakeExtY as *u8) = a = 0;
+        } else {
+            *(&>:_shakeExtY as *u8) = a = 0xFF;
+        }
+
+        // Write scroll registers with proper 16-bit math
+        a = swapBg1AndBg2ScrollShadows;
+        if zero {
+            // BG1 X scroll
+            mem16();
+            #[mem16] {
+                aa = bgA_scroll_x + _shakeExtX;
+            }
+            mem8();
+            BG1HOFS = a;
+            swap_bytes(aa);
+            BG1HOFS = a;
+            
+            // BG1 Y scroll
+            mem16();
+            #[mem16] {
+                aa = bgA_scroll_y + _shakeExtY;
+            }
+            mem8();
+            BG1VOFS = a;
+            swap_bytes(aa);
+            BG1VOFS = a;
+
+            // BG2 X scroll
+            mem16();
+            #[mem16] {
+                aa = bgB_scroll_x + _shakeExtX;
+            }
+            mem8();
+            BG2HOFS = a;
+            swap_bytes(aa);
+            BG2HOFS = a;
+            
+            // BG2 Y scroll
+            mem16();
+            #[mem16] {
+                aa = bgB_scroll_y + _shakeExtY;
+            }
+            mem8();
+            BG2VOFS = a;
+            swap_bytes(aa);
+            BG2VOFS = a;
+        }
+        else {
+            // Swapped mode: BG1 uses bgB, BG2 uses bgA
+            mem16();
+            #[mem16] {
+                aa = bgB_scroll_x + _shakeExtX;
+            }
+            mem8();
+            BG1HOFS = a;
+            swap_bytes(aa);
+            BG1HOFS = a;
+            
+            mem16();
+            #[mem16] {
+                aa = bgB_scroll_y + _shakeExtY;
+            }
+            mem8();
+            BG1VOFS = a;
+            swap_bytes(aa);
+            BG1VOFS = a;
+
+            mem16();
+            #[mem16] {
+                aa = bgA_scroll_x + _shakeExtX;
+            }
+            mem8();
+            BG2HOFS = a;
+            swap_bytes(aa);
+            BG2HOFS = a;
+            
+            mem16();
+            #[mem16] {
+                aa = bgA_scroll_y + _shakeExtY;
+            }
+            mem8();
+            BG2VOFS = a;
+            swap_bytes(aa);
+            BG2VOFS = a;
+        }
+
+
+        engine_hooks.wait_frame__vblank__inline();
+
+
+        INIDISP = a = _brightness_buffer;
+    }
+
+    idx8();
+    mem16();
+    #[mem16, idx8] {
+        metatiles.process_draw_tile_buffer__vblank();
+    }
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        aa = *(&nmiCounter as *u16) & 0xff;
+
+        frameCounter_loword = aa = aa + frameCounter_loword;
+        if zero {
+            frameCounter_hiword++;
+        }
+
+        engine_hooks.wait_frame__after_vblank__mem16_idx16__inline();
+    }
+
+    mem8();
+    #[mem8, idx16] {
+        nmiCounter = 0;
+
+        // audio.process();
+    }
+
+    mem8_idx8();
+    #[mem8, idx8] {
+        engine_hooks.wait_frame__after_vblank__mem8_idx8__inline();
+    }
+
+
+    data_bank = pop8();
+    p = pop8();
+
+// DB = unknown
+}
+
+
+
+// Start screen shake effect
+//
+// intensity: max pixels of shake offset (1-4 recommended)
+// frames: duration of shake in frames (60 = 1 second)
+//
+// DB = lowram
+#[mem8, idx8]
+func start_screen_shake(intensity : u8 in a, frames : u8 in x) {
+    screenShakeIntensity = a;
+    screenShakeCounter = x;
+}
+
+
+// Change the brightness of the display.
+//
+// NOTE: Will also wait until the end of the current frame
+//
+// DB = lowram
+#[mem8]
+func wait_frame_and_change_brightness(new_brightness : u8 in a) {
+    _brightness_buffer = a;
+
+    ^return wait_frame();
+}
+
+
+
+// Preform a fadeout animation until the display is disabled (force-blank).
+//
+// NOTE: If the system is in force-blank, this function will not fadeout.
+//
+// RETURNS: Force-blank
+//
+// DB = lowram
+#[mem8, idx8]
+func wait_multiple_frames_and_fadeout() {
+    a = _brightness_buffer;
+    if negative {
+        ^return wait_frame();
+    }
+    if a >= 15 + 1 {
+        a = 15;
+    }
+    do {
+        a--;
+        wait_frame_and_change_brightness(a);
+        a = _brightness_buffer;
+    } while !negative;
+
+// In force blank.
+}
+
+
+
+// Preform a fadeout animation until the display is disabled (force-blank) at one-third speed.
+//
+// NOTE: If the system is in force-blank, this function will not fadeout.
+//
+// RETURNS: Force-blank
+//
+// DB = lowram
+#[mem8, idx8]
+func wait_multiple_frames_and_fadeout__slow() {
+    while true {
+        a = _brightness_buffer;
+        if negative {
+            // In force blank.
+            return;
+        }
+        if a >= 15 + 1 {
+            a = 15;
+        }
+        a--;
+        wait_frame_and_change_brightness(a);
+
+        wait_frame();
+        wait_frame();
+    }
+}
+
+
+// Preform a fade-in animation.
+//
+// NOTE: If the screen's brightness if full, this function will not do anything.
+//
+// DB = lowram
+#[mem8, idx8]
+func wait_multiple_frames_and_fadein() {
+    a = _brightness_buffer;
+    if a >= 15 {
+        a = 0;
+    }
+    do {
+        wait_frame_and_change_brightness(a);
+
+        a = _brightness_buffer;
+        a++;
+    } while a < 15 + 1;
+}
+
+
+}
+
+import "game/ms_palettes";
+

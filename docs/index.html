@@ -4,6 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>SuperMaker 16 — Multi-Genre SNES Game Editor</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -172,79 +173,6 @@
     .dot-y { background: var(--gold); }
     .dot-g { background: var(--green); }
     .window-body { padding: 0; }
-
-    /* fake editor grid */
-    .fake-editor {
-      display: grid; grid-template-columns: 160px 1fr; height: 280px;
-      font-family: var(--pixel); font-size: 8px;
-    }
-    .fake-sidebar {
-      background: var(--bg1); border-right: 1px solid var(--border);
-      padding: 12px 8px; overflow: hidden;
-    }
-    .fake-sidebar .section-label {
-      color: var(--muted); font-size: 7px; margin-bottom: 6px; letter-spacing: 1px;
-    }
-    .fake-tree-item {
-      padding: 5px 8px; color: var(--text); font-size: 8px;
-      cursor: default; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .fake-tree-item.selected { background: var(--blue2); color: #fff; }
-    .fake-tree-item.child { padding-left: 20px; color: var(--muted); font-size: 7px; }
-
-    .fake-canvas {
-      background: #0a0a0c;
-      display: grid;
-      grid-template-columns: repeat(16, 1fr);
-      grid-template-rows: repeat(14, 1fr);
-      gap: 1px;
-      padding: 4px;
-      position: relative;
-    }
-    .fake-canvas .tile {
-      border-radius: 1px;
-    }
-
-    /* pixel palette */
-    .t0 { background: #1a1a2e; }
-    .t1 { background: #2a3a1a; }
-    .t2 { background: #3a2a1a; }
-    .t3 { background: #1a2a3a; }
-    .t4 { background: #2a1a3a; }
-    .t5 { background: #2c5282; }
-    .t6 { background: #276749; }
-    .t7 { background: #744210; }
-    .t8 { background: var(--bg1); }
-    .ts { background: #4a3728; }  /* solid */
-    .tw { background: #6b4c3b; }  /* wall */
-
-    .fake-canvas .entity-dot {
-      position: absolute;
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: var(--red);
-      border: 1px solid #fff;
-    }
-    .fake-canvas .player-dot {
-      position: absolute;
-      width: 6px; height: 8px;
-      background: var(--gold);
-      border: 1px solid #fff;
-    }
-
-    /* toolbar above canvas */
-    .fake-toolbar {
-      background: var(--bg3); border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; gap: 6px; padding: 6px 10px;
-      flex-wrap: wrap;
-    }
-    .fake-btn {
-      background: var(--bg2); border: 1px solid var(--border);
-      color: var(--muted); font-family: var(--pixel); font-size: 7px;
-      padding: 3px 7px; cursor: default;
-    }
-    .fake-btn.active { background: var(--blue2); color: #fff; border-color: var(--blue); }
-    .fake-tag { color: var(--muted); font-size: 7px; }
 
     /* ── Stats bar ────────────────────────────────────────────── */
     .stats-bar {
@@ -486,7 +414,7 @@
       <a href="#features" class="hide-sm">Features</a>
       <a href="#workflow" class="hide-sm">How It Works</a>
       <a href="#sdk" class="hide-sm">SDK</a>
-      <a href="https://github.com" class="hide-sm" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/valdirSalgueiro/supermaker" class="hide-sm" target="_blank" rel="noopener">GitHub</a>
       <a href="#download" class="btn-nav">Download</a>
     </div>
   </div>
@@ -508,7 +436,7 @@
       </p>
       <div class="hero-ctas">
         <a href="#download" class="btn-primary">⬇ Download Editor</a>
-        <a href="https://github.com" class="btn-secondary" target="_blank" rel="noopener">View on GitHub</a>
+        <a href="https://github.com/valdirSalgueiro/supermaker" class="btn-secondary" target="_blank" rel="noopener">View on GitHub</a>
       </div>
     </div>
 
@@ -519,34 +447,11 @@
           <span class="dot dot-r"></span>
           <span class="dot dot-y"></span>
           <span class="dot dot-g"></span>
-          <span style="margin-left:8px">SuperMaker 16 — dungeon1 / cave_b2.map</span>
+          <span style="margin-left:8px">SuperMaker 16 — Level Editor</span>
         </div>
-        <div class="fake-toolbar">
-          <span class="fake-btn active">BG1</span>
-          <span class="fake-btn">BG2</span>
-          <span class="fake-btn active">Grid</span>
-          <span class="fake-btn active">Spawns</span>
-          <span class="fake-btn">Floor/Ceil</span>
-          <span style="flex:1"></span>
-          <span class="fake-btn">1x</span>
-          <span class="fake-btn">2x</span>
-        </div>
-        <div class="fake-editor">
-          <div class="fake-sidebar">
-            <div class="section-label">ROOMS</div>
-            <div class="fake-tree-item">▼ Dungeon 1</div>
-            <div class="fake-tree-item child">cave_b1</div>
-            <div class="fake-tree-item child selected">cave_b2</div>
-            <div class="fake-tree-item child">cave_b3</div>
-            <div class="fake-tree-item child">cave_boss</div>
-            <div class="fake-tree-item" style="margin-top:10px">▼ Dungeon 2</div>
-            <div class="fake-tree-item child">tower_1f</div>
-            <div class="fake-tree-item child">tower_2f</div>
-          </div>
-          <div style="display:flex;flex-direction:column;overflow:hidden;">
-            <div id="mapCanvas" class="fake-canvas"></div>
-          </div>
-        </div>
+        <img src="screenshots/screenshot-level-editor.png"
+             alt="SuperMaker 16 Level Editor"
+             style="display:block;width:100%;height:auto;"/>
       </div>
     </div>
   </div>
@@ -665,6 +570,46 @@
         </div>
       </div>
 
+    </div>
+  </div>
+</section>
+
+<!-- ── Screenshots ── -->
+<section id="screenshots" style="background:var(--bg0);padding:80px 0;">
+  <div class="container">
+    <div style="text-align:center;margin-bottom:48px" class="reveal">
+      <p class="muted pixel" style="font-size:9px;margin-bottom:12px;letter-spacing:2px">// IN ACTION</p>
+      <h2 class="section-title">See it in action</h2>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:32px;">
+      <div class="reveal">
+        <p class="muted" style="font-size:11px;font-family:var(--pixel);letter-spacing:2px;margin-bottom:10px;">
+          LEVEL EDITOR
+        </p>
+        <div class="window-chrome" style="box-shadow:8px 8px 0 rgba(0,0,0,.6);">
+          <div class="window-titlebar">
+            <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+            <span style="margin-left:8px">Level Editor — stage11 / 00-00-room</span>
+          </div>
+          <img src="screenshots/screenshot-level-editor.png"
+               alt="Level Editor showing a beat 'em up stage with spawn regions and character sprites"
+               style="display:block;width:100%;height:auto;"/>
+        </div>
+      </div>
+      <div class="reveal">
+        <p class="muted" style="font-size:11px;font-family:var(--pixel);letter-spacing:2px;margin-bottom:10px;">
+          SPRITE EDITOR
+        </p>
+        <div class="window-chrome" style="box-shadow:8px 8px 0 rgba(0,0,0,.6);">
+          <div class="window-titlebar">
+            <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+            <span style="margin-left:8px">Sprite Editor — dug / idle</span>
+          </div>
+          <img src="screenshots/screenshot-sprite-editor.png"
+               alt="Sprite Editor showing entity list, animation list, hitbox editor, and frame viewer"
+               style="display:block;width:100%;height:auto;"/>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -806,7 +751,7 @@
               The full 65816 engine — entity system, behavior VM, rendering, DMA, audio —
               is open source and available on GitHub. Build on it, learn from it, contribute to it.
             </div>
-            <a href="https://github.com" class="lc-link" target="_blank" rel="noopener">→ View Engine on GitHub</a>
+            <a href="https://github.com/valdirSalgueiro/supermaker" class="lc-link" target="_blank" rel="noopener">→ View Engine on GitHub</a>
           </div>
           <div class="license-card closed">
             <div class="lc-head">
@@ -879,13 +824,13 @@
         <span style="font-size:36px">🪟</span>
         <span class="platform">Editor — Windows x64</span>
         <span class="version" style="color:var(--blue);font-family:var(--pixel);font-size:8px">PROPRIETARY · FREE TO USE</span>
-        <a href="https://github.com" class="btn-primary" target="_blank" rel="noopener">⬇ Download .zip</a>
+        <a href="https://github.com/valdirSalgueiro/supermaker" class="btn-primary" target="_blank" rel="noopener">⬇ Download .zip</a>
       </div>
       <div class="dl-card">
         <span style="font-size:36px">🔓</span>
         <span class="platform">Engine SDK</span>
         <span class="version" style="color:var(--green);font-family:var(--pixel);font-size:8px">OPEN SOURCE</span>
-        <a href="https://github.com" class="btn-secondary" target="_blank" rel="noopener" style="font-family:var(--pixel);font-size:9px;padding:12px 24px">View on GitHub</a>
+        <a href="https://github.com/valdirSalgueiro/supermaker" class="btn-secondary" target="_blank" rel="noopener" style="font-family:var(--pixel);font-size:9px;padding:12px 24px">View on GitHub</a>
       </div>
     </div>
   </div>
@@ -899,7 +844,7 @@
       <div class="tagline" style="margin-top:6px">For devs who think 16-bit was peak gaming.</div>
     </div>
     <div class="foot-links">
-      <a href="https://github.com" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/valdirSalgueiro/supermaker" target="_blank" rel="noopener">GitHub</a>
       <a href="#features">Features</a>
       <a href="#download">Download</a>
     </div>
@@ -907,53 +852,6 @@
 </footer>
 
 <script>
-  // Animate the fake tile map
-  (function() {
-    const canvas = document.getElementById('mapCanvas');
-    if (!canvas) return;
-    const COLS = 16, ROWS = 14;
-    const map = [
-      'tw','tw','tw','tw','tw','tw','tw','tw','tw','tw','tw','tw','tw','tw','tw','tw',
-      'tw','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','tw',
-      'tw','t6','ts','ts','t6','t6','t6','t6','t6','t6','ts','ts','t6','t6','t6','tw',
-      'tw','t6','ts','ts','t6','t6','t6','t6','t6','t6','ts','ts','t6','t6','t6','tw',
-      'tw','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','tw',
-      'tw','t6','t6','t6','t8','t8','t6','t6','t6','t8','t8','t6','t6','t6','t6','tw',
-      'tw','t6','t6','t6','t8','t8','t6','t6','t6','t8','t8','t6','t6','t6','t6','tw',
-      'tw','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','tw',
-      'tw','t6','t6','t6','t6','t6','t5','t5','t5','t6','t6','t6','t6','t6','t6','tw',
-      'tw','t6','t6','t6','t6','t6','t5','t7','t5','t6','t6','t6','t6','t6','t6','tw',
-      'tw','t6','t6','t6','t6','t6','t5','t5','t5','t6','t6','t6','t6','t6','t6','tw',
-      'tw','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','tw',
-      'tw','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','t6','tw',
-      'tw','tw','tw','tw','tw','tw','tw','tw','tw','tw','tw','tw','tw','tw','tw','tw',
-    ];
-    map.forEach(cls => {
-      const tile = document.createElement('div');
-      tile.className = 'tile ' + cls;
-      canvas.appendChild(tile);
-    });
-
-    // entity dots
-    const entities = [
-      {top:'22%', left:'28%'},
-      {top:'55%', left:'60%'},
-      {top:'38%', left:'72%'},
-    ];
-    entities.forEach(pos => {
-      const dot = document.createElement('div');
-      dot.className = 'entity-dot';
-      dot.style.top = pos.top; dot.style.left = pos.left;
-      canvas.appendChild(dot);
-    });
-
-    // player dot
-    const player = document.createElement('div');
-    player.className = 'player-dot';
-    player.style.top = '64%'; player.style.left = '44%';
-    canvas.appendChild(player);
-  })();
-
   // Scroll reveal
   const reveals = document.querySelectorAll('.reveal');
   const observer = new IntersectionObserver((entries) => {

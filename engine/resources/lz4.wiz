@@ -1,0 +1,406 @@
+// LZ4 Decompression for SNES
+//
+// Decompresses LZ4-like compressed data to a Work-RAM buffer.
+// This is a custom LZ4 variant optimized for 65816 decompression.
+//
+// Copyright (c) 2024
+// Distributed under The MIT License
+
+import "src/memmap";
+import "../registers";
+
+
+namespace lz4 {
+
+
+// Minimum match length (LZ4 standard)
+let MIN_MATCH = 4;
+
+
+// Decompression buffer in WRAM bank $7e
+// This buffer is used to decompress data before DMA to VRAM
+// Size: 32KB should handle most tile resources
+// Note: Using wram7e instead of wram7f for better DMA compatibility
+in wram7e {
+    var decompressionBuffer : [u8 ; 0x8000];
+}
+
+
+in zeropage {
+    // Source pointer (far pointer into ROM) - use indexed addressing srcPtr[yy]
+    var _srcPtr : far *u8;
+    
+    // Temp pointer for reading u16 values
+    var _srcPtrWord : far *u16;
+    
+    // Current index into source
+    var _srcIndex : u16;
+    
+    // Destination index (index into decompressionBuffer in bank $7f)
+    var _dstIndex : u16;
+    
+    // End index for source (srcIndex + compressed size)
+    var _srcEnd : u16;
+    
+    // Decompressed size (for return value)
+    var _decompressedSize : u16;
+    
+    // Temp variables for decompression
+    var _token : u8;
+    var _literalLen : u16;
+    var _matchLen : u16;
+    var _matchOffset : u16;
+}
+
+
+in code {
+
+
+// Decompress LZ4 data to the decompression buffer.
+//
+// Input format:
+//   u16 LE: compressed_size | 0x8000 (compression flag already stripped by caller)
+//   u16 LE: decompressed_size
+//   bytes: compressed data
+//
+// IN: a:xx = far pointer to compressed data (at the size header)
+// OUT: decompressedSize = size of decompressed data
+// OUT: data is in decompressionBuffer
+//
+// DB = 0x80
+#[mem8, idx16]
+func decompress(srcAddr: u16 in xx, srcBank: u8 in a) : u16 in _decompressedSize {
+
+    // Setup source pointer
+    *(&_srcPtr as *u16) = xx;
+    #:_srcPtr = a;
+    *(&_srcPtrWord as *u16) = xx;
+    #:_srcPtrWord = a;
+    
+    // Read compressed size (2 bytes LE) using far pointer and strip compression flag
+    mem16();
+    #[mem16] {
+        aa = *_srcPtrWord;
+        aa &= 0x7FFF;  // Strip compression flag
+        _srcEnd = aa;  // compressed_size (will adjust later)
+        
+        // Advance pointer by 2 to read decompressed size
+        aa = *(&_srcPtrWord as *u16);
+        aa += 2;
+        *(&_srcPtrWord as *u16) = aa;
+        
+        // Read decompressed size (2 bytes LE)
+        aa = *_srcPtrWord;
+        _decompressedSize = aa;
+        
+        // Adjust srcEnd: srcEnd = 4 + compressed_size
+        // Data layout: [0-1] compressed_size|flag, [2-3] decompressed_size, [4+] compressed_data
+        aa = _srcEnd;
+        aa += 4;
+        _srcEnd = aa;
+        
+        // Start index at 4 (past both size headers)
+        _srcIndex = aa = 4;
+        
+        // Initialize destination index
+        _dstIndex = 0;
+    }
+    mem8();
+    
+    // Main decompression loop
+    __decompress_loop();
+    
+    return _decompressedSize;
+}
+
+
+// Internal decompression loop - runs with DB = 0x7E for correct buffer access
+// DB = 0x80
+#[mem8, idx16]
+func __decompress_loop() {
+    // Save current data bank and switch to 0x7E for buffer writes
+    push8(data_bank);
+    a = 0x7E;
+    push8(a);
+    data_bank = pop8();
+// DB = 0x7E
+
+__loop:
+    // Check if we're done (srcIndex >= srcEnd)
+    mem16();
+    #[mem16] {
+        aa = _srcIndex;
+        cmp(aa, _srcEnd);
+    }
+    mem8();
+    if carry {
+        goto __done;  // srcIndex >= srcEnd
+    }
+    
+    __process_token();
+    
+    goto __loop;
+    
+__done:
+    // Restore data bank
+    data_bank = pop8();
+// DB = 0x80
+}
+
+
+// Process one LZ4 token (literals + match)
+// Returns when token is fully processed
+// DB = 0x7E
+#[mem8, idx16]
+func __process_token() {
+
+    // Read token byte
+    yy = _srcIndex;
+    a = _srcPtr[yy];
+    _token = a;
+    mem16();
+    #[mem16] {
+        _srcIndex++;
+    }
+    mem8();
+    
+    // Extract literal length (high nibble >> 4)
+    a = _token;
+    a = a >>> 4;  // Logical shift right 4 bits
+    mem16();
+    #[mem16] {
+        aa &= 0x00FF;
+        _literalLen = aa;
+    }
+    mem8();
+    
+    // If literal length == 15, read extended length
+    a = <:_literalLen;
+    if a == 15 {
+        __read_extended_literal_length();
+    }
+    
+    // Copy literals if any
+    mem16();
+    #[mem16] {
+        aa = _literalLen;
+    }
+    mem8();
+    if !zero {
+        __copy_literals();
+    }
+    
+    // Check if we're done (srcIndex >= srcEnd - last block has no match)
+    mem16();
+    #[mem16] {
+        aa = _srcIndex;
+        cmp(aa, _srcEnd);
+    }
+    mem8();
+    if carry {
+        return;
+    }
+    
+    // Read match offset (2 bytes LE) using far pointer
+    __read_match_offset();
+    
+    // Extract match length base (low nibble) - DO NOT add MIN_MATCH yet
+    // Extended bytes (if any) must be added to the base nibble first
+    a = _token;
+    a &= 0x0F;
+    mem16();
+    #[mem16] {
+        aa &= 0x00FF;
+        _matchLen = aa;  // Store just the nibble, not +MIN_MATCH
+    }
+    mem8();
+    
+    // If match length nibble was 15, read extended length
+    // Extended bytes are added to _matchLen (the base nibble)
+    a = _token;
+    a &= 0x0F;
+    if a == 15 {
+        __read_extended_match_length();
+    }
+    
+    // NOW add MIN_MATCH after all extended bytes have been accumulated
+    mem16();
+    #[mem16] {
+        aa = _matchLen;
+        aa += MIN_MATCH;
+        _matchLen = aa;
+    }
+    mem8();
+    
+    // Copy match (from already decompressed data)
+    __copy_match();
+}
+
+
+// Read extended literal length bytes
+// DB = 0x7E
+#[mem8, idx16]
+func __read_extended_literal_length() {
+var _extByte : u8 in zpTmp_byte_0;
+
+    do {
+        yy = _srcIndex;
+        a = _srcPtr[yy];
+        _extByte = a;  // Save extension byte before 16-bit operations
+        
+        mem16();
+        #[mem16] {
+            _srcIndex++;
+            
+            // Load extension byte and zero-extend to 16-bit
+            aa = 0;
+        }
+        mem8();
+        a = _extByte;
+        mem16();
+        #[mem16] {
+            // aa low byte now has _extByte, high byte is 0
+            aa += _literalLen;
+            _literalLen = aa;
+        }
+        mem8();
+        a = _extByte;
+    } while a == 0xFF;
+}
+
+
+// Read match offset (2 bytes LE)
+// DB = 0x7E
+#[mem8, idx16]
+func __read_match_offset() {
+    // Temporarily use _srcPtrWord to read the offset
+    mem16();
+    #[mem16] {
+        // Set up temp pointer for reading the offset
+        aa = *(&_srcPtr as *u16);
+        aa += _srcIndex;
+        *(&_srcPtrWord as *u16) = aa;
+    }
+    mem8();
+    // Bank byte stays the same
+    a = #:_srcPtr;
+    #:_srcPtrWord = a;
+    
+    mem16();
+    #[mem16] {
+        aa = *_srcPtrWord;
+        _matchOffset = aa;
+        
+        // Advance srcIndex by 2
+        aa = _srcIndex;
+        aa += 2;
+        _srcIndex = aa;
+    }
+    mem8();
+}
+
+
+// Read extended match length bytes
+// DB = 0x7E
+#[mem8, idx16]
+func __read_extended_match_length() {
+var _extByte : u8 in zpTmp_byte_0;
+
+    do {
+        yy = _srcIndex;
+        a = _srcPtr[yy];
+        _extByte = a;  // Save extension byte before 16-bit operations
+        
+        mem16();
+        #[mem16] {
+            _srcIndex++;
+            
+            // Load extension byte and zero-extend to 16-bit
+            aa = 0;
+        }
+        mem8();
+        a = _extByte;
+        mem16();
+        #[mem16] {
+            // aa low byte now has _extByte, high byte is 0
+            aa += _matchLen;
+            _matchLen = aa;
+        }
+        mem8();
+        a = _extByte;
+    } while a == 0xFF;
+}
+
+
+// Copy literal bytes from source to destination
+// Uses _literalLen as count
+// Modifies: _srcIndex, _dstIndex, _literalLen
+// DB = 0x7E
+#[mem8, idx16]
+func __copy_literals() {
+    // Simple byte-by-byte copy from ROM (far pointer) to WRAM buffer
+    do {
+        yy = _srcIndex;
+        a = _srcPtr[yy];
+        
+        // Write to destination in bank $7f
+        xx = _dstIndex;
+        decompressionBuffer[xx] = a;
+        
+        // Advance indices
+        mem16();
+        #[mem16] {
+            _srcIndex++;
+            _dstIndex++;
+            _literalLen--;
+            aa = _literalLen;
+        }
+        mem8();
+    } while !zero;
+}
+
+
+// Copy match bytes from already decompressed data
+// Uses _matchLen and _matchOffset
+// Modifies: _dstIndex, _matchLen
+// DB = 0x7E
+#[mem8, idx16]
+func __copy_match() {
+// NOTE: Using zpTmp_word_2 instead of zpTmp_word_0 to avoid clobbering
+// caller's variables (e.g., metasprites._header.firstTile uses zpTmp_word_0)
+var _matchSrc : u16 in zpTmp_word_2;
+
+    // Calculate source index (current dest - offset)
+    mem16();
+    #[mem16] {
+        aa = _dstIndex;
+        carry = true;
+        aa -#= _matchOffset;
+        _matchSrc = aa;
+    }
+    mem8();
+    
+    // Copy bytes (must handle overlapping case byte-by-byte)
+    // Both source and dest are in decompressionBuffer (bank $7f)
+    do {
+        xx = _matchSrc;
+        a = decompressionBuffer[xx];
+        
+        xx = _dstIndex;
+        decompressionBuffer[xx] = a;
+        
+        mem16();
+        #[mem16] {
+            _matchSrc++;
+            _dstIndex++;
+            _matchLen--;
+            aa = _matchLen;
+        }
+        mem8();
+    } while !zero;
+}
+
+
+}  // in code
+
+}  // namespace lz4

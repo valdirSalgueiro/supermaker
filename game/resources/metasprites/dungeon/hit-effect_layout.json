@@ -1,0 +1,148 @@
+{
+  "name": "hit-effect",
+  "frame_width": 32,
+  "frame_height": 32,
+  "opt_type": "balanced",
+  "opt_level": "max",
+  "unique_tiles": 58,
+  "tile_data_bytes": 1856,
+  "frames": [
+    {
+      "name": "sprite0",
+      "index": 0,
+      "sprite_count": 4,
+      "sprites_8x8": 0,
+      "sprites_16x16": 4,
+      "tiles_wasted": 1,
+      "objects": [
+        {
+          "x": 0,
+          "y": 0,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 0,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 0,
+          "y": 16,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 16,
+          "size": "16x16",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite1",
+      "index": 1,
+      "sprite_count": 4,
+      "sprites_8x8": 0,
+      "sprites_16x16": 4,
+      "tiles_wasted": 0,
+      "objects": [
+        {
+          "x": 0,
+          "y": 0,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 0,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 0,
+          "y": 16,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 16,
+          "size": "16x16",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite2",
+      "index": 2,
+      "sprite_count": 4,
+      "sprites_8x8": 0,
+      "sprites_16x16": 4,
+      "tiles_wasted": 0,
+      "objects": [
+        {
+          "x": 0,
+          "y": 0,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 0,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 0,
+          "y": 16,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 16,
+          "size": "16x16",
+          "palette": 0
+        }
+      ]
+    },
+    {
+      "name": "sprite3",
+      "index": 3,
+      "sprite_count": 4,
+      "sprites_8x8": 0,
+      "sprites_16x16": 4,
+      "tiles_wasted": 5,
+      "objects": [
+        {
+          "x": 0,
+          "y": 0,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 0,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 0,
+          "y": 16,
+          "size": "16x16",
+          "palette": 0
+        },
+        {
+          "x": 16,
+          "y": 16,
+          "size": "16x16",
+          "palette": 0
+        }
+      ]
+    }
+  ],
+  "_metasprites_json_sha256": "397ea197cbce8ae7fe2b2b58e7c3c88091c5f27f192ad8cbb21a17f2a71aca0d"
+}

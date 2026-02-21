@@ -1,0 +1,291 @@
+// DMA Queue - VBlank-budget-aware VRAM DMA queue
+// 
+// Queues DMA transfers and executes them during VBlank.
+// Stops when VBlank budget is exceeded to prevent visual corruption.
+// Remaining transfers carry over to next frame.
+
+import "src/memmap";
+import "registers";
+
+
+namespace dma_queue {
+
+
+let MAX_ENTRIES = 32;  // Maximum number of queued transfers
+let MAX_BYTES_PER_FRAME = 4600;  // Maximum bytes that can be queued per frame
+
+in lowram {
+    // SoA arrays for queue storage (each array = MAX_ENTRIES entries)
+    // Using bytes to avoid Wiz array indexing issues
+    var __queue_src_lo_l   : [u8 ; MAX_ENTRIES];  // ROM address low byte
+    var __queue_src_lo_h   : [u8 ; MAX_ENTRIES];  // ROM address high byte
+    var __queue_src_bank   : [u8 ; MAX_ENTRIES];  // ROM bank
+    var __queue_dst_l      : [u8 ; MAX_ENTRIES];  // VRAM word address low byte
+    var __queue_dst_h      : [u8 ; MAX_ENTRIES];  // VRAM word address high byte
+    var __queue_size_l     : [u8 ; MAX_ENTRIES];  // Transfer size low byte
+    var __queue_size_h     : [u8 ; MAX_ENTRIES];  // Transfer size high byte
+    
+    // Number of entries in queue (head of queue)
+    var __count : u8;
+    
+    // Current read position in queue (for budget-limited flushing)
+    var __read_pos : u8;
+    
+    // Total bytes queued this frame (for budget limiting)
+    var __bytes_queued_this_frame : u16;
+}
+
+
+in zeropage {
+    // Temporary variables for push function
+    var __push_src_bank : u8;
+    var __push_src_lo   : u16;
+    var __push_dst      : u16;
+    var __push_size     : u16;
+    
+    // For flush function - split bytes for size accumulation
+    var __push_size_l   : u8;
+    var __push_size_h   : u8;
+    
+    // Bytes transferred this VBlank (for budget tracking)
+    var __bytes_this_vblank : u16;
+}
+
+
+in code {
+
+
+// Reset queue at frame start (only resets if queue is empty)
+// Call this at start of game loop before queueing new tiles
+// DB = any
+#[mem8, idx16]
+inline func reset() {
+    // Only reset if we've finished all pending transfers
+    a = __count;
+    if a == __read_pos {
+        __count = a = 0;
+        __read_pos = a;
+        // Reset byte budget for new frame
+        mem16();
+        #[mem16] {
+            __bytes_queued_this_frame = aa = 0;
+        }
+        mem8();
+    }
+}
+
+
+// Set the size for the next push operation
+// Call this before calling push()
+#[mem16, idx16]
+inline func set_size(size : u16 in aa) {
+    __push_size = aa;
+}
+
+
+// Check if a given number of bytes would fit in the budget
+// Does NOT commit - use this for pre-checks before queueing multiple entries
+// Returns: carry = true if would exceed budget, false if fits
+// DB = any
+#[mem16, idx16]
+inline func would_exceed_budget(bytes : u16 in aa) : bool in carry {
+    aa += __bytes_queued_this_frame;
+    if aa >= MAX_BYTES_PER_FRAME {
+        carry = true;
+        return true;
+    } else {
+        carry = false;
+        return false;
+    }
+}
+
+
+// Enqueue a VRAM transfer (simple - no merging)
+//
+// INPUT:
+//   a = src_bank (ROM bank)
+//   xx = src_lo (ROM address low word)
+//   yy = dst (VRAM word address)
+//   __push_size must be set before calling (use set_size())
+//
+// OUTPUT:
+//   carry = set if queue is full, clear on success
+//
+// DB = 0x7e
+#[mem8, idx16]
+func push(src_bank : u8 in a, src_lo : u16 in xx, dst : u16 in yy) : bool in carry {
+    // Save parameters  
+    __push_src_bank = a;
+    __push_src_lo = xx;
+    __push_dst = yy;
+
+    // Check byte budget
+    mem16();
+    #[mem16] {
+        aa = __bytes_queued_this_frame;
+        aa += __push_size;
+        if aa >= MAX_BYTES_PER_FRAME {
+            // Would exceed byte budget
+            mem8();
+            return true;
+        }
+        // Update byte counter (commit the addition)
+        __bytes_queued_this_frame = aa;
+    }
+    mem8();
+    
+    // Check queue full (entry count)
+    a = __count;
+    cmp(a, MAX_ENTRIES);
+    if carry {
+        // Queue full - too many entries
+        return true;
+    }
+    
+    // Index into arrays (y = count, simple byte index)
+    // Switch to idx8 for array access
+    idx8();
+    #[idx8] {
+        y = a;
+        
+        // Store src_lo (split into bytes)
+        a = <:__push_src_lo;
+        __queue_src_lo_l[y] = a;
+        a = >:__push_src_lo;
+        __queue_src_lo_h[y] = a;
+        
+        // Store src_bank
+        a = __push_src_bank;
+        __queue_src_bank[y] = a;
+        
+        // Store dst (split into bytes)
+        a = <:__push_dst;
+        __queue_dst_l[y] = a;
+        a = >:__push_dst;
+        __queue_dst_h[y] = a;
+        
+        // Store size (split into bytes)
+        a = <:__push_size;
+        __queue_size_l[y] = a;
+        a = >:__push_size;
+        __queue_size_h[y] = a;
+    }
+    idx16();
+    
+    __count++;
+    
+    carry = false;
+    return false;
+}
+
+
+// Execute queued transfers up to VBlank budget
+// Stops when budget is exceeded, remaining transfers carry over to next frame
+// Call once per VBlank, uses DMA channel 0
+//
+// REQUIRES: VBlank or Force-Blank
+// DB = 0x80
+#[mem8, idx8]
+func flush__vblank() {
+    // Check if there are pending transfers
+    a = __read_pos;
+    cmp(a, __count);
+    if a == __count { return; }
+    
+    // Reset byte counter for this VBlank
+    mem16();
+    #[mem16] {
+        __bytes_this_vblank = aa = 0;
+    }
+    mem8();
+    
+    // Setup DMA0 for VRAM word writes (two-register transfer to VMDATA)
+    VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
+    DMAP0 = a = DMAP_TO_PPU | DMAP_TRANSFER_TWO;
+    BBAD0 = a = <:&VMDATA;
+    
+    y = __read_pos;
+    
+    do {
+        // Read size bytes into temporaries (while in mem8 mode)
+        __push_size_l = a = __queue_size_l[y];
+        __push_size_h = a = __queue_size_h[y];
+        
+        // Build 16-bit size in __push_size (low byte first since it's little-endian)
+        // __push_size is a u16 at consecutive addresses, write bytes individually
+        (&<:__push_size as *u8)[0] = a = __push_size_l;
+        (&>:__push_size as *u8)[0] = a = __push_size_h;
+        
+        mem16();
+        #[mem16] {
+            // Add transfer size to running total
+            aa = __bytes_this_vblank;
+            aa += __push_size;
+            __bytes_this_vblank = aa;
+        }
+        mem8();
+        
+        // Set VRAM destination
+        VMADDL = a = __queue_dst_l[y];
+        VMADDH = a = __queue_dst_h[y];
+        
+        // Set source address
+        A1T0L = a = __queue_src_lo_l[y];
+        A1T0H = a = __queue_src_lo_h[y];
+        A1B0 = a = __queue_src_bank[y];
+        
+        // Set transfer size
+        DAS0L = a = __push_size_l;
+        DAS0H = a = __push_size_h;
+        
+        // Execute DMA
+        MDMAEN = a = MDMAEN_DMA0;
+        
+        // Advance read position
+        y++;
+        __read_pos = y;
+        
+        // Check if we've processed all entries
+        a = y;
+        cmp(a, __count);
+    } while a != __count;
+
+__flush_done:
+}
+
+
+// Check if all queued transfers have been completed
+// Returns true if queue is empty, false if transfers are pending
+// DB = any
+#[mem8]
+inline func is_complete() : bool in carry {
+    a = __read_pos;
+    cmp(a, __count);
+    if a == __count {
+        carry = true;
+    } else {
+        carry = false;
+    }
+}
+
+
+// Get current queue count (for debugging)
+// DB = any
+#[mem8]
+inline func get_count() : u8 in a {
+    return __count;
+}
+
+
+// Get pending transfer count (for debugging)  
+// DB = any
+#[mem8]
+inline func get_pending() : u8 in a {
+    a = __count;
+    a -= __read_pos;
+}
+
+
+}
+
+}

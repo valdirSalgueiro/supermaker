@@ -1,0 +1,587 @@
+// Camera System
+// =============
+// Handles camera tracking, scrolling, and column streaming for scrolling maps.
+//
+// Uses 16-bit world coordinates for player position to support maps larger than 256 pixels.
+// Screen position = world position - camera position.
+//
+// Copyright (c) 2024
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+import "../registers";
+import "../wait-frame";
+import "../dma-queue";
+import "../entity_api";
+import "map-system";
+import "metatiles";
+import "spawn-regions";
+
+import "src/player";
+
+
+// Camera follow parameters
+let CAMERA_MARGIN = 64;            // Distance from AABB to screen edge before camera follows
+let CAMERA_Y_MAX = 512;            // Maximum Y scroll value
+
+// Screen dimensions
+let SCREEN_WIDTH = 256;
+let SCREEN_HEIGHT = 224;
+
+// Derived limits (hoisted to avoid magic numbers)
+let SCREEN_RIGHT_LIMIT  = SCREEN_WIDTH  - CAMERA_MARGIN;  // 192
+let SCREEN_BOTTOM_LIMIT = SCREEN_HEIGHT - CAMERA_MARGIN;  // 160
+
+// Tile size for column streaming
+let TILE_SIZE_SHIFT = 4;           // 16 pixels = 1 << 4
+
+
+namespace camera {
+
+
+in lowram {
+    // Camera position (16-bit in pixels)
+    // NOTE: Other code accesses via (&camX as *u16) pattern
+    var camX : u16;
+    var camY : u16;
+    
+    // Current and previous level column for scroll streaming
+    var currentLevelColumn : u8;
+    var lastLevelColumn : u8;
+    
+    // Column streaming state
+    var streamDirection : u8;  // 0 = none, 1 = right, 0xFF = left
+    
+    // Forward-only scrolling mode (beat 'em up style)
+    // When non-zero, camera will NEVER scroll left
+    var forwardOnlyScrolling : u8;
+    
+    // Maximum player screen X position (for smooth camera unlock)
+    // Prevents camera jump when unlocking from locked combat region
+    // Camera will only scroll right if player exceeds this screen position
+    var maxPlayerScreenX : u16;
+}
+
+// Player world position is stored in entities.SoA.worldX/Y[0] (player = entity 0)
+// Use entities.SoA.worldX_lo[0], entities.SoA.worldX_hi[0], etc.
+
+
+in code {
+
+
+// Initialize camera and player world position
+// Call on room load after player entity position is set
+//
+// DB = 0x7e
+#[mem8, idx8]
+func init() {
+    mem16();
+    #[mem16] {
+        camX = aa = 0;
+        camY = aa = 0;
+        maxPlayerScreenX = aa = SCREEN_RIGHT_LIMIT as u16;
+    }
+    mem8();
+    
+    currentLevelColumn = a = 0;
+    lastLevelColumn = a = 0;
+    streamDirection = a = 0;
+    forwardOnlyScrolling = a = 1;
+    
+    // Player world position is already set in entities.SoA.worldX/Y[0]
+    // by dungeon._set_player_pos() before this is called
+}
+
+
+// Update camera position to follow player AABB
+// Uses 16-bit world coordinates
+// Camera tracks AABB edges, not sprite origin
+//
+// DB = 0x7e
+#[mem8, idx8]
+func update() {
+var _aabbLeft   : u16 in zpTmp_word_0;
+var _aabbRight  : u16 in zpTmp_word_6;  // word_1 is clobbered by apply_bounds (_maxX)
+var _aabbTop    : u16 in zpTmp_word_2;
+var _aabbBottom : u16 in zpTmp_word_3;
+var _aabbOffset : u16 in zpTmp_word_4;  // Zero-extended bounds (left/top, width/height)
+var _camLimit   : u16 in zpTmp_word_5;  // Camera edge limit (camX + margin, etc.)
+
+    // ============================================================
+    // PHASE 1: Compute AABB X edges
+    // ============================================================
+    
+    // Zero-extend bounds_left
+    (&<:_aabbOffset as *u8)[0] = a = entities.SoA.bounds_left[0];
+    (&<:_aabbOffset as *u8)[1] = a = 0;
+    // Zero-extend bounds_width
+    (&<:_camLimit as *u8)[0] = a = entities.SoA.bounds_width[0];
+    (&<:_camLimit as *u8)[1] = a = 0;
+    
+    mem16();
+    #[mem16] {
+        // aabbLeft = worldX + bounds_left
+        aa = *((&entities.SoA.worldX_lo[0]) as *u16);
+        carry = false;
+        aa +#= _aabbOffset;
+        _aabbLeft = aa;
+    
+        // aabbRight = aabbLeft + bounds_width
+        carry = false;
+        aa +#= _camLimit;
+        _aabbRight = aa;
+
+        // Skip X camera tracking if position wrapped (bit 15 set indicates invalid/negative)
+        // This prevents the camera from chasing a player who wrapped past 0
+        aa = _aabbLeft;
+        if aa & 0x8000 != 0 {
+            goto __vertical_tracking;
+        }
+
+    
+    // ============================================================
+    // PHASE 2: Adjust camera X based on AABB edges
+    // ============================================================
+
+        // --- LEFT EDGE ---
+        // if aabbLeft < camX + CAMERA_MARGIN, move camera left
+        // SKIP if forwardOnlyScrolling is enabled (beat 'em up mode)
+        _camLimit = aa = camX + CAMERA_MARGIN as u16;
+        
+        cmp(aa, _aabbLeft);
+        if carry {
+            // Need to scroll left - but check if forward-only mode is active
+            // Store compare result, check flag in mem8, then decide
+            _camLimit = aa = _aabbLeft;  // Save aabbLeft to temp
+        }
+    }
+    
+    // Check forward-only flag outside mem16 block
+    a = forwardOnlyScrolling;
+    if zero {
+        // Forward scrolling not active, check if we need to scroll left
+        mem16();
+        #[mem16] {
+            // Compare again: was camLimit < aabbLeft?
+            aa = camX + CAMERA_MARGIN as u16;
+            cmp(aa, _camLimit);  // _camLimit now holds aabbLeft from above
+            if carry {
+                // camX = max(0, aabbLeft - CAMERA_MARGIN)
+                aa = _camLimit;  // _camLimit = aabbLeft
+                if aa < CAMERA_MARGIN as u16 {
+                    aa = 0;
+                } else {
+                    carry = true;
+                    aa -#= CAMERA_MARGIN as u16;
+                }
+                camX = aa;
+            }
+        }
+        mem8();
+    }
+    
+    mem16();
+    #[mem16] {
+        // --- RIGHT EDGE ---
+        // Use maxPlayerScreenX as the right-edge scroll threshold.
+        // Normally SCREEN_RIGHT_LIMIT (240), but during/after camera lock
+        // it adapts to the player's actual screen position for smooth unlock.
+        //
+        // if camX < scrollMax && aabbRight - camX > maxPlayerScreenX:
+        //     camX = aabbRight - maxPlayerScreenX
+        // maxPlayerScreenX = max(maxPlayerScreenX, aabbRight - camX)
+
+        aa = camX;
+        cmp(aa, *((&map_system.cameraMaxX_lo) as *u16));
+        if !carry {
+            // playerRightScreenX = aabbRight - camX
+            aa = _aabbRight;
+            carry = true;
+            aa -#= camX;
+            // strict greater than: carry set AND not equal
+            cmp(aa, maxPlayerScreenX);
+            if carry {
+                if !zero {
+                    // playerRightScreenX > maxPlayerScreenX → scroll right
+                    aa = _aabbRight;
+                    carry = true;
+                    aa -#= maxPlayerScreenX;
+                    camX = aa;
+                }
+            }
+        }
+
+    }
+    mem8();
+    
+__vertical_tracking:
+    // ============================================================
+    // PHASE 1: Compute AABB Y edges
+    // ============================================================
+    
+    // No vertical scrolling possible if map height == screen height
+    a = map_system.mapHeight;
+    if a == map_system.SCREEN_HEIGHT_TILES {
+        goto __apply_bounds;
+    }
+    
+    // Zero-extend bounds_top
+    (&<:_aabbOffset as *u8)[0] = a = entities.SoA.bounds_top[0];
+    (&<:_aabbOffset as *u8)[1] = a = 0;
+    // Zero-extend bounds_height
+    (&<:_camLimit as *u8)[0] = a = entities.SoA.bounds_height[0];
+    (&<:_camLimit as *u8)[1] = a = 0;
+    
+    mem16();
+    #[mem16] {
+        // aabbTop = worldY + bounds_top
+        aa = *((&entities.SoA.worldY_lo[0]) as *u16);
+        carry = false;
+        aa +#= _aabbOffset;
+        _aabbTop = aa;
+
+        // aabbBottom = aabbTop + bounds_height
+        carry = false;
+        aa +#= _camLimit;
+        _aabbBottom = aa;
+    
+        // Skip Y camera tracking if position wrapped (bit 15 set indicates invalid/negative)
+        aa = _aabbTop;
+        if aa & 0x8000 != 0 {
+            goto __apply_bounds;
+        }
+
+    // ============================================================
+    // PHASE 2: Adjust camera Y based on AABB edges
+    // ============================================================
+
+        // --- TOP EDGE ---
+        // if aabbTop < camY + CAMERA_MARGIN, move camera up
+        _camLimit = aa = camY + CAMERA_MARGIN as u16;
+        
+        cmp(aa, _aabbTop);
+        if carry {
+            // camY = max(0, aabbTop - CAMERA_MARGIN)
+            aa = _aabbTop;
+            if aa < CAMERA_MARGIN as u16 {
+                aa = 0;
+            } else {
+                carry = true;
+                aa -#= CAMERA_MARGIN as u16;
+            }
+            camY = aa;
+        }
+    
+        // --- BOTTOM EDGE ---
+        // NOTE: camY may have changed above; re-read
+        // if aabbBottom > camY + SCREEN_BOTTOM_LIMIT, move camera down
+        _camLimit = aa = camY + SCREEN_BOTTOM_LIMIT as u16;
+        
+        cmp(aa, _aabbBottom);
+        if !carry {
+            aa = _aabbBottom;
+            carry = true;
+            aa -#= SCREEN_BOTTOM_LIMIT as u16;
+            camY = aa;
+        }
+    }
+    mem8();
+    
+__apply_bounds:
+    // === Apply camera bounds ===
+    apply_bounds();
+
+    // === Update maxPlayerScreenX AFTER apply_bounds ===
+    // Uses the final clamped camX so the value reflects the player's true screen X.
+    // This prevents a snap on region unlock: if the player was at screen X 300 during
+    // the lock, maxPlayerScreenX = 300, and the camera won't jump when the lock releases.
+    // (Skip if X was invalid — aabbRight has bit 15 set when world pos wrapped.)
+    mem16();
+    #[mem16] {
+        aa = _aabbRight;
+        if aa & 0x8000 == 0 {
+            carry = true;
+            aa -#= camX;
+            cmp(aa, SCREEN_RIGHT_LIMIT as u16);
+            if !carry {
+                aa = SCREEN_RIGHT_LIMIT as u16;
+            }
+            maxPlayerScreenX = aa;
+        }
+    }
+    mem8();
+
+    // NOTE: Entity clamping is done OUTSIDE camera code (in player.clamp_to_visible_area)
+    // Camera code must never move entities.
+
+    // === Update scroll registers and stream columns ===
+    update_scroll();
+}
+
+
+// Apply camera bounds clamping
+//
+// When a spawn region is active with LOCK_CAMERA, camera is clamped to
+// [regionStartX, regionEndX] instead of [0, cameraMaxX].
+//
+// DB = 0x7e
+#[mem8, idx8]
+func apply_bounds() {
+var _minX : u16 in zpTmp_word_0;
+var _maxX : u16 in zpTmp_word_1;
+
+    mem16_idx16();
+    #[mem16, idx16] {
+        // Clamp camY to [0, CAMERA_Y_MAX]
+        aa = camY;
+        if aa & 0x8000 != 0 {
+            // Negative -> clamp to 0
+            camY = aa = 0;
+        } else {
+            cmp(aa, CAMERA_Y_MAX as u16);
+            if carry {
+                // camY > CAMERA_Y_MAX -> clamp
+                camY = aa = CAMERA_Y_MAX as u16;
+            }
+        }
+        
+        // Determine X bounds based on spawn region lock state
+        carry = spawn_regions.is_camera_locked();
+        if carry {
+            // Spawn region active with camera lock
+            // Clamp to [regionStartX, regionEndX]
+            aa = spawn_regions.regionStartX;
+            _minX = aa;
+            xx = spawn_regions.regionEndX;
+            _maxX = xx;
+        } else {
+            // Normal bounds: [0, cameraMaxX]
+            _minX = aa = 0;
+            _maxX = aa = *((&map_system.cameraMaxX_lo) as *u16);
+        }
+        
+        // Clamp camX to [_minX, _maxX]
+        aa = camX;
+        if aa & 0x8000 != 0 {
+            // Negative -> clamp to minX
+            camX = aa = _minX;
+        } else {
+            cmp(aa, _minX);
+            if !carry {
+                // camX < minX -> clamp to minX
+                camX = aa = _minX;
+            } else {
+                aa = camX;
+                cmp(aa, _maxX);
+                if carry {
+                    // camX > maxX -> clamp to maxX
+                    camX = aa = _maxX;
+                }
+            }
+        }
+    }
+    mem8_idx8();
+}
+
+
+// NOTE: Entity clamping has been moved to player.clamp_to_visible_area()
+// Camera code must never move entities.
+
+
+// Update the scroll registers and stream new columns if needed
+//
+// DB = 0x7e
+#[mem8, idx8]
+func update_scroll() {
+var _newColumn : u8 in zpTmp_byte_0;
+
+    // Set scroll shadow variables from camera position
+    mem16();
+    #[mem16] {
+        // BG1 (foreground) scrolls at full camera rate
+        bgA_scroll_x = aa = camX;
+        bgA_scroll_y = aa = camY;
+        
+        // BG2 (background) scrolls at 1/4 rate for parallax effect
+        aa = camX;
+        aa >>>= 2;
+        bgB_scroll_x = aa;
+        
+        aa = camY;
+        aa >>>= 2;
+        bgB_scroll_y = aa;
+    }
+    mem8();
+    
+    // Sync to map_system for other code that uses it
+    // (map_system uses lo/hi bytes for legacy reasons)
+    map_system.cameraX_lo = a = (&<:camX as *u8)[0];
+    map_system.cameraX_hi = a = (&<:camX as *u8)[1];
+    
+    // Calculate current level column: camX >> 4 (divide by tile size 16)
+    a = (&<:camX as *u8)[1];  // camX high byte
+    a <<= 4;
+    _newColumn = a;
+    a = (&<:camX as *u8)[0];  // camX low byte
+    a >>>= 4;
+    a = a | _newColumn;
+    currentLevelColumn = a;
+    
+    // Check if we crossed a tile boundary
+    a ^= lastLevelColumn;
+    if !zero {
+        // Column changed - determine direction and stream
+        a = currentLevelColumn;
+        carry = true;
+        a -#= lastLevelColumn;
+        if !negative {
+            // Moving right - stream rightmost column
+            streamDirection = a = 1;
+            stream_column_right();
+        } else {
+            // Moving left - stream leftmost column
+            streamDirection = a = 0xFF;
+            stream_column_left();
+        }
+        
+        lastLevelColumn = a = currentLevelColumn;
+    }
+}
+
+
+// Stream a new column on the right edge of the screen
+// Called when camera moves right and crosses a tile boundary
+//
+// DB = 0x7e
+#[mem8, idx8]
+func stream_column_right() {
+var _column : u8 in zpTmp_byte_0;
+var _vramColumn : u8 in zpTmp_byte_1;
+var _mapPtr : far *u8 in zpTmp_farPtr;
+var _mapOffset : u16 in zpTmp_word_0;
+
+    // Calculate which map column to load: currentLevelColumn + 16 (rightmost visible + 1)
+    // But we need the column that's about to become visible
+    a = currentLevelColumn;
+    carry = false;
+    a +#= 16;  // Screen is 16 tiles wide, load the column coming into view
+    _column = a;
+    
+    // Check if column is within map bounds
+    if a >= map_system.mapWidth {
+        return;  // Past end of map, nothing to stream
+    }
+    
+    // Calculate VRAM column (0-31, wrapping)
+    a = _column;
+    a = a & 0x1F;  // Modulo 32
+    _vramColumn = a;
+    
+    // Setup far pointer to map data
+    (&<:_mapPtr as *u8)[0] = a = map_system.bg1MapPtr_lo;
+    (&<:_mapPtr as *u8)[1] = a = map_system.bg1MapPtr_hi;
+    (&<:_mapPtr as *u8)[2] = a = map_system.bg1MapPtr_bank;
+    
+    // Queue the column buffer for VBlank transfer
+    // For now, fill the column buffer
+    fill_column_buffer(_column, _vramColumn);
+}
+
+
+// Stream a new column on the left edge of the screen
+// Called when camera moves left and crosses a tile boundary
+//
+// DB = 0x7e
+#[mem8, idx8]
+func stream_column_left() {
+var _column : u8 in zpTmp_byte_0;
+var _vramColumn : u8 in zpTmp_byte_1;
+
+    // The column to load is currentLevelColumn (the leftmost visible column)
+    _column = a = currentLevelColumn;
+    
+    // Calculate VRAM column (0-31, wrapping)
+    a = a & 0x1F;
+    _vramColumn = a;
+    
+    // Queue the column for streaming
+    fill_column_buffer(_column, _vramColumn);
+}
+
+
+// Fill the column buffer with tile data from the map
+// and mark it for VBlank transfer
+//
+// Parameters:
+//   mapColumn - which column in the map to read (0 to mapWidth-1)
+//   vramColumn - which VRAM column to write to (0-31)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func fill_column_buffer(mapColumn : u8 in a, vramColumn : u8 in x) {
+var _mapColumn : u8 in zpTmp_byte_4;
+var _vramColumn : u8 in zpTmp_byte_5;
+var _mapPtr : far *u8 in zpTmp_farPtr;
+var _row : u8 in zpTmp_byte_6;
+var _mapOffset : u16 in zpTmp_word_0;
+var _stride : u8 in zpTmp_byte_7;
+
+    _mapColumn = a;
+    _vramColumn = x;
+
+    // Setup far pointer to map data
+    (&<:_mapPtr as *u8)[0] = a = map_system.bg1MapPtr_lo;
+    (&<:_mapPtr as *u8)[1] = a = map_system.bg1MapPtr_hi;
+    (&<:_mapPtr as *u8)[2] = a = map_system.bg1MapPtr_bank;
+
+    // Pre-compute row stride: mapWidth * 2 bytes (minus the 2 already advanced by _read_tile_with_flip)
+    a = map_system.mapWidth;
+    a <<= 1;
+    carry = true;
+    a -#= 2;
+    _stride = a;
+
+    // Calculate initial map offset: mapColumn * 2 (each tile is 2 bytes, u16)
+    mem16();
+    #[mem16] {
+        aa = 0;
+    }
+    mem8();
+    a = _mapColumn;
+    a <<= 1;
+    (&<:_mapOffset as *u8)[0] = a;
+    (&>:_mapOffset as *u8)[0] = a = 0;
+
+    // Fill buffer with 14 rows
+    _row = a = 0;
+    do {
+        // _read_tile_with_flip reads tile, computes flip, advances _mapOffset by 2
+        // Returns: A = tilemap_low, zpTmp_byte_2 = tilemap_high | flip
+        map_system._read_tile_with_flip();
+
+        y = _row;
+        map_system.BG1Buffer.tiles_lo[y] = a;
+        map_system.BG1Buffer.tiles_hi[y] = a = zpTmp_byte_2;
+
+        // Advance to next row: offset += stride (mapWidth*2 - 2, since _read_tile_with_flip already added 2)
+        carry = false;
+        a = <:_mapOffset;
+        a +#= _stride;
+        (&<:_mapOffset as *u8)[0] = a;
+        a = >:_mapOffset;
+        a +#= 0;
+        (&>:_mapOffset as *u8)[0] = a;
+
+        _row++;
+        a = _row;
+    } while a < map_system.SCREEN_HEIGHT_TILES;
+
+    // Mark buffer for VBlank transfer
+    map_system.BG1Buffer.column = a = _vramColumn;
+    map_system.BG1Buffer.pending = a = 1;
+}
+
+
+}  // in code
+
+}  // namespace camera

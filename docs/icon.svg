@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <radialGradient id="bgGrad" cx="50%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#252528"/>
+      <stop offset="100%" stop-color="#0f0f10"/>
+    </radialGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3.5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <clipPath id="roundClip">
+      <rect width="256" height="256" rx="20"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="256" height="256" rx="20" fill="url(#bgGrad)"/>
+
+  <!-- Scanline texture -->
+  <rect width="256" height="256" rx="20" clip-path="url(#roundClip)"
+        fill="none"
+        style="background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.1) 2px, rgba(0,0,0,0.1) 4px)"/>
+
+  <!-- Gold outer border -->
+  <rect x="6" y="6" width="244" height="244" rx="14" fill="none" stroke="#f0c040" stroke-width="3"/>
+  <!-- Subtle inner border -->
+  <rect x="11" y="11" width="234" height="234" rx="10" fill="none" stroke="#c8962a" stroke-width="1" opacity="0.35"/>
+
+  <!-- Blue cartridge-label band -->
+  <rect x="10" y="10" width="236" height="58" rx="10" fill="#1e3a5c" clip-path="url(#roundClip)"/>
+  <rect x="10" y="46" width="236" height="22" fill="#264f78" clip-path="url(#roundClip)"/>
+  <!-- Blue band bottom edge -->
+  <line x1="10" y1="68" x2="246" y2="68" stroke="#569cd6" stroke-width="1.5" opacity="0.6"/>
+
+  <!-- "SM" wordmark in blue band -->
+  <text x="128" y="46"
+        font-family="'Courier New', Courier, monospace"
+        font-weight="900"
+        font-size="28"
+        text-anchor="middle"
+        fill="#7ec8e3"
+        letter-spacing="12">SM</text>
+
+  <!-- Pixel corner accents in band -->
+  <rect x="14" y="14" width="5" height="5" fill="#f0c040" opacity="0.7"/>
+  <rect x="237" y="14" width="5" height="5" fill="#f0c040" opacity="0.7"/>
+
+  <!-- ── Pixel-art "16" ──────────────────────────────────── -->
+  <!-- Grid: 12px cells. "1" = 3×5, "6" = 4×5, gap = 12px   -->
+  <!-- "1" origin: (80, 117)   "6" origin: (128, 117)        -->
+  <g filter="url(#glow)" shape-rendering="crispEdges">
+
+    <!-- digit "1" -->
+    <!--r0--><rect x="92"  y="117" width="12" height="12" fill="#f0c040"/>
+    <!--r1--><rect x="80"  y="129" width="12" height="12" fill="#f0c040"/>
+             <rect x="92"  y="129" width="12" height="12" fill="#f0c040"/>
+    <!--r2--><rect x="92"  y="141" width="12" height="12" fill="#f0c040"/>
+    <!--r3--><rect x="92"  y="153" width="12" height="12" fill="#f0c040"/>
+    <!--r4--><rect x="80"  y="165" width="12" height="12" fill="#f0c040"/>
+             <rect x="92"  y="165" width="12" height="12" fill="#f0c040"/>
+             <rect x="104" y="165" width="12" height="12" fill="#f0c040"/>
+
+    <!-- digit "6" -->
+    <!--r0--><rect x="140" y="117" width="12" height="12" fill="#f0c040"/>
+             <rect x="152" y="117" width="12" height="12" fill="#f0c040"/>
+    <!--r1--><rect x="128" y="129" width="12" height="12" fill="#f0c040"/>
+    <!--r2--><rect x="128" y="141" width="12" height="12" fill="#f0c040"/>
+             <rect x="140" y="141" width="12" height="12" fill="#f0c040"/>
+             <rect x="152" y="141" width="12" height="12" fill="#f0c040"/>
+    <!--r3--><rect x="128" y="153" width="12" height="12" fill="#f0c040"/>
+             <rect x="164" y="153" width="12" height="12" fill="#f0c040"/>
+    <!--r4--><rect x="140" y="165" width="12" height="12" fill="#f0c040"/>
+             <rect x="152" y="165" width="12" height="12" fill="#f0c040"/>
+  </g>
+
+  <!-- Thin separator line above BIT label -->
+  <line x1="76" y1="190" x2="180" y2="190" stroke="#f0c040" stroke-width="1" opacity="0.3"/>
+
+  <!-- "BIT" label -->
+  <text x="128" y="206"
+        font-family="'Courier New', Courier, monospace"
+        font-weight="700"
+        font-size="11"
+        text-anchor="middle"
+        fill="#f0c040"
+        letter-spacing="7"
+        opacity="0.65">BIT</text>
+
+  <!-- Bottom corner accents -->
+  <rect x="14"  y="237" width="5" height="5" fill="#f0c040" opacity="0.4"/>
+  <rect x="237" y="237" width="5" height="5" fill="#f0c040" opacity="0.4"/>
+
+  <!-- Side circuit traces (left) -->
+  <rect x="6" y="96"  width="6" height="5" rx="1" fill="#3a3a42"/>
+  <rect x="6" y="108" width="6" height="5" rx="1" fill="#3a3a42"/>
+  <rect x="6" y="120" width="6" height="5" rx="1" fill="#3a3a42"/>
+  <rect x="6" y="132" width="6" height="5" rx="1" fill="#3a3a42"/>
+  <rect x="6" y="144" width="6" height="5" rx="1" fill="#3a3a42"/>
+  <rect x="6" y="156" width="6" height="5" rx="1" fill="#3a3a42"/>
+
+  <!-- Side circuit traces (right) -->
+  <rect x="244" y="96"  width="6" height="5" rx="1" fill="#3a3a42"/>
+  <rect x="244" y="108" width="6" height="5" rx="1" fill="#3a3a42"/>
+  <rect x="244" y="120" width="6" height="5" rx="1" fill="#3a3a42"/>
+  <rect x="244" y="132" width="6" height="5" rx="1" fill="#3a3a42"/>
+  <rect x="244" y="144" width="6" height="5" rx="1" fill="#3a3a42"/>
+  <rect x="244" y="156" width="6" height="5" rx="1" fill="#3a3a42"/>
+</svg>

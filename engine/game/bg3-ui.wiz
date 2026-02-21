@@ -1,0 +1,57 @@
+// BG3 UI Overlay
+// ===============
+// Loads BG3 HUD tileset into VRAM and clears the tilemap.
+// The HUD module (src/hud.wiz) dynamically builds the tilemap each frame.
+// BG3 in Mode 1 uses 2bpp tiles (4 colors from palette row 0).
+//
+// Copyright (c) 2024
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "src/memmap";
+import "../registers";
+import "../vram-map";
+import "../resources/dma";
+
+
+namespace bg3_ui {
+
+
+in code {
+    // Embedded BG3 tile data (2bpp format, ~469 tiles from bg3-1.png)
+    const BG3_TILES = embed "resources/tilesets/bg3.chr";
+
+
+// Load BG3 HUD tiles into VRAM and clear the tilemap.
+//
+// The tilemap is built dynamically by the HUD module each frame,
+// so we only load tile graphics here and clear the map to empty+priority.
+//
+// REQUIRES: Force-Blank
+// Uses DMA Channel 0
+//
+// DB = 0x80
+#[mem8, idx16]
+func load__forceblank() {
+    // Load BG3 tiles into VRAM
+    VMAIN = a = VMAIN_INCREMENT_1 | VMAIN_INCREMENT_HIGH;
+    VMADD = xx = VRAM_BG3_TILES_WADDR;
+
+    // Setup DMA for tile data
+    DMAP0 = a = DMAP_TO_PPU | DMAP_TRANSFER_TWO;
+    BBAD0 = a = <:&VMDATA;
+
+    A1T0 = xx = &BG3_TILES as u16;
+    A1B0 = a = #:far &BG3_TILES;
+    DAS0 = xx = sizeof(typeof(BG3_TILES));
+
+    HDMAEN = 0;
+    MDMAEN = a = MDMAEN_DMA0;
+
+    // Clear BG3 tilemap (all entries = 0x2020 = empty tile 0x20 with priority bit set)
+    dma.set_tilemap__forceblank(VRAM_BG3_MAP_WADDR, 0x2020);
+}
+
+
+}  // in code
+
+}  // namespace bg3_ui

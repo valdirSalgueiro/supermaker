@@ -1,0 +1,255 @@
+import "memmap";
+import "engine/entity_api";
+import "engine/game/metasprites";
+import "engine/game/camera";
+
+namespace player {
+
+in zeropage {
+    // The player's hurtbox (screen coordinates)
+    var playerHurtbox : entities.U8Aabb;
+
+    // The player's hitbox (screen coordinates)
+    var playerHitbox : entities.U8Aabb;
+
+    // 16-bit X coordinates for offscreen collision detection.
+    // The u8 left/right fields in playerHitbox/playerHurtbox clamp to 0-255,
+    // which breaks collision with offscreen entities.
+    var playerHitbox_left16 : u16;
+    var playerHitbox_right16 : u16;
+    var playerHurtbox_left16 : u16;
+    var playerHurtbox_right16 : u16;
+}
+
+in code {
+// ═══════════════════════════════════════════════════════════════════════════
+// HITBOX / HURTBOX SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+// These functions compute and update the player's collision boxes based on
+// the current metasprite frame and screen position (worldX - camX).
+//
+// Hitbox/hurtbox values are u8 XYWH, frame-absolute pixel positions.
+// The Python tool pre-mirrors X for left-facing frames, so no FRAME_WIDTH
+// adjustment is needed here — screenX is always the sprite's left edge.
+
+
+// Update player's hitbox and hurtbox
+//
+// DB = 0x7e
+#[mem8, idx16]
+func update_collision_boxes() {
+    // Get msFrameAddr first - needed for hitbox/hurtbox data
+    xx = entities.SoA.msFrameAddr[PLAYER_ENTITY_ID];
+
+    // Compute screen position from world position - camera
+    // Keep as 16-bit signed value - only clamp AFTER adding hitbox offsets
+    mem16();
+    #[mem16] {
+        // _screenX_16 (zpTmp_word_0) = worldX - camX
+        aa = entities.SoA.worldX[PLAYER_ENTITY_ID];
+        aa -= camera.camX;
+        zpTmp_word_0 = aa;
+
+        // _screenY_16 (zpTmp_word_1) = worldY - camY
+        aa = entities.SoA.worldY[PLAYER_ENTITY_ID];
+        aa -= camera.camY;
+        zpTmp_word_1 = aa;
+    }
+    mem8();
+
+    _update_player_hitbox(xx);
+    _update_player_hurtbox(xx);
+}
+
+
+// Add u8 offset to 16-bit screen X position (zpTmp_word_0), then clamp to 0-255.
+// Also stores unclamped 16-bit result in zpTmp_word_4 for offscreen collision.
+// Values are frame-absolute pixel positions (0-255), always non-negative.
+//
+// KEEP: xx
+//
+// DB = 0x7e
+#[mem8, idx16]
+func __add_screenX16_to_i8a_clamp(u8offset : u8 in a) : u8 in a {
+    // Zero-extend the u8 offset to 16-bit
+    zpTmp_byte_0 = a;
+    zpTmp_byte_1 = a = 0;
+
+    // Add offset to screenX_16, clamp negative to 0
+    mem16();
+    #[mem16] {
+        aa = zpTmp_word_0;
+        aa += *((&zpTmp_byte_0) as *u16);
+        if negative {
+            aa = 0;
+        }
+        zpTmp_word_4 = aa;  // unclamped 16-bit result for collision
+        if aa >= 256 {
+            aa = 255;
+        }
+    }
+    mem8();
+
+    return a;
+}
+
+
+// Add u8 offset to 16-bit screen Y position (zpTmp_word_1), then clamp to 0-224.
+// Values are frame-absolute pixel positions (0-255), always non-negative.
+//
+// KEEP: xx
+//
+// DB = 0x7e
+#[mem8, idx16]
+func __add_screenY16_to_i8a_clamp(u8offset : u8 in a) : u8 in a {
+    // Zero-extend the u8 offset to 16-bit
+    zpTmp_byte_0 = a;
+    zpTmp_byte_1 = a = 0;
+
+    // Add offset to screenY_16, clamp result to screen bounds (0-224)
+    mem16();
+    #[mem16] {
+        aa = zpTmp_word_1;
+        aa += *((&zpTmp_byte_0) as *u16);
+        if negative {
+            aa = 0;
+        } else if aa >= 224 {
+            aa = 224;
+        }
+    }
+    mem8();
+
+    return a;
+}
+
+
+// Update player hitbox
+//
+// Called once per frame
+// ROM data is already correctly mirrored for each facing direction by the metasprite tool.
+//
+// KEEP: xx
+//
+// DB = 0x7e
+#[mem8, idx16]
+func _update_player_hitbox(msFrameAddr : u16 in xx) {
+
+    // Check sentinel (hitbox_x == 0xFF means no hitbox)
+    a = metasprites.MsDataFormat.hitbox_x[xx] as u8;
+    if a == metasprites.MsDataFormat.NO_AABB_VALUE {
+        a = 0xff;
+        playerHitbox.top = a;
+        playerHitbox.bottom = 0;
+        playerHitbox.left = a;
+        playerHitbox.right = 0;
+        mem16();
+        #[mem16] {
+            playerHitbox_left16 = aa = 0xFFFF;
+            playerHitbox_right16 = aa;
+        }
+        mem8();
+        return;
+    }
+
+    // screen_left = screenX + hitbox_x
+    __add_screenX16_to_i8a_clamp(a);
+    playerHitbox.left = a;
+    mem16(); #[mem16] { playerHitbox_left16 = aa = zpTmp_word_4; } mem8();
+
+    // screen_right = screenX + hitbox_x + hitbox_w
+    a = metasprites.MsDataFormat.hitbox_x[xx] as u8;
+    carry = false;
+    a +#= metasprites.MsDataFormat.hitbox_w[xx] as u8;
+    __add_screenX16_to_i8a_clamp(a);
+    playerHitbox.right = a;
+    mem16(); #[mem16] { playerHitbox_right16 = aa = zpTmp_word_4; } mem8();
+
+    // screen_top = screenY + hitbox_y
+    a = metasprites.MsDataFormat.hitbox_y[xx] as u8;
+    __add_screenY16_to_i8a_clamp(a);
+    playerHitbox.top = a;
+
+    // screen_bottom = screenY + hitbox_y + hitbox_h
+    a = metasprites.MsDataFormat.hitbox_y[xx] as u8;
+    carry = false;
+    a +#= metasprites.MsDataFormat.hitbox_h[xx] as u8;
+    __add_screenY16_to_i8a_clamp(a);
+    playerHitbox.bottom = a;
+}
+
+
+
+// Update player hurtbox
+//
+// Called once per frame
+// ROM data is already correctly mirrored for each facing direction by the metasprite tool.
+//
+// DB = 0x7e
+#[mem8, idx16]
+inline func _update_player_hurtbox(msFrameAddr : u16 in xx) {
+
+    a = iframeCounter;
+    if !zero {
+        a--;
+        iframeCounter = a;
+
+        // player has no hurtbox during i-frames
+        a = 0xff;
+        playerHurtbox.top = a;
+        playerHurtbox.bottom = 0;
+        playerHurtbox.left = a;
+        playerHurtbox.right = 0;
+        mem16();
+        #[mem16] {
+            playerHurtbox_left16 = aa = 0xFFFF;
+            playerHurtbox_right16 = aa;
+        }
+        mem8();
+    }
+    else {
+        // Check sentinel (hurtbox_x == 0xFF means no hurtbox)
+        a = metasprites.MsDataFormat.hurtbox_x[xx] as u8;
+        if a == metasprites.MsDataFormat.NO_AABB_VALUE {
+            a = 0xff;
+            playerHurtbox.top = a;
+            playerHurtbox.bottom = 0;
+            playerHurtbox.left = a;
+            playerHurtbox.right = 0;
+            mem16();
+            #[mem16] {
+                playerHurtbox_left16 = aa = 0xFFFF;
+                playerHurtbox_right16 = aa;
+            }
+            mem8();
+            return;
+        }
+
+        // screen_left = screenX + hurtbox_x
+        __add_screenX16_to_i8a_clamp(a);
+        playerHurtbox.left = a;
+        mem16(); #[mem16] { playerHurtbox_left16 = aa = zpTmp_word_4; } mem8();
+
+        // screen_right = screenX + hurtbox_x + hurtbox_w
+        a = metasprites.MsDataFormat.hurtbox_x[xx] as u8;
+        carry = false;
+        a +#= metasprites.MsDataFormat.hurtbox_w[xx] as u8;
+        __add_screenX16_to_i8a_clamp(a);
+        playerHurtbox.right = a;
+        mem16(); #[mem16] { playerHurtbox_right16 = aa = zpTmp_word_4; } mem8();
+
+        // screen_top = screenY + hurtbox_y
+        a = metasprites.MsDataFormat.hurtbox_y[xx] as u8;
+        __add_screenY16_to_i8a_clamp(a);
+        playerHurtbox.top = a;
+
+        // screen_bottom = screenY + hurtbox_y + hurtbox_h
+        a = metasprites.MsDataFormat.hurtbox_y[xx] as u8;
+        carry = false;
+        a +#= metasprites.MsDataFormat.hurtbox_h[xx] as u8;
+        __add_screenY16_to_i8a_clamp(a);
+        playerHurtbox.bottom = a;
+    }
+}
+}
+
+}

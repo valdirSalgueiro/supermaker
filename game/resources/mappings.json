@@ -1,0 +1,76 @@
+{
+  "game_title": "SUPER GAME",
+  "memory_map": {
+    "mode": "hirom",
+    "first_resource_bank": "c1",
+    "n_resource_banks": 14
+  },
+  "tad_binary_directory": "../../terrific-audio-driver/target/release/",
+  "gamestate": {
+    "identifier": "USG!",
+    "_comment": "Only increment version when reordering or resizing flags/variables/cart sizes.",
+    "version": 1,
+    "cart_ram_size": 4096,
+    "n_save_slots": 4,
+    "n_save_copies": 4,
+    "u8_array_len": 32,
+    "u16_array_len": 16,
+    "global_flags": [
+      "boss_defeated"
+    ],
+    "dungeon_flags": [
+      "dungeon_key",
+      "dungeon_orb",
+      null
+    ],
+    "u8_vars": [
+      "player_health",
+      "player_lives"
+    ],
+    "u16_vars": []
+  },
+  "palettes": [
+    "slum",
+    "hud_tiles",
+    "title_screen",
+    "stage12",
+    "stage11"
+  ],
+  "mt_tilesets": [
+    "slum",
+    "stage12",
+    "stage11"
+  ],
+  "ms_spritesheets": [
+    "dungeon"
+  ],
+  "tiles": [
+    "ui",
+    "text",
+    "metasprite_hud"
+  ],
+  "bg_images": [
+    "loading_audio_data"
+  ],
+  "interactive_tile_functions": [
+    "unlocked_door"
+  ],
+  "room_transitions": [
+    "fadein_reset_player",
+    "fadein"
+  ],
+  "gamemodes": [
+    {
+      "name": "game_loop",
+      "source": "gameloop"
+    },
+    {
+      "name": "room_transition",
+      "source": "room-transition"
+    },
+    {
+      "name": "animation_test",
+      "source": "animation-test"
+    }
+  ]
+}

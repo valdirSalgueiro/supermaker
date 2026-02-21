@@ -1,0 +1,174 @@
+// Copyright (c) 2021, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+import "../memmap";
+
+import "engine/entity_api";
+import "engine/entity_utils";
+import "engine/gamemodes";
+import "engine/wait-frame";
+import "engine/dma-queue";
+
+import "engine/audio";
+// import "engine/game/room";
+// import "engine/game/gamestate";
+import "engine/game/dungeon";
+import "engine/game/ms_palettes";
+import "engine/game/metasprites";
+// import "engine/game/room-transitions"
+import "engine/game/entityloop";
+import "engine/game/map-system";
+import "engine/game/camera";
+import "engine/game/spawn-regions";
+import "engine/game/group-ai";
+
+import "../player";
+import "../interactive-tiles";
+import "../debug-skip";
+import "../collision";
+import "../hud";
+
+import "gen/enums";
+import "gen/ms-drawing-functions";
+import "gen/room-progression";
+
+
+namespace metasprites {
+    in zeropage{
+        var attr : u8;
+        var size_large : u8;
+    }
+}
+
+namespace gamemodes {
+namespace game_loop {
+
+// Frames to wait after room cleared before auto-transition (~1.5 seconds)
+let ROOM_CLEAR_DELAY = 90;
+
+in wram7e {
+    var roomClearTimer : u8;
+}
+
+
+in code {
+
+// Process the game loop
+//
+// ASSUMES: PPU setup and screen enabled
+//
+// DB = 0x7e
+#[mem8, idx8]
+func exec {
+    // Position-based room transitions disabled for now
+    // Will be replaced with event-triggered transitions later
+
+    roomClearTimer = a = 0;
+
+    ^do {
+        // Reset DMA queue at start of frame (only if previous transfers completed)
+        // This allows large sprite transfers to span multiple frames
+        idx16();
+        #[idx16] {
+            dma_queue.reset();
+        }
+        idx8();
+        
+        // Always process player entity first
+        entities.currentEntityId = PLAYER_ENTITY_ID;
+        player.process();
+        metasprites.process_entity_animation(PLAYER_ENTITY_ID);
+
+
+        idx16();
+        #[mem8, idx16] {
+            player.update_collision_boxes();
+        }
+        mem8_idx8();
+
+        entityloop.process_active_entities();
+        entityloop.process_effects();
+        
+        // Collision detection: player vs enemies and enemies vs player
+        collision.detect_all();
+        
+        // Resolve group AI movement intents (after all enemies have written theirs)
+        group_ai.resolve_intents();
+
+        // Process unlocked door transitions
+        metatiles.interactive_tiles.unlocked_door.process_transition();
+
+        // Process spawn region system (check for activation, spawn enemies)
+        spawn_regions.check_region_entry();
+        spawn_regions.process_active_region();
+
+        // Update camera based on player position
+        camera.update();
+
+        // Clamp player to visible area (AABB-based, after camera moves)
+        player.clamp_to_visible_area();
+        
+        // Clamp player to walk plane (ceiling and floor)
+        y = 0;  // Player is entity 0
+        entity_utils.clamp_to_walk_plane(y);
+
+        entityloop.sort_active_entities();
+        entityloop.draw_entities();
+
+
+        // ms_palettes.process();
+
+        debug_skip.check_skip_buttons();
+
+        // Update HUD (health bars, timer, etc.) before VBlank
+        hud.update();
+        idx16();
+        #[idx16] {
+            hud.queue_transfer();
+        }
+        idx8();
+
+        // Room clear auto-transition: wait then load next room
+        a = spawn_regions.roomCleared;
+        if !zero {
+            a = roomClearTimer;
+            if !zero {
+                a--;
+                roomClearTimer = a;
+                if zero {
+                    // Timer expired — transition to next room
+                    _do_room_transition();
+                }
+            } else {
+                // First frame after clear — start timer
+                roomClearTimer = a = ROOM_CLEAR_DELAY;
+            }
+        }
+
+        wait_frame();
+
+        negative = is_next_game_mode_unchanged();
+    } while negative;
+}
+
+
+// Transition to next room in progression (with fade)
+//
+// DB = 0x7e
+#[mem8, idx8]
+func _do_room_transition() {
+    carry = room_progression.load_next_room();
+    if !carry {
+        // Next room loaded into roomToLoad — trigger dungeon load (handles fade out/in)
+        dungeon.load_dungeon_and_room(dungeon.roomToLoad);
+        // Note: load_dungeon_and_room does not return (it switches game mode)
+    }
+    // At end of progression or not in progression — do nothing
+}
+
+
+}
+
+}
+}
+

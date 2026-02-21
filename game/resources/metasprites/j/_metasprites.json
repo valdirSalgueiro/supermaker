@@ -1,0 +1,116 @@
+{
+  "name": "j",
+  "palette": "j",
+  "firstTile": 0,
+  "endTile": 256,
+  "dynamic": true,
+  "framesets": [
+    {
+      "name": "J",
+      "source": "j.png",
+      "frameWidth": 128,
+      "frameHeight": 128,
+      "autoFlip": "h",
+      "frames": [
+        "frame0",
+        "frame1",
+        "frame2",
+        "frame3",
+        "frame4",
+        "frame5",
+        "frame6",
+        "frame7",
+        "frame8",
+        "frame9",
+        "frame10",
+        "frame11"
+      ],
+      "animations": {
+        "idle": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame0"
+          ],
+          "loop": true
+        },
+        "walk": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame0",
+            "frame1",
+            "frame2"
+          ],
+          "loop": true
+        },
+        "attack1": {
+          "delay-type": "frame",
+          "fixed-delay": 4,
+          "frames": [
+            "frame3",
+            "frame4",
+            "frame3"
+          ],
+          "loop": false
+        },
+        "attack2": {
+          "delay-type": "frame",
+          "fixed-delay": 4,
+          "frames": [
+            "frame5",
+            "frame6",
+            "frame5"
+          ],
+          "loop": false
+        },
+        "hurt1": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame7"
+          ],
+          "loop": false
+        },
+        "hurt2": {
+          "delay-type": "frame",
+          "fixed-delay": 5,
+          "frames": [
+            "frame8"
+          ],
+          "loop": false
+        },
+        "knockback": {
+          "delay-type": "frame",
+          "fixed-delay": 10,
+          "frames": [
+            "frame9",
+            "frame10"
+          ],
+          "loop": false
+        },
+        "recover": {
+          "delay-type": "frame",
+          "fixed-delay": 10,
+          "frames": [
+            "frame11",
+            "frame11",
+            "frame11",
+            "frame11"
+          ],
+          "loop": false
+        }
+      },
+      "hitboxes": {
+        "frame6": "82 48 46 16",
+        "frame4": "82 56 37 13"
+      },
+      "hurtboxes": {
+        "frame0-frame6": "46 36 36 92"
+      },
+      "bounds": "46 36 36 92",
+      "order": 2,
+      "defaultLayout": "auto 0 0"
+    }
+  ]
+}

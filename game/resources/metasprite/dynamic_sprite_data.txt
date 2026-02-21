@@ -1,0 +1,6 @@
+# Dynamic Metasprite Sprite Data Debug
+# Spritesheet: dynamic
+# Format: 5 bytes per sprite (x, y, char, attr, size), terminated by x=0xFF
+
+=== Frameset: Player ===
+

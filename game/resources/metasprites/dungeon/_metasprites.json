@@ -1,0 +1,30 @@
+{
+  "name": "dungeon",
+  "palette": "effects",
+  "firstTile": 96,
+  "endTile": 160,
+  "framesets": [
+    {
+      "name": "HitEffect",
+      "source": "hit-effect.png",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "xorigin": 0,
+      "yorigin": 0,
+      "frames": [ "frame0", "frame1", "frame2", "frame3" ],
+      "defaultLayout": "square_four_32 0 0",
+      "order": 2,
+      "animations": {
+        "effect": {
+          "delay-type": "frame",
+          "fixed-delay": 2,
+          "frames": [ "frame0", "frame1", "frame2", "frame3" ],
+          "loop": false
+        }
+      },
+
+      "hitboxes": {},
+      "hurtboxes": {}
+    }
+  ]
+}

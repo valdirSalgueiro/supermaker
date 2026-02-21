@@ -1,0 +1,39 @@
+// Copyright (c) 2024, Marcus Rowe <undisbeliever@gmail.com>.
+// Distributed under The MIT License, see the LICENSE file for more details.
+
+
+// VRAM Map
+// ========
+//
+// Optimized layout for maximum BG1/BG2 tile space:
+//   0x0000-0x03FF: BG1 tilemap (32x32 = 1024 words)
+//   0x0400-0x07FF: BG2 tilemap (32x32 = 1024 words)
+//   0x0800-0x0BFF: BG3 tilemap (32x32 = 1024 words)
+//   0x0C00-0x0FFF: (unused - 1024 words)
+//   0x1000-0x4FFF: BG1/BG2 tiles (16384 words = 1024 4bpp 8x8 tiles)
+//   0x5000-0x5FFF: BG3 tiles (4096 words)
+//   0x6000+:       OBJ sprites (8192-aligned)
+
+// BG tilemaps - packed at start of VRAM
+let VRAM_METATILE_MAP_WADDR     = 0x0000;  // 32x32
+let VRAM_SECOND_LAYER_MAP_WADDR = 0x0400;  // 32x32
+
+// Textbox and UI (BG3) - map before tiles, tiles after BG1/BG2
+let VRAM_BG3_MAP_WADDR   = 0x0800;  // 32x32
+let VRAM_BG3_TILES_WADDR = 0x5000;  // After BG1/BG2 tiles
+
+// MetaTiles and Second Layer tiles (BG1/BG2)
+// Must be 4096-word aligned (BG12NBA_WALIGN)
+// With 16x16 native tile mode, tile N uses 8x8 tiles N, N+1, N+16, N+17
+// So max 256 16x16 tiles = 1024 8x8 tiles
+let VRAM_MTSL_TILES_WADDR = 0x1000;
+
+// MetaSprite tiles (OBJ)
+// Must be 8192-word aligned (OBJSEL_BASE_WALIGN)
+let VRAM_OBJ_WADDR       = 0x6000;
+
+// HUD metasprite (fixed OBJ tiles)
+let VRAM_OBJ_HUD_WADDR   = 0x6200;
+
+
+

@@ -1,0 +1,46 @@
+{
+  "dungeons": [
+    {
+      "name": "stage11",
+      "path": "dungeons/stage11",
+      "infinite": false,
+      "width": 1,
+      "height": 1,
+      "default_room": "00-00-room",
+      "starting_tile_x": 8,
+      "starting_tile_y": 7,
+      "tileset": "stage11",
+      "ms_spritesheet": "dungeon",
+      "song": "blank",
+      "transparent_color": "FF00FF00",
+      "source_image": "tilesets/stage11.png"
+    },
+    {
+      "name": "stage12",
+      "path": "dungeons/stage12",
+      "infinite": false,
+      "width": 1,
+      "height": 1,
+      "default_room": "00-00-room",
+      "starting_tile_x": 8,
+      "starting_tile_y": 7,
+      "tileset": "stage12",
+      "ms_spritesheet": "dungeon",
+      "song": "blank",
+      "transparent_color": "FF00FF00"
+    },
+    {
+      "name": "slum",
+      "path": "dungeons/slum",
+      "infinite": true,
+      "width": 3,
+      "height": 1,
+      "default_room": "00-00-room",
+      "starting_tile_x": 8,
+      "starting_tile_y": 7,
+      "tileset": "slum",
+      "ms_spritesheet": "dungeon",
+      "song": "blank"
+    }
+  ]
+}
